@@ -176,4 +176,13 @@
     <string name="pdf_no_bank_details">Dados bancários não informados.</string>
     <string name="pdf_footer">Invoice %1$s  |  Gerado pelo OnSite</string>
     <string name="pdf_page">Página %1$d de %2$d</string>
+    <!-- Home calendar -->
+    <string name="calendar_expand">Mostrar mês inteiro</string>
+    <string name="calendar_collapse">Mostrar semana</string>
+    <string name="calendar_previous">Anterior</string>
+    <string name="calendar_next">Próximo</string>
+    <string name="calendar_today">Hoje</string>
+    <string name="calendar_sessions_on">Sessões em %1$s</string>
+    <string name="calendar_no_sessions">Nenhuma sessão neste dia.</string>
+    <string name="calendar_day_total">Total: %1$s</string>
 </resources>

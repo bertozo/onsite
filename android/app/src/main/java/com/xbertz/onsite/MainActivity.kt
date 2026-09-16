@@ -18,6 +18,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -107,11 +108,16 @@ import com.xbertz.onsite.ui.theme.OnSiteTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.Duration
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle as JavaTextStyle
+import java.time.temporal.TemporalAdjusters
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -353,10 +359,12 @@ fun MainMenuScreen(
     onTrackerClick: () -> Unit,
     onReportsClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    profileViewModel: ProfileViewModel = viewModel()
+    profileViewModel: ProfileViewModel = viewModel(),
+    calendarViewModel: CalendarViewModel = viewModel()
 ) {
     val profile by profileViewModel.uiState.collectAsState()
     val profilePhoto = rememberBitmapFromFile(profile.photoPath)
+    val calendar by calendarViewModel.uiState.collectAsState()
 
     val secondaryActions = listOf(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
@@ -421,7 +429,19 @@ fun MainMenuScreen(
             }
         }
 
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(20.dp))
+
+        HomeCalendar(
+            state = calendar,
+            onSelectDate = calendarViewModel::selectDate,
+            onToggleExpanded = calendarViewModel::toggleExpanded,
+            onShift = calendarViewModel::shift,
+            onToday = calendarViewModel::goToToday
+        )
+        Spacer(Modifier.height(16.dp))
+        CalendarDaySessions(state = calendar)
+
+        Spacer(Modifier.height(24.dp))
 
         ElevatedCard(
             onClick = onTrackerClick,
@@ -504,6 +524,242 @@ private fun MenuCard(action: MenuAction, modifier: Modifier = Modifier) {
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Home calendar (week strip that expands to the month)
+// ---------------------------------------------------------------------------
+
+/** Month title + navigation, weekday labels and either the Mon–Sun strip or the full month grid. */
+@Composable
+private fun HomeCalendar(
+    state: CalendarUiState,
+    onSelectDate: (LocalDate) -> Unit,
+    onToggleExpanded: () -> Unit,
+    onShift: (forward: Boolean) -> Unit,
+    onToday: () -> Unit
+) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val today = remember { LocalDate.now() }
+    val title = remember(state.titleMonth, locale) {
+        val month = state.titleMonth.month.getDisplayName(JavaTextStyle.FULL_STANDALONE, locale)
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+        if (state.titleMonth.year == today.year) month else "$month ${state.titleMonth.year}"
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp).animateContentSize()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The whole title is the expand/collapse toggle, like a dropdown.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(onClick = onToggleExpanded)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        if (state.expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = stringResource(if (state.expanded) R.string.calendar_collapse else R.string.calendar_expand)
+                    )
+                }
+                IconButton(onClick = { onShift(false) }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = stringResource(R.string.calendar_previous))
+                }
+                IconButton(onClick = { onShift(true) }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = stringResource(R.string.calendar_next))
+                }
+                IconButton(onClick = onToday) {
+                    Icon(Icons.Filled.Today, contentDescription = stringResource(R.string.calendar_today))
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                DayOfWeek.entries.forEach { day ->
+                    Text(
+                        day.getDisplayName(JavaTextStyle.SHORT, locale).trimEnd('.').replaceFirstChar { it.titlecase(locale) },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+
+            val weeks: List<LocalDate> = if (state.expanded) {
+                // Every Monday from the one on/before the 1st up to the one covering the last day of the month.
+                val first = state.visibleMonth.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                val last = state.visibleMonth.atEndOfMonth()
+                generateSequence(first) { it.plusWeeks(1) }.takeWhile { it <= last }.toList()
+            } else {
+                listOf(state.weekStart)
+            }
+
+            weeks.forEach { monday ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    (0L until 7L).forEach { offset ->
+                        val date = monday.plusDays(offset)
+                        CalendarDayCell(
+                            date = date,
+                            selected = date == state.selectedDate,
+                            isToday = date == today,
+                            dimmed = state.expanded && YearMonth.from(date) != state.visibleMonth,
+                            hasSessions = date in state.daysWithSessions,
+                            onClick = { onSelectDate(date) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    date: LocalDate,
+    selected: Boolean,
+    isToday: Boolean,
+    dimmed: Boolean,
+    hasSessions: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val textColor = when {
+        selected -> MaterialTheme.colorScheme.onPrimary
+        dimmed -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        isToday -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(vertical = 2.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .clickable(onClick = onClick)
+        ) {
+            Text(
+                date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected || isToday) FontWeight.Bold else FontWeight.Normal,
+                color = textColor
+            )
+        }
+        // Marker for days that have sessions; kept as an empty slot otherwise so rows stay the same height.
+        Box(
+            modifier = Modifier
+                .size(5.dp)
+                .clip(CircleShape)
+                .background(
+                    if (hasSessions) (if (dimmed) textColor else MaterialTheme.colorScheme.primary) else Color.Transparent
+                )
+        )
+    }
+}
+
+/** The selected day's sessions under the calendar, read-only; editing stays on the tracker screen. */
+@Composable
+private fun CalendarDaySessions(state: CalendarUiState) {
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ENGLISH) }
+    val totalMillis = state.dayTotalMillis
+    val totalText = stringResource(
+        R.string.duration_format,
+        TimeUnit.MILLISECONDS.toHours(totalMillis),
+        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+    )
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                stringResource(R.string.calendar_sessions_on, state.selectedDate.format(dateFormatter)),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f)
+            )
+            if (state.daySessions.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.calendar_day_total, totalText),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (state.daySessions.isEmpty()) {
+            Text(
+                stringResource(R.string.calendar_no_sessions),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            state.daySessions.forEachIndexed { index, session ->
+                if (index > 0) Spacer(Modifier.height(8.dp))
+                CalendarSessionRow(session)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarSessionRow(session: TrackingSession) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val zone = remember { ZoneId.systemDefault() }
+    val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone).toLocalTime()
+    val end = session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
+    val durationMillis = session.durationMillis ?: 0L
+    val details = listOfNotNull(
+        session.companyName?.takeIf { it.isNotBlank() },
+        session.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "${start.format(timeFormatter)} – ${end?.format(timeFormatter) ?: ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
                 )
             }
         }
