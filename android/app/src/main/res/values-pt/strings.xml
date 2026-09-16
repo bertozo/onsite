@@ -185,4 +185,15 @@
     <string name="calendar_sessions_on">Sessões em %1$s</string>
     <string name="calendar_no_sessions">Nenhuma sessão neste dia.</string>
     <string name="calendar_day_total">Total: %1$s</string>
+    <!-- Planning -->
+    <string name="menu_planning">Planejamento</string>
+    <string name="planning_jobs">Trabalhos</string>
+    <string name="planning_empty">Toque em + para adicionar um trabalho neste dia.</string>
+    <string name="planning_add_job">Adicionar trabalho</string>
+    <string name="planning_edit_job">Editar trabalho</string>
+    <string name="planning_notes">Observações</string>
+    <string name="planning_end_time_optional">Hora final (opcional)</string>
+    <string name="planning_clear_end_time">Limpar hora final</string>
+    <string name="planning_none">Nenhum</string>
+    <string name="planning_details_required">Escolha uma empresa, local ou tipo de serviço, ou escreva uma observação.</string>
 </resources>

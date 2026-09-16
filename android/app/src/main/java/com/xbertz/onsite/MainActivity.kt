@@ -56,6 +56,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -100,6 +101,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xbertz.onsite.data.Company
 import com.xbertz.onsite.data.JobType
+import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
 import com.xbertz.onsite.invoice.buildInvoiceLines
@@ -152,7 +154,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Screen {
-    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS
+    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING
 }
 
 @Composable
@@ -171,6 +173,7 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
             onJobTypesClick = { screen = Screen.JOB_TYPES },
             onTrackerClick = { screen = Screen.TRACKER },
             onReportsClick = { screen = Screen.REPORTS },
+            onPlanningClick = { screen = Screen.PLANNING },
             onSettingsClick = { screen = Screen.SETTINGS }
         )
         Screen.TRACKER -> TrackerScreen(onBack = { screen = Screen.MENU })
@@ -180,6 +183,7 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU })
         Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
         Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.MENU }, viewModel = settingsViewModel)
+        Screen.PLANNING -> PlanningScreen(onBack = { screen = Screen.MENU })
     }
 }
 
@@ -358,6 +362,7 @@ fun MainMenuScreen(
     onJobTypesClick: () -> Unit,
     onTrackerClick: () -> Unit,
     onReportsClick: () -> Unit,
+    onPlanningClick: () -> Unit,
     onSettingsClick: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel(),
     calendarViewModel: CalendarViewModel = viewModel()
@@ -420,6 +425,13 @@ fun MainMenuScreen(
                     }
                 }
             }
+            IconButton(onClick = onPlanningClick) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = stringResource(R.string.menu_planning),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
             IconButton(onClick = onSettingsClick) {
                 Icon(
                     Icons.Filled.Settings,
@@ -431,8 +443,8 @@ fun MainMenuScreen(
 
         Spacer(Modifier.height(20.dp))
 
-        HomeCalendar(
-            state = calendar,
+        CalendarPanel(
+            state = calendar.calendar,
             onSelectDate = calendarViewModel::selectDate,
             onToggleExpanded = calendarViewModel::toggleExpanded,
             onShift = calendarViewModel::shift,
@@ -531,12 +543,12 @@ private fun MenuCard(action: MenuAction, modifier: Modifier = Modifier) {
 }
 
 // ---------------------------------------------------------------------------
-// Home calendar (week strip that expands to the month)
+// Calendar panel (week strip that expands to the month) + home day sessions
 // ---------------------------------------------------------------------------
 
 /** Month title + navigation, weekday labels and either the Mon–Sun strip or the full month grid. */
 @Composable
-private fun HomeCalendar(
+private fun CalendarPanel(
     state: CalendarUiState,
     onSelectDate: (LocalDate) -> Unit,
     onToggleExpanded: () -> Unit,
@@ -614,7 +626,7 @@ private fun HomeCalendar(
                             selected = date == state.selectedDate,
                             isToday = date == today,
                             dimmed = state.expanded && YearMonth.from(date) != state.visibleMonth,
-                            hasSessions = date in state.daysWithSessions,
+                            hasSessions = date in state.markedDays,
                             onClick = { onSelectDate(date) },
                             modifier = Modifier.weight(1f)
                         )
@@ -674,7 +686,7 @@ private fun CalendarDayCell(
 
 /** The selected day's sessions under the calendar, read-only; editing stays on the tracker screen. */
 @Composable
-private fun CalendarDaySessions(state: CalendarUiState) {
+private fun CalendarDaySessions(state: HomeCalendarUiState) {
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ENGLISH) }
     val totalMillis = state.dayTotalMillis
     val totalText = stringResource(
@@ -686,7 +698,7 @@ private fun CalendarDaySessions(state: CalendarUiState) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                stringResource(R.string.calendar_sessions_on, state.selectedDate.format(dateFormatter)),
+                stringResource(R.string.calendar_sessions_on, state.calendar.selectedDate.format(dateFormatter)),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -764,6 +776,369 @@ private fun CalendarSessionRow(session: TrackingSession) {
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Planning (jobs scheduled per calendar day)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val companies by viewModel.companies.collectAsState()
+    val sites by viewModel.sites.collectAsState()
+    val jobTypes by viewModel.jobTypes.collectAsState()
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMM", locale) }
+
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editingJob by remember { mutableStateOf<PlannedJob?>(null) }
+    var deletingJob by remember { mutableStateOf<PlannedJob?>(null) }
+
+    if (showAddDialog) {
+        EditPlannedJobDialog(
+            existing = null,
+            initialDate = uiState.calendar.selectedDate,
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { job ->
+                viewModel.saveJob(job)
+                viewModel.selectDate(job.date)
+                showAddDialog = false
+            }
+        )
+    }
+    editingJob?.let { job ->
+        EditPlannedJobDialog(
+            existing = job,
+            initialDate = job.date,
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            onDismiss = { editingJob = null },
+            onConfirm = { updated ->
+                viewModel.saveJob(updated)
+                editingJob = null
+            }
+        )
+    }
+    deletingJob?.let { job ->
+        DeletePlannedJobDialog(
+            job = job,
+            onDismiss = { deletingJob = null },
+            onConfirm = {
+                viewModel.deleteJob(job)
+                deletingJob = null
+            }
+        )
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_planning), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            CalendarPanel(
+                state = uiState.calendar,
+                onSelectDate = viewModel::selectDate,
+                onToggleExpanded = viewModel::toggleExpanded,
+                onShift = viewModel::shift,
+                onToday = viewModel::goToToday
+            )
+
+            Spacer(Modifier.height(20.dp))
+            Text(
+                uiState.calendar.selectedDate.format(dayFormatter).trimEnd('.').uppercase(locale),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader(title = stringResource(R.string.planning_jobs), count = uiState.dayJobs.size)
+                Spacer(Modifier.weight(1f))
+                FilledIconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.planning_add_job))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            if (uiState.dayJobs.isEmpty()) {
+                EmptyState(text = stringResource(R.string.planning_empty))
+            } else {
+                uiState.dayJobs.forEachIndexed { index, job ->
+                    if (index > 0) Spacer(Modifier.height(10.dp))
+                    PlannedJobRow(
+                        job = job,
+                        onEditClick = { editingJob = job },
+                        onDeleteClick = { deletingJob = job }
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+@Composable
+private fun PlannedJobRow(job: PlannedJob, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val timeText = job.endTime?.let { "${job.startTime.format(timeFormatter)} – ${it.format(timeFormatter)}" }
+        ?: job.startTime.format(timeFormatter)
+    val details = listOfNotNull(
+        job.companyName?.takeIf { it.isNotBlank() },
+        job.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer) {
+                Text(
+                    timeText,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val title = job.siteLabel?.takeIf { it.isNotBlank() }
+                    ?: details.ifBlank { null }
+                    ?: job.notes.orEmpty()
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (details.isNotBlank() && title != details) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (!job.notes.isNullOrBlank() && title != job.notes) {
+                    Text(job.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                }
+            }
+            IconButton(onClick = onEditClick) {
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+/** Add (when [existing] is null) or edit a planned job. Company/site/job type are optional here, unlike a tracked session. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditPlannedJobDialog(
+    existing: PlannedJob?,
+    initialDate: LocalDate,
+    companies: List<Company>,
+    sites: List<Site>,
+    jobTypes: List<JobType>,
+    onDismiss: () -> Unit,
+    onConfirm: (PlannedJob) -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+
+    var companyName by remember { mutableStateOf(existing?.companyName) }
+    var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
+    var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
+    var date by remember { mutableStateOf(initialDate) }
+    var startTime by remember { mutableStateOf(existing?.startTime ?: LocalTime.of(7, 0)) }
+    var endTime by remember { mutableStateOf(existing?.endTime) }
+    var notes by remember { mutableStateOf(existing?.notes.orEmpty()) }
+    var companyExpanded by remember { mutableStateOf(false) }
+    var siteExpanded by remember { mutableStateOf(false) }
+    var jobTypeExpanded by remember { mutableStateOf(false) }
+
+    val canSave = companyName != null || siteLabel != null || jobTypeLabel != null || notes.isNotBlank()
+    val none = stringResource(R.string.planning_none)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.EventNote, contentDescription = null) },
+        title = { Text(stringResource(if (existing == null) R.string.planning_add_job else R.string.planning_edit_job)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedButton(
+                    onClick = { showDatePicker(context, date) { date = it } },
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${stringResource(R.string.date)}: ${date.format(dateFormatter)}")
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, startTime) { startTime = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(startTime.format(timeFormatter))
+                    }
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, endTime ?: startTime.plusHours(1)) { endTime = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(endTime?.format(timeFormatter) ?: "–")
+                    }
+                    if (endTime != null) {
+                        IconButton(onClick = { endTime = null }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.planning_clear_end_time), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.start_time),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        stringResource(R.string.planning_end_time_optional),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.company),
+                    icon = Icons.Filled.Business,
+                    value = companyName ?: stringResource(R.string.select_company),
+                    expanded = companyExpanded,
+                    enabled = true,
+                    onExpandedChange = { companyExpanded = it },
+                    onDismiss = { companyExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { companyName = null; companyExpanded = false })
+                    companies.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { companyName = option.name; companyExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.site),
+                    icon = Icons.Filled.Place,
+                    value = siteLabel ?: stringResource(R.string.select_site),
+                    expanded = siteExpanded,
+                    enabled = true,
+                    onExpandedChange = { siteExpanded = it },
+                    onDismiss = { siteExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { siteLabel = null; siteExpanded = false })
+                    sites.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.label) }, onClick = { siteLabel = option.label; siteExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.job_description),
+                    icon = Icons.Filled.Work,
+                    value = jobTypeLabel ?: stringResource(R.string.select_job_type),
+                    expanded = jobTypeExpanded,
+                    enabled = true,
+                    onExpandedChange = { jobTypeExpanded = it },
+                    onDismiss = { jobTypeExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { jobTypeLabel = null; jobTypeExpanded = false })
+                    jobTypes.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { jobTypeLabel = option.name; jobTypeExpanded = false })
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.planning_notes)) },
+                    minLines = 2,
+                    maxLines = 4,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (!canSave) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.planning_details_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        PlannedJob(
+                            id = existing?.id ?: 0L,
+                            dateEpochDay = date.toEpochDay(),
+                            startMinute = startTime.toSecondOfDay() / 60,
+                            endMinute = endTime?.let { it.toSecondOfDay() / 60 },
+                            companyName = companyName,
+                            siteLabel = siteLabel,
+                            jobTypeLabel = jobTypeLabel,
+                            notes = notes.trim().ifBlank { null }
+                        )
+                    )
+                },
+                enabled = canSave
+            ) {
+                Text(stringResource(if (existing == null) R.string.add else R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeletePlannedJobDialog(job: PlannedJob, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(R.string.delete_entry)) },
+        text = {
+            val label = job.siteLabel?.takeIf { it.isNotBlank() }
+            Text(
+                if (label != null) stringResource(R.string.delete_entry_confirm_named, label)
+                else stringResource(R.string.delete_entry_confirm)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }
 
 // ---------------------------------------------------------------------------

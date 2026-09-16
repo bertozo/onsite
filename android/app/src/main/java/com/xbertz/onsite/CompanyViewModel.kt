@@ -31,6 +31,7 @@ class CompanyViewModel(application: Application) : AndroidViewModel(application)
 
     private val dao = AppDatabase.getInstance(application).companyDao()
     private val sessionDao = AppDatabase.getInstance(application).trackingSessionDao()
+    private val plannedJobDao = AppDatabase.getInstance(application).plannedJobDao()
 
     private val _uiState = MutableStateFlow(CompanyFormUiState())
     val uiState: StateFlow<CompanyFormUiState> = _uiState
@@ -103,6 +104,7 @@ class CompanyViewModel(application: Application) : AndroidViewModel(application)
             )
             if (newName != state.original.name) {
                 sessionDao.renameCompany(oldName = state.original.name, newName = newName)
+                plannedJobDao.renameCompany(oldName = state.original.name, newName = newName)
             }
             _editState.value = null
         }
