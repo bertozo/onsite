@@ -182,9 +182,6 @@
     <string name="calendar_previous">Anterior</string>
     <string name="calendar_next">Siguiente</string>
     <string name="calendar_today">Hoy</string>
-    <string name="calendar_sessions_on">Sesiones del %1$s</string>
-    <string name="calendar_no_sessions">No hay sesiones en este día.</string>
-    <string name="calendar_day_total">Total: %1$s</string>
     <!-- Planning -->
     <string name="menu_planning">Planificación</string>
     <string name="planning_jobs">Trabajos</string>

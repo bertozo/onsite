@@ -364,12 +364,10 @@ fun MainMenuScreen(
     onReportsClick: () -> Unit,
     onPlanningClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    profileViewModel: ProfileViewModel = viewModel(),
-    calendarViewModel: CalendarViewModel = viewModel()
+    profileViewModel: ProfileViewModel = viewModel()
 ) {
     val profile by profileViewModel.uiState.collectAsState()
     val profilePhoto = rememberBitmapFromFile(profile.photoPath)
-    val calendar by calendarViewModel.uiState.collectAsState()
 
     val secondaryActions = listOf(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
@@ -441,19 +439,7 @@ fun MainMenuScreen(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
-
-        CalendarPanel(
-            state = calendar.calendar,
-            onSelectDate = calendarViewModel::selectDate,
-            onToggleExpanded = calendarViewModel::toggleExpanded,
-            onShift = calendarViewModel::shift,
-            onToday = calendarViewModel::goToToday
-        )
-        Spacer(Modifier.height(16.dp))
-        CalendarDaySessions(state = calendar)
-
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
 
         ElevatedCard(
             onClick = onTrackerClick,
@@ -543,7 +529,7 @@ private fun MenuCard(action: MenuAction, modifier: Modifier = Modifier) {
 }
 
 // ---------------------------------------------------------------------------
-// Calendar panel (week strip that expands to the month) + home day sessions
+// Calendar panel (week strip that expands to the month)
 // ---------------------------------------------------------------------------
 
 /** Month title + navigation, weekday labels and either the Mon–Sun strip or the full month grid. */
@@ -681,100 +667,6 @@ private fun CalendarDayCell(
                     if (hasSessions) (if (dimmed) textColor else MaterialTheme.colorScheme.primary) else Color.Transparent
                 )
         )
-    }
-}
-
-/** The selected day's sessions under the calendar, read-only; editing stays on the tracker screen. */
-@Composable
-private fun CalendarDaySessions(state: HomeCalendarUiState) {
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ENGLISH) }
-    val totalMillis = state.dayTotalMillis
-    val totalText = stringResource(
-        R.string.duration_format,
-        TimeUnit.MILLISECONDS.toHours(totalMillis),
-        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
-    )
-
-    Column {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                stringResource(R.string.calendar_sessions_on, state.calendar.selectedDate.format(dateFormatter)),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.weight(1f)
-            )
-            if (state.daySessions.isNotEmpty()) {
-                Text(
-                    stringResource(R.string.calendar_day_total, totalText),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        if (state.daySessions.isEmpty()) {
-            Text(
-                stringResource(R.string.calendar_no_sessions),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        } else {
-            state.daySessions.forEachIndexed { index, session ->
-                if (index > 0) Spacer(Modifier.height(8.dp))
-                CalendarSessionRow(session)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CalendarSessionRow(session: TrackingSession) {
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
-    val zone = remember { ZoneId.systemDefault() }
-    val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone).toLocalTime()
-    val end = session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
-    val durationMillis = session.durationMillis ?: 0L
-    val details = listOfNotNull(
-        session.companyName?.takeIf { it.isNotBlank() },
-        session.jobTypeLabel?.takeIf { it.isNotBlank() }
-    ).joinToString(" · ")
-
-    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                if (details.isNotEmpty()) {
-                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Text(
-                    "${start.format(timeFormatter)} – ${end?.format(timeFormatter) ?: ""}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Text(
-                    stringResource(
-                        R.string.duration_format,
-                        TimeUnit.MILLISECONDS.toHours(durationMillis),
-                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                )
-            }
-        }
     }
 }
 

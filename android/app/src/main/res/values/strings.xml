@@ -186,9 +186,6 @@
     <string name="calendar_previous">Previous</string>
     <string name="calendar_next">Next</string>
     <string name="calendar_today">Today</string>
-    <string name="calendar_sessions_on">Sessions on %1$s</string>
-    <string name="calendar_no_sessions">No sessions on this day.</string>
-    <string name="calendar_day_total">Total: %1$s</string>
     <!-- Planning -->
     <string name="menu_planning">Planning</string>
     <string name="planning_jobs">Jobs</string>
