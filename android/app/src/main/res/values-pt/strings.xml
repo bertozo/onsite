@@ -176,4 +176,48 @@
     <string name="pdf_no_bank_details">Dados bancários não informados.</string>
     <string name="pdf_footer">Invoice %1$s  |  Gerado pelo OnSite</string>
     <string name="pdf_page">Página %1$d de %2$d</string>
+    <!-- Home calendar -->
+    <string name="calendar_expand">Mostrar mês inteiro</string>
+    <string name="calendar_collapse">Mostrar semana</string>
+    <string name="calendar_previous">Anterior</string>
+    <string name="calendar_next">Próximo</string>
+    <string name="calendar_today">Hoje</string>
+    <!-- Planning -->
+    <string name="menu_planning">Planejamento</string>
+    <string name="planning_jobs">Trabalhos</string>
+    <string name="planning_empty">Toque em + para adicionar um trabalho neste dia.</string>
+    <string name="planning_add_job">Adicionar trabalho</string>
+    <string name="planning_edit_job">Editar trabalho</string>
+    <string name="planning_notes">Observações</string>
+    <string name="planning_end_time_optional">Hora final (opcional)</string>
+    <string name="planning_clear_end_time">Limpar hora final</string>
+    <string name="planning_none">Nenhum</string>
+    <string name="planning_details_required">Escolha uma empresa, local ou tipo de serviço, ou escreva uma observação.</string>
+    <string name="planning_sessions">Sessões</string>
+    <string name="planning_no_sessions">Nenhuma sessão registrada neste dia.</string>
+    <string name="calendar_day_total">Total: %1$s</string>
+    <!-- Site photo (timestamp camera) -->
+    <string name="menu_photo">Foto do local</string>
+    <string name="menu_photo_subtitle">Com data e hora</string>
+    <string name="photo_settings">Configurações do carimbo</string>
+    <string name="photo_timestamp_position">Posição da data e hora</string>
+    <string name="photo_position_top">Topo da foto</string>
+    <string name="photo_position_bottom">Parte de baixo da foto</string>
+    <string name="photo_logo">Logotipo (canto inferior direito)</string>
+    <string name="photo_logo_none">Sem logotipo — as fotos são salvas sem ele.</string>
+    <string name="photo_choose_logo">Escolher logotipo</string>
+    <string name="photo_remove_logo">Remover</string>
+    <string name="photo_take">Tirar foto</string>
+    <string name="photo_processing">Aplicando carimbo…</string>
+    <string name="photo_last">Última foto</string>
+    <string name="photo_saved">Salva na galeria em Pictures/OnSite.</string>
+    <string name="photo_share">Compartilhar foto</string>
+    <string name="photo_error_save">Não foi possível carimbar ou salvar a foto.</string>
+    <string name="photo_storage_permission">É necessária a permissão de armazenamento para salvar as fotos na galeria.</string>
+    <string name="photo_open_camera">Abrir câmera</string>
+    <string name="photo_camera_permission">É necessária a permissão da câmera para tirar fotos.</string>
+    <string name="photo_close_camera">Fechar câmera</string>
+    <string name="photo_camera_error">Não foi possível iniciar a câmera.</string>
+    <string name="photo_label">Legenda</string>
+    <string name="photo_label_hint">Impressa acima da data, ex.: nome do local ou o que a foto mostra</string>
 </resources>

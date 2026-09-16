@@ -25,6 +25,7 @@ class JobTypeViewModel(application: Application) : AndroidViewModel(application)
 
     private val dao = AppDatabase.getInstance(application).jobTypeDao()
     private val sessionDao = AppDatabase.getInstance(application).trackingSessionDao()
+    private val plannedJobDao = AppDatabase.getInstance(application).plannedJobDao()
 
     private val _uiState = MutableStateFlow(JobTypeFormUiState())
     val uiState: StateFlow<JobTypeFormUiState> = _uiState
@@ -76,6 +77,7 @@ class JobTypeViewModel(application: Application) : AndroidViewModel(application)
             // Sessions store the job type by name, so keep past sessions pointing at the renamed type.
             if (newName != state.original.name) {
                 sessionDao.renameJobType(oldName = state.original.name, newName = newName)
+                plannedJobDao.renameJobType(oldName = state.original.name, newName = newName)
             }
             _editState.value = null
         }

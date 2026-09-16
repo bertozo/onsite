@@ -176,4 +176,48 @@
     <string name="pdf_no_bank_details">Datos bancarios no proporcionados.</string>
     <string name="pdf_footer">Factura %1$s  |  Generado por OnSite</string>
     <string name="pdf_page">Página %1$d de %2$d</string>
+    <!-- Home calendar -->
+    <string name="calendar_expand">Mostrar mes completo</string>
+    <string name="calendar_collapse">Mostrar semana</string>
+    <string name="calendar_previous">Anterior</string>
+    <string name="calendar_next">Siguiente</string>
+    <string name="calendar_today">Hoy</string>
+    <!-- Planning -->
+    <string name="menu_planning">Planificación</string>
+    <string name="planning_jobs">Trabajos</string>
+    <string name="planning_empty">Toca + para agregar un trabajo en este día.</string>
+    <string name="planning_add_job">Agregar trabajo</string>
+    <string name="planning_edit_job">Editar trabajo</string>
+    <string name="planning_notes">Notas</string>
+    <string name="planning_end_time_optional">Hora de fin (opcional)</string>
+    <string name="planning_clear_end_time">Borrar hora de fin</string>
+    <string name="planning_none">Ninguno</string>
+    <string name="planning_details_required">Elige una empresa, sitio o tipo de trabajo, o escribe una nota.</string>
+    <string name="planning_sessions">Sesiones</string>
+    <string name="planning_no_sessions">Ninguna sesión registrada en este día.</string>
+    <string name="calendar_day_total">Total: %1$s</string>
+    <!-- Site photo (timestamp camera) -->
+    <string name="menu_photo">Foto del sitio</string>
+    <string name="menu_photo_subtitle">Con fecha y hora</string>
+    <string name="photo_settings">Ajustes del sello</string>
+    <string name="photo_timestamp_position">Posición de la fecha y hora</string>
+    <string name="photo_position_top">Parte superior de la foto</string>
+    <string name="photo_position_bottom">Parte inferior de la foto</string>
+    <string name="photo_logo">Logotipo (esquina inferior derecha)</string>
+    <string name="photo_logo_none">Sin logotipo — las fotos se guardan sin él.</string>
+    <string name="photo_choose_logo">Elegir logotipo</string>
+    <string name="photo_remove_logo">Quitar</string>
+    <string name="photo_take">Tomar foto</string>
+    <string name="photo_processing">Aplicando sello…</string>
+    <string name="photo_last">Última foto</string>
+    <string name="photo_saved">Guardada en la galería en Pictures/OnSite.</string>
+    <string name="photo_share">Compartir foto</string>
+    <string name="photo_error_save">No se pudo sellar o guardar la foto.</string>
+    <string name="photo_storage_permission">Se necesita el permiso de almacenamiento para guardar las fotos en la galería.</string>
+    <string name="photo_open_camera">Abrir cámara</string>
+    <string name="photo_camera_permission">Se necesita el permiso de la cámara para tomar fotos.</string>
+    <string name="photo_close_camera">Cerrar cámara</string>
+    <string name="photo_camera_error">No se pudo iniciar la cámara.</string>
+    <string name="photo_label">Etiqueta</string>
+    <string name="photo_label_hint">Impresa sobre la fecha, p. ej. nombre del sitio o qué muestra la foto</string>
 </resources>

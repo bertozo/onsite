@@ -7,6 +7,7 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -17,7 +18,17 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.clickable
@@ -55,6 +66,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -85,33 +97,53 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xbertz.onsite.data.Company
 import com.xbertz.onsite.data.JobType
+import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
 import com.xbertz.onsite.invoice.buildInvoiceLines
+import com.xbertz.onsite.photo.PhotoStamper
+import com.xbertz.onsite.photo.TimestampPosition
 import com.xbertz.onsite.report.ReportColumn
 import com.xbertz.onsite.ui.theme.OnSiteTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
+import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.Duration
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle as JavaTextStyle
+import java.time.temporal.TemporalAdjusters
+import java.io.File
+import java.time.LocalDateTime
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -146,7 +178,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Screen {
-    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS
+    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO
 }
 
 @Composable
@@ -165,6 +197,8 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
             onJobTypesClick = { screen = Screen.JOB_TYPES },
             onTrackerClick = { screen = Screen.TRACKER },
             onReportsClick = { screen = Screen.REPORTS },
+            onPlanningClick = { screen = Screen.PLANNING },
+            onPhotoClick = { screen = Screen.PHOTO },
             onSettingsClick = { screen = Screen.SETTINGS }
         )
         Screen.TRACKER -> TrackerScreen(onBack = { screen = Screen.MENU })
@@ -174,12 +208,18 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU })
         Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
         Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.MENU }, viewModel = settingsViewModel)
+        Screen.PLANNING -> PlanningScreen(onBack = { screen = Screen.MENU })
+        Screen.PHOTO -> PhotoScreen(onBack = { screen = Screen.MENU })
     }
 }
 
 // ---------------------------------------------------------------------------
 // Shared building blocks
 // ---------------------------------------------------------------------------
+
+// Planner day markers: fixed colours so they read the same in both themes (the scheme's error colour turns pink in dark mode).
+private val PlannerMarkerGreen = Color(0xFF43A047)
+private val PlannerMarkerRed = Color(0xFFE53935)
 
 private data class MenuAction(
     val title: String,
@@ -352,6 +392,8 @@ fun MainMenuScreen(
     onJobTypesClick: () -> Unit,
     onTrackerClick: () -> Unit,
     onReportsClick: () -> Unit,
+    onPlanningClick: () -> Unit,
+    onPhotoClick: () -> Unit,
     onSettingsClick: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel()
 ) {
@@ -362,7 +404,8 @@ fun MainMenuScreen(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
         MenuAction(stringResource(R.string.menu_companies), stringResource(R.string.menu_companies_subtitle), Icons.Filled.Business, onCompaniesClick),
         MenuAction(stringResource(R.string.menu_sites), stringResource(R.string.menu_sites_subtitle), Icons.Filled.Place, onSitesClick),
-        MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick)
+        MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick),
+        MenuAction(stringResource(R.string.menu_photo), stringResource(R.string.menu_photo_subtitle), Icons.Filled.PhotoCamera, onPhotoClick)
     )
 
     Column(
@@ -411,6 +454,13 @@ fun MainMenuScreen(
                         }
                     }
                 }
+            }
+            IconButton(onClick = onPlanningClick) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = stringResource(R.string.menu_planning),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             IconButton(onClick = onSettingsClick) {
                 Icon(
@@ -508,6 +558,1049 @@ private fun MenuCard(action: MenuAction, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar panel (week strip that expands to the month)
+// ---------------------------------------------------------------------------
+
+/** Month title + navigation, weekday labels and either the Mon–Sun strip or the full month grid. */
+@Composable
+private fun CalendarPanel(
+    state: CalendarUiState,
+    onSelectDate: (LocalDate) -> Unit,
+    onToggleExpanded: () -> Unit,
+    onShift: (forward: Boolean) -> Unit,
+    onToday: () -> Unit
+) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val today = remember { LocalDate.now() }
+    val title = remember(state.titleMonth, locale) {
+        val month = state.titleMonth.month.getDisplayName(JavaTextStyle.FULL_STANDALONE, locale)
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+        if (state.titleMonth.year == today.year) month else "$month ${state.titleMonth.year}"
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp).animateContentSize()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The whole title is the expand/collapse toggle, like a dropdown.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(onClick = onToggleExpanded)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        if (state.expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = stringResource(if (state.expanded) R.string.calendar_collapse else R.string.calendar_expand)
+                    )
+                }
+                IconButton(onClick = { onShift(false) }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = stringResource(R.string.calendar_previous))
+                }
+                IconButton(onClick = { onShift(true) }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = stringResource(R.string.calendar_next))
+                }
+                IconButton(onClick = onToday) {
+                    Icon(Icons.Filled.Today, contentDescription = stringResource(R.string.calendar_today))
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                DayOfWeek.entries.forEach { day ->
+                    Text(
+                        day.getDisplayName(JavaTextStyle.SHORT, locale).trimEnd('.').replaceFirstChar { it.titlecase(locale) },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+
+            val weeks: List<LocalDate> = if (state.expanded) {
+                // Every Monday from the one on/before the 1st up to the one covering the last day of the month.
+                val first = state.visibleMonth.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                val last = state.visibleMonth.atEndOfMonth()
+                generateSequence(first) { it.plusWeeks(1) }.takeWhile { it <= last }.toList()
+            } else {
+                listOf(state.weekStart)
+            }
+
+            weeks.forEach { monday ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    (0L until 7L).forEach { offset ->
+                        val date = monday.plusDays(offset)
+                        CalendarDayCell(
+                            date = date,
+                            selected = date == state.selectedDate,
+                            isToday = date == today,
+                            dimmed = state.expanded && YearMonth.from(date) != state.visibleMonth,
+                            hasSessions = date in state.markedDays,
+                            onClick = { onSelectDate(date) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    date: LocalDate,
+    selected: Boolean,
+    isToday: Boolean,
+    dimmed: Boolean,
+    hasSessions: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val today = remember { LocalDate.now() }
+    val textColor = when {
+        selected -> MaterialTheme.colorScheme.onPrimary
+        dimmed -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        isToday -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(vertical = 2.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .clickable(onClick = onClick)
+        ) {
+            Text(
+                date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected || isToday) FontWeight.Bold else FontWeight.Normal,
+                color = textColor
+            )
+        }
+        // Marker for days that have jobs: blue when the day is past, green today, red when still ahead.
+        // Kept as an empty slot otherwise so rows stay the same height.
+        val markerColor = when {
+            !hasSessions -> Color.Transparent
+            date.isBefore(today) -> MaterialTheme.colorScheme.primary
+            date == today -> PlannerMarkerGreen
+            else -> PlannerMarkerRed
+        }
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (dimmed) markerColor.copy(alpha = 0.4f) else markerColor)
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Planning (jobs scheduled per calendar day)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val companies by viewModel.companies.collectAsState()
+    val sites by viewModel.sites.collectAsState()
+    val jobTypes by viewModel.jobTypes.collectAsState()
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMM", locale) }
+
+    var showAddDialog by remember { mutableStateOf(false) }
+    var editingJob by remember { mutableStateOf<PlannedJob?>(null) }
+    var deletingJob by remember { mutableStateOf<PlannedJob?>(null) }
+
+    if (showAddDialog) {
+        EditPlannedJobDialog(
+            existing = null,
+            initialDate = uiState.calendar.selectedDate,
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { job ->
+                viewModel.saveJob(job)
+                viewModel.selectDate(job.date)
+                showAddDialog = false
+            }
+        )
+    }
+    editingJob?.let { job ->
+        EditPlannedJobDialog(
+            existing = job,
+            initialDate = job.date,
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            onDismiss = { editingJob = null },
+            onConfirm = { updated ->
+                viewModel.saveJob(updated)
+                editingJob = null
+            }
+        )
+    }
+    deletingJob?.let { job ->
+        DeletePlannedJobDialog(
+            job = job,
+            onDismiss = { deletingJob = null },
+            onConfirm = {
+                viewModel.deleteJob(job)
+                deletingJob = null
+            }
+        )
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_planning), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            CalendarPanel(
+                state = uiState.calendar,
+                onSelectDate = viewModel::selectDate,
+                onToggleExpanded = viewModel::toggleExpanded,
+                onShift = viewModel::shift,
+                onToday = viewModel::goToToday
+            )
+
+            Spacer(Modifier.height(20.dp))
+            Text(
+                uiState.calendar.selectedDate.format(dayFormatter).trimEnd('.').uppercase(locale),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader(title = stringResource(R.string.planning_jobs), count = uiState.dayJobs.size)
+                Spacer(Modifier.weight(1f))
+                FilledIconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.planning_add_job))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            if (uiState.dayJobs.isEmpty()) {
+                EmptyState(text = stringResource(R.string.planning_empty))
+            } else {
+                uiState.dayJobs.forEachIndexed { index, job ->
+                    if (index > 0) Spacer(Modifier.height(10.dp))
+                    PlannedJobRow(
+                        job = job,
+                        onEditClick = { editingJob = job },
+                        onDeleteClick = { deletingJob = job }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            PlanningDaySessions(state = uiState)
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** The selected day's completed sessions, read-only; editing stays on the tracker screen. */
+@Composable
+private fun PlanningDaySessions(state: PlanningUiState) {
+    val totalMillis = state.dayTotalMillis
+    val totalText = stringResource(
+        R.string.duration_format,
+        TimeUnit.MILLISECONDS.toHours(totalMillis),
+        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+    )
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionHeader(title = stringResource(R.string.planning_sessions), count = state.daySessions.size)
+            Spacer(Modifier.weight(1f))
+            if (state.daySessions.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.calendar_day_total, totalText),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (state.daySessions.isEmpty()) {
+            EmptyState(text = stringResource(R.string.planning_no_sessions))
+        } else {
+            state.daySessions.forEachIndexed { index, session ->
+                if (index > 0) Spacer(Modifier.height(8.dp))
+                PlanningSessionRow(session)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanningSessionRow(session: TrackingSession) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val zone = remember { ZoneId.systemDefault() }
+    val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone).toLocalTime()
+    val end = session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
+    val durationMillis = session.durationMillis ?: 0L
+    val details = listOfNotNull(
+        session.companyName?.takeIf { it.isNotBlank() },
+        session.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "${start.format(timeFormatter)} – ${end?.format(timeFormatter) ?: ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun PlannedJobRow(job: PlannedJob, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val timeText = job.endTime?.let { "${job.startTime.format(timeFormatter)} – ${it.format(timeFormatter)}" }
+        ?: job.startTime.format(timeFormatter)
+    val details = listOfNotNull(
+        job.companyName?.takeIf { it.isNotBlank() },
+        job.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer) {
+                Text(
+                    timeText,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val title = job.siteLabel?.takeIf { it.isNotBlank() }
+                    ?: details.ifBlank { null }
+                    ?: job.notes.orEmpty()
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (details.isNotBlank() && title != details) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (!job.notes.isNullOrBlank() && title != job.notes) {
+                    Text(job.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                }
+            }
+            IconButton(onClick = onEditClick) {
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+/** Add (when [existing] is null) or edit a planned job. Company/site/job type are optional here, unlike a tracked session. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditPlannedJobDialog(
+    existing: PlannedJob?,
+    initialDate: LocalDate,
+    companies: List<Company>,
+    sites: List<Site>,
+    jobTypes: List<JobType>,
+    onDismiss: () -> Unit,
+    onConfirm: (PlannedJob) -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+
+    var companyName by remember { mutableStateOf(existing?.companyName) }
+    var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
+    var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
+    var date by remember { mutableStateOf(initialDate) }
+    var startTime by remember { mutableStateOf(existing?.startTime ?: LocalTime.of(7, 0)) }
+    var endTime by remember { mutableStateOf(existing?.endTime) }
+    var notes by remember { mutableStateOf(existing?.notes.orEmpty()) }
+    var companyExpanded by remember { mutableStateOf(false) }
+    var siteExpanded by remember { mutableStateOf(false) }
+    var jobTypeExpanded by remember { mutableStateOf(false) }
+
+    val canSave = companyName != null || siteLabel != null || jobTypeLabel != null || notes.isNotBlank()
+    val none = stringResource(R.string.planning_none)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.EventNote, contentDescription = null) },
+        title = { Text(stringResource(if (existing == null) R.string.planning_add_job else R.string.planning_edit_job)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedButton(
+                    onClick = { showDatePicker(context, date) { date = it } },
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${stringResource(R.string.date)}: ${date.format(dateFormatter)}")
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, startTime) { startTime = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(startTime.format(timeFormatter))
+                    }
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, endTime ?: startTime.plusHours(1)) { endTime = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(endTime?.format(timeFormatter) ?: "–")
+                    }
+                    if (endTime != null) {
+                        IconButton(onClick = { endTime = null }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.planning_clear_end_time), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.start_time),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        stringResource(R.string.planning_end_time_optional),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.company),
+                    icon = Icons.Filled.Business,
+                    value = companyName ?: stringResource(R.string.select_company),
+                    expanded = companyExpanded,
+                    enabled = true,
+                    onExpandedChange = { companyExpanded = it },
+                    onDismiss = { companyExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { companyName = null; companyExpanded = false })
+                    companies.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { companyName = option.name; companyExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.site),
+                    icon = Icons.Filled.Place,
+                    value = siteLabel ?: stringResource(R.string.select_site),
+                    expanded = siteExpanded,
+                    enabled = true,
+                    onExpandedChange = { siteExpanded = it },
+                    onDismiss = { siteExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { siteLabel = null; siteExpanded = false })
+                    sites.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.label) }, onClick = { siteLabel = option.label; siteExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.job_description),
+                    icon = Icons.Filled.Work,
+                    value = jobTypeLabel ?: stringResource(R.string.select_job_type),
+                    expanded = jobTypeExpanded,
+                    enabled = true,
+                    onExpandedChange = { jobTypeExpanded = it },
+                    onDismiss = { jobTypeExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { jobTypeLabel = null; jobTypeExpanded = false })
+                    jobTypes.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { jobTypeLabel = option.name; jobTypeExpanded = false })
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.planning_notes)) },
+                    minLines = 2,
+                    maxLines = 4,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (!canSave) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.planning_details_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        PlannedJob(
+                            id = existing?.id ?: 0L,
+                            dateEpochDay = date.toEpochDay(),
+                            startMinute = startTime.toSecondOfDay() / 60,
+                            endMinute = endTime?.let { it.toSecondOfDay() / 60 },
+                            companyName = companyName,
+                            siteLabel = siteLabel,
+                            jobTypeLabel = jobTypeLabel,
+                            notes = notes.trim().ifBlank { null }
+                        )
+                    )
+                },
+                enabled = canSave
+            ) {
+                Text(stringResource(if (existing == null) R.string.add else R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeletePlannedJobDialog(job: PlannedJob, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(R.string.delete_entry)) },
+        text = {
+            val label = job.siteLabel?.takeIf { it.isNotBlank() }
+            Text(
+                if (label != null) stringResource(R.string.delete_entry_confirm_named, label)
+                else stringResource(R.string.delete_entry_confirm)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Site photo (timestamp camera)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val logoBitmap = rememberBitmapFromFile(uiState.logoPath)
+    val lastPhoto = rememberBitmapFromUri(uiState.lastPhotoUri)
+
+    var cameraOpen by rememberSaveable { mutableStateOf(false) }
+    var cameraDenied by remember { mutableStateOf(false) }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraDenied = !granted
+        if (granted) cameraOpen = true
+    }
+    fun openCamera() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (granted) cameraOpen = true else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+    val logoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
+        uri?.let { viewModel.onLogoPicked(it) }
+    }
+    // Below Android 10 the gallery write needs the legacy storage permission; newer versions need nothing.
+    val needsStoragePermission = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q
+    var storageDenied by remember { mutableStateOf(false) }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        storageDenied = !granted
+        if (granted) openCamera()
+    }
+    fun takePhoto() {
+        val granted = !needsStoragePermission || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) openCamera()
+        else storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+
+    if (cameraOpen) {
+        StampCameraView(
+            position = uiState.position,
+            label = uiState.label,
+            logo = logoBitmap,
+            onCapture = { file ->
+                cameraOpen = false
+                viewModel.onPhotoCaptured(file)
+            },
+            newCaptureFile = viewModel::newCaptureFile,
+            onError = {
+                cameraOpen = false
+                viewModel.onCameraError()
+            },
+            onClose = { cameraOpen = false }
+        )
+        return
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_photo), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                    Text(
+                        stringResource(R.string.photo_settings),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Text(
+                        stringResource(R.string.photo_timestamp_position),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.VerticalAlignTop,
+                        title = stringResource(R.string.photo_position_top),
+                        subtitle = null,
+                        selected = uiState.position == TimestampPosition.TOP,
+                        onClick = { viewModel.setPosition(TimestampPosition.TOP) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.VerticalAlignBottom,
+                        title = stringResource(R.string.photo_position_bottom),
+                        subtitle = null,
+                        selected = uiState.position == TimestampPosition.BOTTOM,
+                        onClick = { viewModel.setPosition(TimestampPosition.BOTTOM) }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    OutlinedTextField(
+                        value = uiState.label,
+                        onValueChange = viewModel::setLabel,
+                        label = { Text(stringResource(R.string.photo_label)) },
+                        supportingText = { Text(stringResource(R.string.photo_label_hint)) },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    Text(
+                        stringResource(R.string.photo_logo),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(64.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (logoBitmap != null) {
+                                    Image(
+                                        bitmap = logoBitmap,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.Image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (logoBitmap == null) {
+                                Text(
+                                    stringResource(R.string.photo_logo_none),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(6.dp))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        logoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Text(stringResource(R.string.photo_choose_logo))
+                                }
+                                if (uiState.logoPath != null) {
+                                    TextButton(onClick = { viewModel.clearLogo() }) {
+                                        Text(stringResource(R.string.photo_remove_logo), color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { takePhoto() },
+                enabled = !uiState.isProcessing,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                if (uiState.isProcessing) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photo_processing))
+                } else {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photo_open_camera), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            val errorRes = uiState.errorRes
+            if (errorRes != null || storageDenied || cameraDenied) {
+                Spacer(Modifier.height(12.dp))
+                InfoBanner(
+                    icon = Icons.Filled.Warning,
+                    text = stringResource(
+                        errorRes ?: if (cameraDenied) R.string.photo_camera_permission else R.string.photo_storage_permission
+                    ),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+
+            if (uiState.lastPhotoUri != null) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(title = stringResource(R.string.photo_last))
+                Spacer(Modifier.height(8.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column {
+                        if (lastPhoto != null) {
+                            Image(
+                                bitmap = lastPhoto,
+                                contentDescription = null,
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                stringResource(R.string.photo_saved),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "image/jpeg"
+                                        putExtra(Intent.EXTRA_STREAM, uiState.lastPhotoUri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.photo_share)))
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.photo_share))
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * In-app camera (CameraX) showing the date/time band and logo live over the viewfinder, in the
+ * same proportions [PhotoStamper] uses, so what the user sees is what gets saved.
+ *
+ * Preview and capture are both 4:3 and the preview is letterboxed (FIT_CENTER), so the overlay
+ * can be laid out on the exact rectangle the frame occupies.
+ */
+@Composable
+private fun StampCameraView(
+    position: TimestampPosition,
+    label: String,
+    logo: ImageBitmap?,
+    onCapture: (File) -> Unit,
+    newCaptureFile: () -> File,
+    onError: () -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setResolutionSelector(
+                ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
+            )
+            .build()
+    }
+    var capturing by remember { mutableStateOf(false) }
+
+    // Live clock for the band; the saved photo uses the time of the shutter press.
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = LocalDateTime.now()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val lines = PhotoViewModel.stampLines(label, now)
+
+    BackHandler(onBack = onClose)
+
+    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            // Rectangle the 4:3 (or 3:4 in portrait) frame occupies inside the letterboxed preview.
+            val frameRatio = if (isLandscape) 4f / 3f else 3f / 4f
+            val boxRatio = maxWidth / maxHeight
+            val frameWidth = if (boxRatio > frameRatio) maxHeight * frameRatio else maxWidth
+            val frameHeight = if (boxRatio > frameRatio) maxHeight else maxWidth / frameRatio
+
+            AndroidView(
+                factory = { ctx ->
+                    PreviewView(ctx).apply {
+                        scaleType = PreviewView.ScaleType.FIT_CENTER
+                        val provider = ProcessCameraProvider.getInstance(ctx)
+                        provider.addListener({
+                            try {
+                                val preview = Preview.Builder()
+                                    .setResolutionSelector(
+                                        ResolutionSelector.Builder()
+                                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                                            .build()
+                                    )
+                                    .build()
+                                    .also { it.setSurfaceProvider(surfaceProvider) }
+                                val cameraProvider = provider.get()
+                                cameraProvider.unbindAll()
+                                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                            } catch (e: Exception) {
+                                onError()
+                            }
+                        }, ContextCompat.getMainExecutor(ctx))
+                    }
+                },
+                update = { view -> view.display?.let { imageCapture.targetRotation = it.rotation } },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Overlay drawn on the frame rectangle only, mirroring PhotoStamper's geometry.
+            Box(modifier = Modifier.size(frameWidth, frameHeight).align(Alignment.Center)) {
+                val textSize = frameWidth * PhotoStamper.TEXT_SIZE_FRACTION
+                val padding = frameWidth * PhotoStamper.PADDING_FRACTION
+                val lineHeight = textSize * PhotoStamper.LINE_HEIGHT_FACTOR
+                val blockHeight = padding * 2 + lineHeight * lines.size
+                val density = LocalDensity.current
+                val textSizeSp = with(density) { textSize.toSp() }
+                val lineHeightSp = with(density) { lineHeight.toSp() }
+                val strokePx = with(density) { (textSize * PhotoStamper.STROKE_FACTOR).toPx() }
+                val shadowPx = with(density) { (textSize / 8f).toPx() }
+                val baseStyle = TextStyle(
+                    fontSize = textSizeSp,
+                    lineHeight = lineHeightSp,
+                    fontWeight = FontWeight.Bold,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(if (position == TimestampPosition.TOP) Alignment.TopCenter else Alignment.BottomCenter)
+                        .padding(padding)
+                ) {
+                    lines.forEach { line ->
+                        // Dark outline + white fill, same as PhotoStamper, so the text reads on any background.
+                        Box(modifier = Modifier.height(lineHeight), contentAlignment = Alignment.CenterStart) {
+                            Text(
+                                line,
+                                style = baseStyle.copy(color = Color.Black, drawStyle = Stroke(width = strokePx)),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                line,
+                                style = baseStyle.copy(
+                                    color = Color.White,
+                                    shadow = Shadow(Color.Black.copy(alpha = 0.7f), Offset(0f, shadowPx / 2), shadowPx)
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+                if (logo != null) {
+                    val logoWidth = frameWidth * PhotoStamper.LOGO_WIDTH_FRACTION
+                    val logoHeight = logoWidth * logo.height / logo.width
+                    val bottomInset = if (position == TimestampPosition.BOTTOM) blockHeight + padding else padding
+                    Image(
+                        bitmap = logo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = padding, bottom = bottomInset)
+                            .size(logoWidth, logoHeight)
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.photo_close_camera), tint = Color.White)
+            }
+            // Shutter
+            Surface(
+                onClick = {
+                    if (capturing) return@Surface
+                    capturing = true
+                    val file = newCaptureFile()
+                    imageCapture.takePicture(
+                        ImageCapture.OutputFileOptions.Builder(file).build(),
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                capturing = false
+                                onCapture(file)
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                capturing = false
+                                file.delete()
+                                onError()
+                            }
+                        }
+                    )
+                },
+                enabled = !capturing,
+                shape = CircleShape,
+                color = Color.White,
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (capturing) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                    } else {
+                        Surface(shape = CircleShape, color = Color.White, border = BorderStroke(3.dp, Color.Black), modifier = Modifier.size(60.dp)) {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Loads a gallery image for preview, downsampled so a full-size photo doesn't blow the UI heap. */
+@Composable
+private fun rememberBitmapFromUri(uri: Uri?): ImageBitmap? {
+    val context = LocalContext.current
+    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(uri) {
+        bitmap = if (uri == null) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1200) sample *= 2
+                val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    return bitmap
 }
 
 // ---------------------------------------------------------------------------
