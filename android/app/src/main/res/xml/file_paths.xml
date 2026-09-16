@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!-- Invoice PDFs are written to cacheDir/invoices and shared through the FileProvider. -->
+    <cache-path name="invoices" path="invoices/" />
+</paths>

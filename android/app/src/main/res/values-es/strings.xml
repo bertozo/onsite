@@ -1,0 +1,179 @@
+<resources>
+    <!-- Común -->
+    <string name="back">Atrás</string>
+    <string name="edit">Editar</string>
+    <string name="delete">Eliminar</string>
+    <string name="save">Guardar</string>
+    <string name="cancel">Cancelar</string>
+    <string name="ok">OK</string>
+    <string name="duration_format">%1$dh %2$dmin</string>
+
+    <!-- Menú principal -->
+    <string name="app_tagline">Registra el tiempo de trabajo por ubicación</string>
+    <string name="settings">Ajustes</string>
+    <string name="start_tracking">Iniciar registro</string>
+    <string name="start_tracking_subtitle">Registrar una nueva sesión de trabajo</string>
+    <string name="manage">Gestionar</string>
+    <string name="menu_reports">Informes</string>
+    <string name="menu_reports_subtitle">Historial de sesiones</string>
+    <string name="menu_companies">Empresas</string>
+    <string name="menu_companies_subtitle">Gestionar clientes</string>
+    <string name="menu_sites">Sitios</string>
+    <string name="menu_sites_subtitle">Gestionar ubicaciones</string>
+    <string name="menu_job_types">Tipos de trabajo</string>
+    <string name="menu_job_types_subtitle">Gestionar servicios</string>
+    <string name="menu_profile">Perfil</string>
+    <string name="menu_profile_subtitle">Tus datos</string>
+
+    <!-- Ajustes -->
+    <string name="appearance">Apariencia</string>
+    <string name="theme_system">Predeterminado del sistema</string>
+    <string name="theme_system_subtitle">Seguir el tema del teléfono</string>
+    <string name="theme_light">Claro</string>
+    <string name="theme_light_subtitle">Usar siempre el tema claro</string>
+    <string name="theme_dark">Oscuro</string>
+    <string name="theme_dark_subtitle">Usar siempre el tema oscuro</string>
+    <string name="language">Idioma</string>
+    <string name="language_system">Predeterminado del sistema</string>
+    <string name="language_system_subtitle">Seguir el idioma del teléfono</string>
+    <string name="language_english">English</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_spanish">Español</string>
+
+    <!-- Informes / factura -->
+    <string name="reports_empty">No hay registros en el período seleccionado.</string>
+    <string name="date">Fecha</string>
+    <string name="label">Sitio</string>
+    <string name="hours">Horas</string>
+    <string name="total">TOTAL</string>
+    <string name="generate_invoice">Generar factura</string>
+    <string name="share_invoice">Compartir factura</string>
+    <string name="invoice_register_company_first">Registra una empresa antes de facturar.</string>
+    <string name="bill_to">Facturar a</string>
+    <string name="select_company">Selecciona una empresa</string>
+    <string name="invoice_number">Número de factura</string>
+    <string name="hourly_rate_optional">Tarifa por hora (opcional)</string>
+    <string name="enter_valid_amount">Introduce un importe válido</string>
+    <string name="leave_blank_hours_only">Déjalo en blanco para listar solo las horas</string>
+    <string name="invoice_no_days_for_company">No hay días trabajados para %1$s en el período seleccionado.</string>
+    <string name="invoice_days_to_invoice">Se facturarán %1$d día(s) trabajado(s).</string>
+    <string name="job_type">Tipo de trabajo</string>
+    <string name="columns">Columnas</string>
+    <string name="report_columns">Columnas del informe</string>
+    <string name="report_columns_hint">Fecha y Horas se muestran siempre. El PDF de la factura usa las mismas columnas.</string>
+    <string name="invoice_columns_info">Columnas: %1$s</string>
+    <string name="generate_pdf">Generar PDF</string>
+    <string name="invoice_error_profile">Completa tu perfil antes de generar una factura.</string>
+    <string name="invoice_error_generate">No se pudo generar el PDF: %1$s</string>
+
+    <!-- Empresas -->
+    <string name="invalid_abn">Introduce un ABN válido de 11 dígitos</string>
+    <string name="invalid_bsb">El BSB debe tener 6 dígitos (p. ej. 062-000)</string>
+    <string name="invalid_account_number">El número de cuenta debe tener de 6 a 10 dígitos</string>
+    <string name="invalid_phone">Introduce un teléfono válido</string>
+    <string name="invalid_email">Introduce un correo válido</string>
+    <string name="new_company">Nueva empresa</string>
+    <string name="company_name">Nombre de la empresa</string>
+    <string name="company_abn">Número de registro (ABN)</string>
+    <string name="contact_phone">Teléfono de contacto</string>
+    <string name="billing_email">Correo de facturación</string>
+    <string name="save_company">Guardar empresa</string>
+    <string name="registered_companies">Empresas registradas</string>
+    <string name="companies_empty">Aún no hay empresas. Añade la primera arriba.</string>
+    <string name="abn_value">ABN %1$s</string>
+    <string name="edit_company">Editar empresa</string>
+
+    <!-- Tipos de trabajo -->
+    <string name="new_job_type">Nuevo tipo de trabajo</string>
+    <string name="job_type_hint">Tipo de trabajo (p. ej. Limpieza de ventanas)</string>
+    <string name="save_job_type">Guardar tipo de trabajo</string>
+    <string name="registered_job_types">Tipos de trabajo registrados</string>
+    <string name="edit_job_type">Editar tipo de trabajo</string>
+    <string name="job_types_empty">Aún no hay tipos de trabajo. Añade el primero arriba.</string>
+
+    <!-- Sitios -->
+    <string name="new_site">Nuevo sitio</string>
+    <string name="site_label">Nombre del sitio</string>
+    <string name="address">Dirección</string>
+    <string name="address_placeholder">Empieza a escribir una dirección…</string>
+    <string name="site_select_address_set">Selecciona una dirección de la lista para definir la ubicación del sitio.</string>
+    <string name="site_select_address_update">Selecciona una dirección de la lista para actualizar la ubicación del sitio.</string>
+    <string name="save_site">Guardar sitio</string>
+    <string name="registered_sites">Sitios registrados</string>
+    <string name="sites_empty">Aún no hay sitios. Añade el primero arriba.</string>
+    <string name="edit_site">Editar sitio</string>
+
+    <!-- Perfil -->
+    <string name="profile_photo">Foto de perfil</string>
+    <string name="change_photo">Cambiar foto</string>
+    <string name="personal_info">Datos personales</string>
+    <string name="full_name">Nombre completo</string>
+    <string name="phone">Teléfono</string>
+    <string name="email">Correo electrónico</string>
+    <string name="role_position">Cargo/Puesto</string>
+    <string name="profile_abn">ABN</string>
+    <string name="banking_details">Datos bancarios</string>
+    <string name="bsb">BSB</string>
+    <string name="account_number">Número de cuenta</string>
+    <string name="profile_saved">Perfil guardado.</string>
+
+    <!-- GeoTracker -->
+    <string name="location_permission_required">Se necesita acceso a la ubicación para usar GeoTracker.</string>
+    <string name="missing_companies">empresas</string>
+    <string name="missing_sites">sitios</string>
+    <string name="missing_job_types">tipos de trabajo</string>
+    <string name="setup_missing_banner">Configura %1$s desde el menú principal antes de iniciar una sesión.</string>
+    <string name="session_details">Detalles de la sesión</string>
+    <string name="company">Empresa</string>
+    <string name="site">Sitio</string>
+    <string name="select_site">Selecciona un sitio</string>
+    <string name="job_description">Descripción del trabajo</string>
+    <string name="select_job_type">Selecciona un tipo de trabajo</string>
+    <string name="start">Iniciar</string>
+    <string name="stop">Detener</string>
+    <string name="history">Historial</string>
+    <string name="sessions_empty">Aún no hay sesiones registradas.</string>
+    <string name="location_error">No se pudo obtener la ubicación actual. Comprueba que el GPS esté activado.</string>
+    <!-- Manual session entry -->
+    <string name="add">Agregar</string>
+    <string name="add_session_manually">Agregar manualmente</string>
+    <string name="add_session">Agregar sesión</string>
+    <string name="start_time">Hora de inicio</string>
+    <string name="end_time">Hora de fin</string>
+    <string name="duration">Duración</string>
+    <string name="duration_required">La duración debe ser mayor que cero.</string>
+    <string name="edit_duration">Editar duración</string>
+    <string name="minutes">Minutos</string>
+    <string name="delete_entry">Eliminar registro</string>
+    <string name="delete_entry_confirm_named">¿Seguro que quieres eliminar el registro \"%1$s\"?</string>
+    <string name="delete_entry_confirm">¿Seguro que quieres eliminar este registro?</string>
+    <string name="session_finished">Sesión finalizada</string>
+    <string name="session_site">Sitio: %1$s</string>
+    <string name="session_company">Empresa: %1$s</string>
+    <string name="session_job_type">Tipo de trabajo: %1$s</string>
+    <string name="session_start">Inicio: %1$s</string>
+    <string name="session_end">Fin: %1$s</string>
+    <string name="session_duration">Duración: %1$dh %2$dmin</string>
+    <string name="session_start_location">Ubicación inicial: %1$s, %2$s</string>
+    <string name="session_end_location">Ubicación final: %1$s, %2$s</string>
+
+    <!-- PDF de la factura -->
+    <string name="pdf_title">FACTURA</string>
+    <string name="pdf_invoice_no">Factura n.º</string>
+    <string name="pdf_issue_date">Fecha de emisión</string>
+    <string name="pdf_period">Período</string>
+    <string name="pdf_from">DE</string>
+    <string name="pdf_bill_to">FACTURAR A</string>
+    <string name="pdf_col_rate">TARIFA</string>
+    <string name="pdf_col_amount">IMPORTE</string>
+    <string name="pdf_total_hours">Total de horas</string>
+    <string name="pdf_hourly_rate">Tarifa por hora</string>
+    <string name="pdf_total_due">TOTAL A PAGAR</string>
+    <string name="pdf_payment_details">DATOS DE PAGO</string>
+    <string name="pdf_account_name">Titular: %1$s</string>
+    <string name="pdf_bsb">BSB: %1$s</string>
+    <string name="pdf_account_number">Número de cuenta: %1$s</string>
+    <string name="pdf_no_bank_details">Datos bancarios no proporcionados.</string>
+    <string name="pdf_footer">Factura %1$s  |  Generado por GeoTracker</string>
+    <string name="pdf_page">Página %1$d de %2$d</string>
+</resources>

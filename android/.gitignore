@@ -1,0 +1,21 @@
+*.iml
+.gradle
+/local.properties
+/.idea/
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/app/build
+/app/release
+
+# Kotlin/Gradle caches and build outputs
+.kotlin/
+*.apk
+*.aab
+*.log
+
+# The wrapper jar is intentionally not committed (see CLAUDE.md); Android Studio regenerates it on sync
+gradle/wrapper/gradle-wrapper.jar
