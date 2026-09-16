@@ -1,40 +1,40 @@
 # OnSite
 
-App Android (Kotlin + Jetpack Compose) para registrar horas trabalhadas por local e gerar invoices em PDF. Feito para prestadores de serviço autônomos (formato australiano: ABN, BSB).
+Android app (Kotlin + Jetpack Compose) for logging hours worked per site and generating invoice PDFs. Built for self-employed tradespeople in Australia (ABN, BSB).
 
-## Funcionalidades
+## Features
 
-- **Start tracking** — escolha empresa, local e tipo de serviço e toque em **Start**; o app grava a posição GPS. **Stop** encerra a sessão e mostra o resumo. Também é possível **adicionar sessões manualmente** (data, início, duração).
-- **Cadastros** — Companies (clientes, com ABN/telefone/e-mail), Sites (locais, com busca de endereço), Job types (tipos de serviço). Todos com edição e exclusão.
-- **Profile** — seus dados (nome, cargo, telefone, e-mail, ABN, foto) e dados bancários (BSB, conta) usados na invoice.
-- **Reports** — sessões por período, com colunas configuráveis (Data, Local, Endereço, Empresa, Tipo de serviço, Início, Fim, Horas).
-- **Invoice em PDF** — a partir do report, escolha a empresa, número e valor/hora; o PDF usa um template fixo (A4) com as mesmas colunas do report e é aberto no share sheet.
-- **Idiomas** — inglês, português e espanhol, selecionáveis em Settings (além de tema claro/escuro).
+- **Start tracking** — pick a company, site and job type and tap **Start**; the app records the GPS position. **Stop** ends the session and shows a summary. Sessions can also be **added manually** (date, start time, duration).
+- **Records** — Companies (clients, with ABN/phone/email), Sites (locations, with address search), Job types. All can be edited and deleted.
+- **Profile** — your details (name, title, phone, email, ABN, photo) and bank details (BSB, account) printed on the invoice.
+- **Reports** — sessions by period, with configurable columns (Date, Site, Address, Company, Job type, Start, End, Hours).
+- **PDF invoice** — from a report, choose the company, invoice number and hourly rate; the PDF uses a fixed A4 template with the same columns as the report and opens in the share sheet.
+- **Languages** — English, Portuguese and Spanish, selectable in Settings (plus light/dark theme).
 
-Os dados ficam salvos localmente (Room/SQLite). Não há rastreamento em segundo plano.
+Data is stored locally (Room/SQLite). There is no background tracking.
 
-## Como rodar
+## Running
 
-1. Abra a pasta do projeto no **Android Studio** (Iguana/Koala ou superior) e deixe o Gradle sincronizar. O `gradle/wrapper/gradle-wrapper.jar` não é versionado — o Android Studio o gera no primeiro sync (ou rode `gradle wrapper` na raiz).
-2. Conecte um dispositivo físico (recomendado para GPS real) ou um emulador com localização configurada.
-3. Run ▶ e aceite a permissão de localização.
+1. Open the project folder in **Android Studio** (Iguana/Koala or newer) and let Gradle sync. `gradle/wrapper/gradle-wrapper.jar` is not committed — Android Studio generates it on the first sync (or run `gradle wrapper` in the project root).
+2. Connect a physical device (recommended for real GPS) or an emulator with a configured location.
+3. Run ▶ and grant the location permission.
 
-Pela linha de comando: `./gradlew assembleDebug` (APK) ou `./gradlew installDebug` (instala no dispositivo conectado).
+From the command line: `./gradlew assembleDebug` (APK) or `./gradlew installDebug` (installs on the connected device).
 
-## Estrutura
+## Structure
 
 ```
 app/src/main/java/com/rodolfobertozo/onsite/
-├── MainActivity.kt            # toda a UI Compose (menu, telas, diálogos)
-├── *ViewModel.kt              # um ViewModel por área (tracker, companies, sites, job types, profile, invoice, report, settings)
-├── AppLocale.kt               # seleção de idioma (SharedPreferences + attachBaseContext)
-├── Validators.kt              # regras de ABN, BSB, conta, telefone, e-mail
-├── AddressSearch.kt           # busca de endereços (Photon/OSM, restrita à Austrália)
-├── data/                      # Room: entidades, DAOs, AppDatabase (migrações)
-├── invoice/                   # InvoiceData (linhas por dia) + InvoicePdfTemplate (layout A4)
-└── report/ReportColumn.kt     # template de colunas compartilhado por report e PDF
+├── MainActivity.kt            # all Compose UI (menu, screens, dialogs)
+├── *ViewModel.kt              # one ViewModel per area (tracker, companies, sites, job types, profile, invoice, report, settings)
+├── AppLocale.kt               # language selection (SharedPreferences + attachBaseContext)
+├── Validators.kt              # ABN, BSB, account, phone and email rules
+├── AddressSearch.kt           # address search (Photon/OSM, restricted to Australia)
+├── data/                      # Room: entities, DAOs, AppDatabase (migrations)
+├── invoice/                   # InvoiceData (one line per day) + InvoicePdfTemplate (A4 layout)
+└── report/ReportColumn.kt     # column template shared by the report and the PDF
 ```
 
-## Busca de endereço
+## Address search
 
-Usa a API pública [Photon](https://photon.komoot.io) (OpenStreetMap), limitada ao bounding box da Austrália. Requer `INTERNET`.
+Uses the public [Photon](https://photon.komoot.io) API (OpenStreetMap), limited to Australia's bounding box. Requires `INTERNET`.
