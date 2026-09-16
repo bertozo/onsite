@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.rodolfobertozo.geotracker"
+    namespace = "com.rodolfobertozo.onsite"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.rodolfobertozo.geotracker"
+        applicationId = "com.rodolfobertozo.onsite"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

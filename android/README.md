@@ -1,30 +1,40 @@
-# GeoTracker
+# OnSite
 
-App Android (Kotlin + Jetpack Compose) para registrar quanto tempo você passa em um local, usando GPS.
+App Android (Kotlin + Jetpack Compose) para registrar horas trabalhadas por local e gerar invoices em PDF. Feito para prestadores de serviço autônomos (formato australiano: ABN, BSB).
 
-## Como funciona
+## Funcionalidades
 
-1. Ao abrir o app, ele pede permissão de localização e busca as coordenadas GPS atuais.
-2. Você pode digitar uma **label opcional** (ex: "Escritório", "Academia").
-3. Toque em **Start**: salva um registro com data/hora, latitude/longitude e a label.
-4. O botão vira **Stop**. Ao tocar, salva outro registro com o horário de término (mesma localização/label).
-5. O **Histórico** abaixo lista todos os registros, e calcula automaticamente a duração de cada sessão concluída (tempo entre Start e Stop).
+- **Start tracking** — escolha empresa, local e tipo de serviço e toque em **Start**; o app grava a posição GPS. **Stop** encerra a sessão e mostra o resumo. Também é possível **adicionar sessões manualmente** (data, início, duração).
+- **Cadastros** — Companies (clientes, com ABN/telefone/e-mail), Sites (locais, com busca de endereço), Job types (tipos de serviço). Todos com edição e exclusão.
+- **Profile** — seus dados (nome, cargo, telefone, e-mail, ABN, foto) e dados bancários (BSB, conta) usados na invoice.
+- **Reports** — sessões por período, com colunas configuráveis (Data, Local, Endereço, Empresa, Tipo de serviço, Início, Fim, Horas).
+- **Invoice em PDF** — a partir do report, escolha a empresa, número e valor/hora; o PDF usa um template fixo (A4) com as mesmas colunas do report e é aberto no share sheet.
+- **Idiomas** — inglês, português e espanhol, selecionáveis em Settings (além de tema claro/escuro).
 
-Os dados ficam salvos localmente no dispositivo em um banco Room (SQLite), então o histórico persiste entre aberturas do app.
+Os dados ficam salvos localmente (Room/SQLite). Não há rastreamento em segundo plano.
 
-## Como abrir e rodar
+## Como rodar
 
-1. Abra a pasta `geolocation-app` no **Android Studio** (versão recente, Iguana/Koala ou superior).
-2. O Android Studio vai sincronizar o Gradle automaticamente. Como este projeto foi criado sem o Gradle instalado na máquina, o arquivo `gradle/wrapper/gradle-wrapper.jar` não existe ainda — na primeira sincronização o Android Studio oferece para criá-lo/baixar a distribuição do Gradle automaticamente (aceite o prompt). Se preferir gerar manualmente e tiver o Gradle instalado, rode `gradle wrapper` na raiz do projeto.
-3. Conecte um dispositivo físico (recomendado, para GPS real) ou use um emulador com localização configurada (Extended Controls > Location).
-4. Rode o app (Run ▶). Aceite a permissão de localização quando solicitado.
+1. Abra a pasta do projeto no **Android Studio** (Iguana/Koala ou superior) e deixe o Gradle sincronizar. O `gradle/wrapper/gradle-wrapper.jar` não é versionado — o Android Studio o gera no primeiro sync (ou rode `gradle wrapper` na raiz).
+2. Conecte um dispositivo físico (recomendado para GPS real) ou um emulador com localização configurada.
+3. Run ▶ e aceite a permissão de localização.
 
-## Estrutura principal
+Pela linha de comando: `./gradlew assembleDebug` (APK) ou `./gradlew installDebug` (instala no dispositivo conectado).
 
-- `app/src/main/java/.../MainActivity.kt` — UI em Jetpack Compose (tela principal, botões Start/Stop, histórico).
-- `app/src/main/java/.../LocationTrackerViewModel.kt` — lógica de obtenção de localização (FusedLocationProviderClient) e gravação dos registros.
-- `app/src/main/java/.../data/` — entidade Room (`LocationRecord`), DAO e banco de dados.
+## Estrutura
 
-## Permissões
+```
+app/src/main/java/com/rodolfobertozo/onsite/
+├── MainActivity.kt            # toda a UI Compose (menu, telas, diálogos)
+├── *ViewModel.kt              # um ViewModel por área (tracker, companies, sites, job types, profile, invoice, report, settings)
+├── AppLocale.kt               # seleção de idioma (SharedPreferences + attachBaseContext)
+├── Validators.kt              # regras de ABN, BSB, conta, telefone, e-mail
+├── AddressSearch.kt           # busca de endereços (Photon/OSM, restrita à Austrália)
+├── data/                      # Room: entidades, DAOs, AppDatabase (migrações)
+├── invoice/                   # InvoiceData (linhas por dia) + InvoicePdfTemplate (layout A4)
+└── report/ReportColumn.kt     # template de colunas compartilhado por report e PDF
+```
 
-O app usa apenas `ACCESS_FINE_LOCATION` e `ACCESS_COARSE_LOCATION` (localização em primeiro plano). Não há rastreamento em segundo plano.
+## Busca de endereço
+
+Usa a API pública [Photon](https://photon.komoot.io) (OpenStreetMap), limitada ao bounding box da Austrália. Requer `INTERNET`.

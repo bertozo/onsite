@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "GeoTracker"
+rootProject.name = "OnSite"
 include(":app")

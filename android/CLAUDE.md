@@ -4,28 +4,31 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-GeoTracker — an Android app (Kotlin + Jetpack Compose) that lets a user record how long they spend at a location using GPS. Tapping **Start** saves a timestamped record (lat/lon + optional label); tapping **Stop** saves a matching end record. History is listed with computed session durations. All comments/strings in the codebase are in Portuguese (pt-BR); keep new UI text and comments consistent with that unless told otherwise.
+OnSite (package `com.rodolfobertozo.onsite`) — an Android app (Kotlin + Jetpack Compose) for a self-employed tradesperson in Australia to log work sessions per site (GPS or manual entry), keep clients/sites/job types, and generate invoice PDFs. UI strings live in `res/values*/strings.xml` in English (default), Portuguese (`values-pt`) and Spanish (`values-es`); **never hardcode user-facing text in Kotlin** — add a key to all three files. Code comments are in English.
 
 ## Build & run
 
-- Open the project root in Android Studio (Iguana/Koala+) and let it sync Gradle — the `gradle/wrapper/gradle-wrapper.jar` binary is intentionally not committed; Android Studio downloads/creates it on first sync (accept the prompt). If working from the CLI instead, run `gradle wrapper` once to generate it, then use `./gradlew`.
-- Build debug APK: `./gradlew assembleDebug`
-- Install on a connected device/emulator: `./gradlew installDebug`
-- There is no test source set yet (no `app/src/test` or `app/src/androidTest`), so there are no test/lint commands to run.
-- GPS testing requires either a physical device or an emulator with a location set via Extended Controls > Location. There is no background location tracking — only foreground (`ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`).
+- Open the project root in Android Studio and let it sync Gradle. `gradle/wrapper/gradle-wrapper.jar` is intentionally not committed; Android Studio generates it on first sync.
+- CLI (Windows/Git Bash): the wrapper needs a JDK 17–21, e.g. `export JAVA_HOME="$HOME/.jdks/jbr-21.0.11"` (the JBR bundled with Android Studio is too new for Gradle 8.14). Then `./gradlew assembleDebug` or `./gradlew installDebug`.
+- No test source sets yet; verification is a compile + install on the connected device (`adb` at `$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe`).
+- Location is foreground only (`ACCESS_FINE_LOCATION`/`ACCESS_COARSE_LOCATION`); `INTERNET` is used only for address search.
 
 ## Architecture
 
-Single-screen MVVM app, all under `app/src/main/java/com/rodolfobertozo/geotracker/`:
+MVVM, everything under `app/src/main/java/com/rodolfobertozo/onsite/`:
 
-- `MainActivity.kt` — the entire UI in one Composable (`GeoTrackerScreen`). Handles the runtime location-permission flow directly (via `rememberLauncherForActivityResult`) and renders state from the ViewModel: current lat/lon, label input, Start/Stop button, and a `LazyColumn` history list.
-- `LocationTrackerViewModel.kt` — an `AndroidViewModel` holding a `TrackerUiState` (`MutableStateFlow`). Fetches a one-shot location via `FusedLocationProviderClient.getCurrentLocation(...)` (not continuous updates). `startTracking()`/`stopTracking()` each insert one `LocationRecord` row (type START or STOP) rather than updating a single session row — a "session" is reconstructed at read time.
-- `data/` — Room persistence:
-  - `LocationRecord.kt` — the entity (`location_records` table) plus the `EventType { START, STOP }` enum.
-  - `LocationDao.kt` — insert, and two queries: all records descending by time, and the most recent record (used on ViewModel init to restore whether a session is currently active — active means the latest record is a START with no matching STOP yet).
-  - `AppDatabase.kt` — singleton Room database (`geotracker.db`) via double-checked-locking `getInstance()`.
-  - `Converters.kt` — Room TypeConverter for `EventType` <-> String.
+- `MainActivity.kt` — **all** Compose UI: `AppRoot` switches between `Screen` values (menu, tracker, reports, companies, sites, job types, profile, settings); each screen is a composable in the same file, plus its dialogs. `MainActivity.attachBaseContext` wraps the context with `LocaleManager` so the chosen language applies before resources are read; a language change calls `recreate()` and `AppRoot` keeps the current screen via `rememberSaveable`.
+- ViewModels are `AndroidViewModel`s, one per area: `LocationTrackerViewModel` (start/stop with GPS, manual sessions, edit/delete), `CompanyViewModel`, `SiteViewModel` (address search with debounce), `JobTypeViewModel`, `ProfileViewModel`, `InvoiceViewModel` (PDF generation + sequential invoice number), `ReportViewModel` (column selection), `SettingsViewModel` (theme + language). UI state flows out via `StateFlow`; screens never mutate state directly.
+- ViewModel messages are **string resource ids** (`@StringRes Int` or `UiMessage(resId, args)`), resolved in the UI with `stringResource`, so they follow the app language. Code holding only an Application context uses `LocaleManager.resources(context)`.
+- `data/` — Room (`onsite.db`, currently version 9, migrations in `AppDatabase`). Entities: `TrackingSession` (one row per session; `companyName`/`siteLabel`/`jobTypeLabel` stored **as text**), `Company`, `Site` (with lat/lon + address), `JobType`, `Profile` (single row, id = 1).
+- `invoice/` — `InvoiceData.kt` groups sessions into one `InvoiceLine` per worked day and exposes `valueFor(ReportColumn)`; `InvoicePdfTemplate.kt` renders the fixed A4 layout with Android's `PdfDocument` (no PDF library). PDFs go to `cacheDir/invoices/` and are shared through the `FileProvider` declared in the manifest (`res/xml/file_paths.xml`).
+- `report/ReportColumn.kt` — the single column template used by both the on-screen `ReportTable` and the PDF; enum order is display order, `DATE`/`HOURS` are always shown.
+- `Validators.kt` — ABN (modulus-89 check), BSB, account number, phone, email; blank is valid (fields are optional).
+- `AddressSearch.kt` — Photon (OSM) geocoder, restricted to Australia's bounding box.
 
-**Session/duration logic**: there is no explicit "session" entity. `records` is a flat, time-descending stream of START/STOP rows. Duration for a completed session is computed in the UI (`MainActivity.kt`, in the `LazyColumn` items block) by looking at `records[index + 1]` immediately after a STOP and checking it's a START — i.e., it assumes STOP/START rows always alternate correctly and are contiguous by insertion order. Any change to how records are inserted (e.g., allowing edits, deletions, or concurrent sessions) must preserve this adjacency assumption or the duration calculation will silently break.
+## Things that are easy to break
 
-**State flow**: UI state changes originate only from the ViewModel (`_uiState.update { ... }`); `MainActivity` never mutates state directly, it only reads `uiState`/`records` via `collectAsState()` and calls ViewModel methods.
+- Sessions reference companies/job types **by name**. Renaming one must call `TrackingSessionDao.renameCompany`/`renameJobType` (the edit flows already do) or reports and invoices stop matching.
+- `ReportColumn` order and `InvoicePdfTemplate.columnSpecs` widths define the invoice layout; changing columns means updating both `valueFor` and the specs.
+- Room schema changes require a new `Migration` in `AppDatabase` and a version bump; `exportSchema` is false.
+- `LocaleManager` reads SharedPreferences `settings`/`language` synchronously — keep it cheap, it runs in `attachBaseContext`.
