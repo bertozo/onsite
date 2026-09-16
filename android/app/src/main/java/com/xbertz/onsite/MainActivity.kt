@@ -105,6 +105,7 @@ import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
 import com.xbertz.onsite.invoice.buildInvoiceLines
+import com.xbertz.onsite.photo.TimestampPosition
 import com.xbertz.onsite.report.ReportColumn
 import com.xbertz.onsite.ui.theme.OnSiteTheme
 import kotlinx.coroutines.Dispatchers
@@ -154,7 +155,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Screen {
-    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING
+    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO
 }
 
 @Composable
@@ -174,6 +175,7 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
             onTrackerClick = { screen = Screen.TRACKER },
             onReportsClick = { screen = Screen.REPORTS },
             onPlanningClick = { screen = Screen.PLANNING },
+            onPhotoClick = { screen = Screen.PHOTO },
             onSettingsClick = { screen = Screen.SETTINGS }
         )
         Screen.TRACKER -> TrackerScreen(onBack = { screen = Screen.MENU })
@@ -184,6 +186,7 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
         Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.MENU }, viewModel = settingsViewModel)
         Screen.PLANNING -> PlanningScreen(onBack = { screen = Screen.MENU })
+        Screen.PHOTO -> PhotoScreen(onBack = { screen = Screen.MENU })
     }
 }
 
@@ -367,6 +370,7 @@ fun MainMenuScreen(
     onTrackerClick: () -> Unit,
     onReportsClick: () -> Unit,
     onPlanningClick: () -> Unit,
+    onPhotoClick: () -> Unit,
     onSettingsClick: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel()
 ) {
@@ -377,7 +381,8 @@ fun MainMenuScreen(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
         MenuAction(stringResource(R.string.menu_companies), stringResource(R.string.menu_companies_subtitle), Icons.Filled.Business, onCompaniesClick),
         MenuAction(stringResource(R.string.menu_sites), stringResource(R.string.menu_sites_subtitle), Icons.Filled.Place, onSitesClick),
-        MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick)
+        MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick),
+        MenuAction(stringResource(R.string.menu_photo), stringResource(R.string.menu_photo_subtitle), Icons.Filled.PhotoCamera, onPhotoClick)
     )
 
     Column(
@@ -1129,6 +1134,229 @@ private fun DeletePlannedJobDialog(job: PlannedJob, onDismiss: () -> Unit, onCon
             }
         }
     )
+}
+
+// ---------------------------------------------------------------------------
+// Site photo (timestamp camera)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val logoBitmap = rememberBitmapFromFile(uiState.logoPath)
+    val lastPhoto = rememberBitmapFromUri(uiState.lastPhotoUri)
+
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
+        viewModel.onCaptureResult(ok)
+    }
+    val logoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
+        uri?.let { viewModel.onLogoPicked(it) }
+    }
+    // Below Android 10 the gallery write needs the legacy storage permission; newer versions need nothing.
+    val needsStoragePermission = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q
+    var storageDenied by remember { mutableStateOf(false) }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        storageDenied = !granted
+        if (granted) cameraLauncher.launch(viewModel.newCaptureUri())
+    }
+    fun takePhoto() {
+        val granted = !needsStoragePermission || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) cameraLauncher.launch(viewModel.newCaptureUri())
+        else storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_photo), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                    Text(
+                        stringResource(R.string.photo_settings),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Text(
+                        stringResource(R.string.photo_timestamp_position),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.VerticalAlignTop,
+                        title = stringResource(R.string.photo_position_top),
+                        subtitle = null,
+                        selected = uiState.position == TimestampPosition.TOP,
+                        onClick = { viewModel.setPosition(TimestampPosition.TOP) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.VerticalAlignBottom,
+                        title = stringResource(R.string.photo_position_bottom),
+                        subtitle = null,
+                        selected = uiState.position == TimestampPosition.BOTTOM,
+                        onClick = { viewModel.setPosition(TimestampPosition.BOTTOM) }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    Text(
+                        stringResource(R.string.photo_logo),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(64.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (logoBitmap != null) {
+                                    Image(
+                                        bitmap = logoBitmap,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.Image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (logoBitmap == null) {
+                                Text(
+                                    stringResource(R.string.photo_logo_none),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(6.dp))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        logoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Text(stringResource(R.string.photo_choose_logo))
+                                }
+                                if (uiState.logoPath != null) {
+                                    TextButton(onClick = { viewModel.clearLogo() }) {
+                                        Text(stringResource(R.string.photo_remove_logo), color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { takePhoto() },
+                enabled = !uiState.isProcessing,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                if (uiState.isProcessing) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photo_processing))
+                } else {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photo_take), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            val errorRes = uiState.errorRes
+            if (errorRes != null || storageDenied) {
+                Spacer(Modifier.height(12.dp))
+                InfoBanner(
+                    icon = Icons.Filled.Warning,
+                    text = stringResource(errorRes ?: R.string.photo_storage_permission),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+
+            if (uiState.lastPhotoUri != null) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(title = stringResource(R.string.photo_last))
+                Spacer(Modifier.height(8.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column {
+                        if (lastPhoto != null) {
+                            Image(
+                                bitmap = lastPhoto,
+                                contentDescription = null,
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                stringResource(R.string.photo_saved),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "image/jpeg"
+                                        putExtra(Intent.EXTRA_STREAM, uiState.lastPhotoUri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.photo_share)))
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.photo_share))
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** Loads a gallery image for preview, downsampled so a full-size photo doesn't blow the UI heap. */
+@Composable
+private fun rememberBitmapFromUri(uri: Uri?): ImageBitmap? {
+    val context = LocalContext.current
+    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(uri) {
+        bitmap = if (uri == null) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1200) sample *= 2
+                val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    return bitmap
 }
 
 // ---------------------------------------------------------------------------

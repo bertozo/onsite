@@ -200,4 +200,22 @@
     <string name="planning_sessions">Sessions</string>
     <string name="planning_no_sessions">No sessions recorded on this day.</string>
     <string name="calendar_day_total">Total: %1$s</string>
+    <!-- Site photo (timestamp camera) -->
+    <string name="menu_photo">Site photo</string>
+    <string name="menu_photo_subtitle">Stamped date &amp; time</string>
+    <string name="photo_settings">Stamp settings</string>
+    <string name="photo_timestamp_position">Date &amp; time position</string>
+    <string name="photo_position_top">Top of the photo</string>
+    <string name="photo_position_bottom">Bottom of the photo</string>
+    <string name="photo_logo">Logo (bottom-right corner)</string>
+    <string name="photo_logo_none">No logo set — photos are saved without one.</string>
+    <string name="photo_choose_logo">Choose logo</string>
+    <string name="photo_remove_logo">Remove</string>
+    <string name="photo_take">Take photo</string>
+    <string name="photo_processing">Stamping photo…</string>
+    <string name="photo_last">Last photo</string>
+    <string name="photo_saved">Saved to the gallery in Pictures/OnSite.</string>
+    <string name="photo_share">Share photo</string>
+    <string name="photo_error_save">Could not stamp or save the photo.</string>
+    <string name="photo_storage_permission">Storage permission is needed to save photos to the gallery.</string>
 </resources>

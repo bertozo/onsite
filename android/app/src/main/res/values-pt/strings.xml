@@ -196,4 +196,22 @@
     <string name="planning_sessions">Sessões</string>
     <string name="planning_no_sessions">Nenhuma sessão registrada neste dia.</string>
     <string name="calendar_day_total">Total: %1$s</string>
+    <!-- Site photo (timestamp camera) -->
+    <string name="menu_photo">Foto do local</string>
+    <string name="menu_photo_subtitle">Com data e hora</string>
+    <string name="photo_settings">Configurações do carimbo</string>
+    <string name="photo_timestamp_position">Posição da data e hora</string>
+    <string name="photo_position_top">Topo da foto</string>
+    <string name="photo_position_bottom">Parte de baixo da foto</string>
+    <string name="photo_logo">Logotipo (canto inferior direito)</string>
+    <string name="photo_logo_none">Sem logotipo — as fotos são salvas sem ele.</string>
+    <string name="photo_choose_logo">Escolher logotipo</string>
+    <string name="photo_remove_logo">Remover</string>
+    <string name="photo_take">Tirar foto</string>
+    <string name="photo_processing">Aplicando carimbo…</string>
+    <string name="photo_last">Última foto</string>
+    <string name="photo_saved">Salva na galeria em Pictures/OnSite.</string>
+    <string name="photo_share">Compartilhar foto</string>
+    <string name="photo_error_save">Não foi possível carimbar ou salvar a foto.</string>
+    <string name="photo_storage_permission">É necessária a permissão de armazenamento para salvar as fotos na galeria.</string>
 </resources>
