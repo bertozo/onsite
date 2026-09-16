@@ -8,31 +8,46 @@ import com.xbertz.onsite.data.Company
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
+import com.xbertz.onsite.data.TrackingSession
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 
 /** Planning screen: the calendar plus the jobs scheduled for the selected day. */
 data class PlanningUiState(
     val calendar: CalendarUiState,
     /** Jobs of the selected day, by start time. */
-    val dayJobs: List<PlannedJob> = emptyList()
-)
+    val dayJobs: List<PlannedJob> = emptyList(),
+    /** Completed sessions of the selected day, oldest first. */
+    val daySessions: List<TrackingSession> = emptyList()
+) {
+    val dayTotalMillis: Long get() = daySessions.sumOf { it.durationMillis ?: 0L }
+}
 
 class PlanningViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
     private val dao = db.plannedJobDao()
-    private val navigator = CalendarNavigator()
+    private val zone: ZoneId = ZoneId.systemDefault()
+    private val navigator = CalendarNavigator(zone)
 
-    val uiState: StateFlow<PlanningUiState> = combine(navigator.state, dao.getAll()) { nav, jobs ->
-        val byDay = jobs.groupBy { it.date }
+    val uiState: StateFlow<PlanningUiState> = combine(
+        navigator.state, dao.getAll(), db.trackingSessionDao().getAll()
+    ) { nav, jobs, sessions ->
+        val jobsByDay = jobs.groupBy { it.date }
+        val sessionsOfDay = sessions
+            .filter { it.stopTimestampMillis != null }
+            .filter { Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate() == nav.selectedDate }
+            .sortedBy { it.startTimestampMillis }
         PlanningUiState(
-            calendar = nav.copy(markedDays = byDay.keys),
-            dayJobs = byDay[nav.selectedDate].orEmpty()
+            calendar = nav.copy(markedDays = jobsByDay.keys),
+            dayJobs = jobsByDay[nav.selectedDate].orEmpty(),
+            daySessions = sessionsOfDay
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlanningUiState(navigator.state.value))
 

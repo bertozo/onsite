@@ -191,6 +191,10 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
 // Shared building blocks
 // ---------------------------------------------------------------------------
 
+// Planner day markers: fixed colours so they read the same in both themes (the scheme's error colour turns pink in dark mode).
+private val PlannerMarkerGreen = Color(0xFF43A047)
+private val PlannerMarkerRed = Color(0xFFE53935)
+
 private data class MenuAction(
     val title: String,
     val subtitle: String,
@@ -633,6 +637,7 @@ private fun CalendarDayCell(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val today = remember { LocalDate.now() }
     val textColor = when {
         selected -> MaterialTheme.colorScheme.onPrimary
         dimmed -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
@@ -658,14 +663,19 @@ private fun CalendarDayCell(
                 color = textColor
             )
         }
-        // Marker for days that have sessions; kept as an empty slot otherwise so rows stay the same height.
+        // Marker for days that have jobs: blue when the day is past, green today, red when still ahead.
+        // Kept as an empty slot otherwise so rows stay the same height.
+        val markerColor = when {
+            !hasSessions -> Color.Transparent
+            date.isBefore(today) -> MaterialTheme.colorScheme.primary
+            date == today -> PlannerMarkerGreen
+            else -> PlannerMarkerRed
+        }
         Box(
             modifier = Modifier
-                .size(5.dp)
+                .size(6.dp)
                 .clip(CircleShape)
-                .background(
-                    if (hasSessions) (if (dimmed) textColor else MaterialTheme.colorScheme.primary) else Color.Transparent
-                )
+                .background(if (dimmed) markerColor.copy(alpha = 0.4f) else markerColor)
         )
     }
 }
@@ -772,10 +782,98 @@ fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel(
                     )
                 }
             }
+
+            Spacer(Modifier.height(24.dp))
+            PlanningDaySessions(state = uiState)
             Spacer(Modifier.height(16.dp))
         }
     }
 }
+
+/** The selected day's completed sessions, read-only; editing stays on the tracker screen. */
+@Composable
+private fun PlanningDaySessions(state: PlanningUiState) {
+    val totalMillis = state.dayTotalMillis
+    val totalText = stringResource(
+        R.string.duration_format,
+        TimeUnit.MILLISECONDS.toHours(totalMillis),
+        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+    )
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionHeader(title = stringResource(R.string.planning_sessions), count = state.daySessions.size)
+            Spacer(Modifier.weight(1f))
+            if (state.daySessions.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.calendar_day_total, totalText),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (state.daySessions.isEmpty()) {
+            EmptyState(text = stringResource(R.string.planning_no_sessions))
+        } else {
+            state.daySessions.forEachIndexed { index, session ->
+                if (index > 0) Spacer(Modifier.height(8.dp))
+                PlanningSessionRow(session)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanningSessionRow(session: TrackingSession) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val zone = remember { ZoneId.systemDefault() }
+    val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone).toLocalTime()
+    val end = session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
+    val durationMillis = session.durationMillis ?: 0L
+    val details = listOfNotNull(
+        session.companyName?.takeIf { it.isNotBlank() },
+        session.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "${start.format(timeFormatter)} – ${end?.format(timeFormatter) ?: ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun PlannedJobRow(job: PlannedJob, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {

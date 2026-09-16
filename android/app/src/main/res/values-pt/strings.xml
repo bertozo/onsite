@@ -193,4 +193,7 @@
     <string name="planning_clear_end_time">Limpar hora final</string>
     <string name="planning_none">Nenhum</string>
     <string name="planning_details_required">Escolha uma empresa, local ou tipo de serviço, ou escreva uma observação.</string>
+    <string name="planning_sessions">Sessões</string>
+    <string name="planning_no_sessions">Nenhuma sessão registrada neste dia.</string>
+    <string name="calendar_day_total">Total: %1$s</string>
 </resources>

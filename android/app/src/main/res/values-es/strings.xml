@@ -193,4 +193,7 @@
     <string name="planning_clear_end_time">Borrar hora de fin</string>
     <string name="planning_none">Ninguno</string>
     <string name="planning_details_required">Elige una empresa, sitio o tipo de trabajo, o escribe una nota.</string>
+    <string name="planning_sessions">Sesiones</string>
+    <string name="planning_no_sessions">Ninguna sesión registrada en este día.</string>
+    <string name="calendar_day_total">Total: %1$s</string>
 </resources>
