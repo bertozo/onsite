@@ -2,6 +2,4 @@
 <paths>
     <!-- Invoice PDFs are written to cacheDir/invoices and shared through the FileProvider. -->
     <cache-path name="invoices" path="invoices/" />
-    <!-- Raw camera captures for the site-photo tool; deleted once the stamped copy is in the gallery. -->
-    <cache-path name="photos" path="photos/" />
 </paths>

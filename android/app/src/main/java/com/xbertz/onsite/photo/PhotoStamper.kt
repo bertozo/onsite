@@ -30,8 +30,13 @@ object PhotoStamper {
 
     /** Longest side kept when decoding; camera output is far bigger than needed and would risk OOM. */
     private const val MAX_SIDE = 2560
-    private const val LOGO_WIDTH_FRACTION = 0.18f
-    private const val BAND_ALPHA = 150
+
+    // Stamp geometry as fractions of the image width, shared with the live camera overlay so the
+    // viewfinder shows exactly what will be saved.
+    const val TEXT_SIZE_FRACTION = 1f / 26f
+    const val PADDING_FRACTION = TEXT_SIZE_FRACTION * 0.6f
+    const val LOGO_WIDTH_FRACTION = 0.18f
+    const val BAND_ALPHA = 150
 
     /** Decodes [source] (honouring EXIF rotation) and returns a new bitmap with the stamp drawn on it. */
     @Throws(IOException::class)
@@ -41,8 +46,8 @@ object PhotoStamper {
         val width = photo.width.toFloat()
         val height = photo.height.toFloat()
 
-        val textSize = width / 26f
-        val padding = textSize * 0.6f
+        val textSize = width * TEXT_SIZE_FRACTION
+        val padding = width * PADDING_FRACTION
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             this.textSize = textSize

@@ -214,4 +214,8 @@
     <string name="photo_share">Compartilhar foto</string>
     <string name="photo_error_save">Não foi possível carimbar ou salvar a foto.</string>
     <string name="photo_storage_permission">É necessária a permissão de armazenamento para salvar as fotos na galeria.</string>
+    <string name="photo_open_camera">Abrir câmera</string>
+    <string name="photo_camera_permission">É necessária a permissão da câmera para tirar fotos.</string>
+    <string name="photo_close_camera">Fechar câmera</string>
+    <string name="photo_camera_error">Não foi possível iniciar a câmera.</string>
 </resources>

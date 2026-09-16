@@ -214,4 +214,8 @@
     <string name="photo_share">Compartir foto</string>
     <string name="photo_error_save">No se pudo sellar o guardar la foto.</string>
     <string name="photo_storage_permission">Se necesita el permiso de almacenamiento para guardar las fotos en la galería.</string>
+    <string name="photo_open_camera">Abrir cámara</string>
+    <string name="photo_camera_permission">Se necesita el permiso de la cámara para tomar fotos.</string>
+    <string name="photo_close_camera">Cerrar cámara</string>
+    <string name="photo_camera_error">No se pudo iniciar la cámara.</string>
 </resources>

@@ -218,4 +218,8 @@
     <string name="photo_share">Share photo</string>
     <string name="photo_error_save">Could not stamp or save the photo.</string>
     <string name="photo_storage_permission">Storage permission is needed to save photos to the gallery.</string>
+    <string name="photo_open_camera">Open camera</string>
+    <string name="photo_camera_permission">Camera permission is needed to take photos.</string>
+    <string name="photo_close_camera">Close camera</string>
+    <string name="photo_camera_error">The camera could not be started.</string>
 </resources>

@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.StringRes
-import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.photo.PhotoStamper
@@ -32,9 +31,9 @@ data class PhotoUiState(
 )
 
 /**
- * Site-photo tool: takes a picture through the camera app, stamps date/time (+ optional logo)
- * on it and saves it to the gallery. Settings persist in the "settings" SharedPreferences and
- * the logo as a file in filesDir.
+ * Site-photo tool: the in-app camera (CameraX, see `StampCameraView`) writes a capture file,
+ * this stamps date/time (+ optional logo) on it and saves it to the gallery. Settings persist in
+ * the "settings" SharedPreferences and the logo as a file in filesDir.
  */
 class PhotoViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -49,9 +48,6 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
         )
     )
     val uiState: StateFlow<PhotoUiState> = _uiState
-
-    /** The file the camera app is currently writing to; consumed by [onCaptureResult]. */
-    private var pendingCapture: File? = null
 
     fun setPosition(position: TimestampPosition) {
         prefs.edit().putString(KEY_POSITION, position.name).apply()
@@ -76,23 +72,19 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(logoPath = null) }
     }
 
-    /** Creates the temp file the camera app will fill and returns its FileProvider Uri. */
-    fun newCaptureUri(): Uri {
-        val application = getApplication<Application>()
-        val dir = File(application.cacheDir, CAPTURE_DIR).apply { mkdirs() }
-        val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
-        pendingCapture = file
+    /** Temp file for the next capture; the camera writes it and [onPhotoCaptured] consumes it. */
+    fun newCaptureFile(): File {
+        val dir = File(getApplication<Application>().cacheDir, CAPTURE_DIR).apply { mkdirs() }
         _uiState.update { it.copy(errorRes = null) }
-        return FileProvider.getUriForFile(application, "${application.packageName}.fileprovider", file)
+        return File(dir, "capture_${System.currentTimeMillis()}.jpg")
     }
 
-    fun onCaptureResult(success: Boolean) {
-        val file = pendingCapture ?: return
-        pendingCapture = null
-        if (!success) {
-            file.delete()
-            return
-        }
+    fun onCameraError() {
+        _uiState.update { it.copy(errorRes = R.string.photo_camera_error) }
+    }
+
+    /** Stamps and saves a capture written by the camera; the temp file is deleted either way. */
+    fun onPhotoCaptured(file: File) {
         val takenAt = LocalDateTime.now()
         val state = _uiState.value
         _uiState.update { it.copy(isProcessing = true, errorRes = null) }
@@ -100,9 +92,8 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
             val application = getApplication<Application>()
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val sourceUri = FileProvider.getUriForFile(application, "${application.packageName}.fileprovider", file)
                     val bitmap = PhotoStamper.stamp(
-                        application, sourceUri, takenAt.format(STAMP_FORMAT), state.position, state.logoPath
+                        application, Uri.fromFile(file), takenAt.format(STAMP_FORMAT), state.position, state.logoPath
                     )
                     try {
                         PhotoStamper.saveToGallery(application, bitmap, "OnSite_${takenAt.format(FILE_FORMAT)}.jpg")

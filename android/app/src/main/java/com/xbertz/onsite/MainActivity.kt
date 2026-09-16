@@ -7,6 +7,7 @@ import android.app.TimePickerDialog
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -17,6 +18,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -90,7 +100,11 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -105,6 +119,7 @@ import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
 import com.xbertz.onsite.invoice.buildInvoiceLines
+import com.xbertz.onsite.photo.PhotoStamper
 import com.xbertz.onsite.photo.TimestampPosition
 import com.xbertz.onsite.report.ReportColumn
 import com.xbertz.onsite.ui.theme.OnSiteTheme
@@ -121,6 +136,8 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle as JavaTextStyle
 import java.time.temporal.TemporalAdjusters
+import java.io.File
+import java.time.LocalDateTime
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -1147,8 +1164,15 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
     val logoBitmap = rememberBitmapFromFile(uiState.logoPath)
     val lastPhoto = rememberBitmapFromUri(uiState.lastPhotoUri)
 
-    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { ok ->
-        viewModel.onCaptureResult(ok)
+    var cameraOpen by rememberSaveable { mutableStateOf(false) }
+    var cameraDenied by remember { mutableStateOf(false) }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraDenied = !granted
+        if (granted) cameraOpen = true
+    }
+    fun openCamera() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (granted) cameraOpen = true else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
     }
     val logoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
         uri?.let { viewModel.onLogoPicked(it) }
@@ -1158,14 +1182,32 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
     var storageDenied by remember { mutableStateOf(false) }
     val storagePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         storageDenied = !granted
-        if (granted) cameraLauncher.launch(viewModel.newCaptureUri())
+        if (granted) openCamera()
     }
     fun takePhoto() {
         val granted = !needsStoragePermission || ContextCompat.checkSelfPermission(
             context, Manifest.permission.WRITE_EXTERNAL_STORAGE
         ) == PackageManager.PERMISSION_GRANTED
-        if (granted) cameraLauncher.launch(viewModel.newCaptureUri())
+        if (granted) openCamera()
         else storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+
+    if (cameraOpen) {
+        StampCameraView(
+            position = uiState.position,
+            logo = logoBitmap,
+            onCapture = { file ->
+                cameraOpen = false
+                viewModel.onPhotoCaptured(file)
+            },
+            newCaptureFile = viewModel::newCaptureFile,
+            onError = {
+                cameraOpen = false
+                viewModel.onCameraError()
+            },
+            onClose = { cameraOpen = false }
+        )
+        return
     }
 
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_photo), onBack = onBack) }) { padding ->
@@ -1278,16 +1320,18 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
                 } else {
                     Icon(Icons.Filled.PhotoCamera, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.photo_take), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.photo_open_camera), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
             }
 
             val errorRes = uiState.errorRes
-            if (errorRes != null || storageDenied) {
+            if (errorRes != null || storageDenied || cameraDenied) {
                 Spacer(Modifier.height(12.dp))
                 InfoBanner(
                     icon = Icons.Filled.Warning,
-                    text = stringResource(errorRes ?: R.string.photo_storage_permission),
+                    text = stringResource(
+                        errorRes ?: if (cameraDenied) R.string.photo_camera_permission else R.string.photo_storage_permission
+                    ),
                     containerColor = MaterialTheme.colorScheme.errorContainer,
                     contentColor = MaterialTheme.colorScheme.onErrorContainer
                 )
@@ -1335,6 +1379,166 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
                 }
             }
             Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * In-app camera (CameraX) showing the date/time band and logo live over the viewfinder, in the
+ * same proportions [PhotoStamper] uses, so what the user sees is what gets saved.
+ *
+ * Preview and capture are both 4:3 and the preview is letterboxed (FIT_CENTER), so the overlay
+ * can be laid out on the exact rectangle the frame occupies.
+ */
+@Composable
+private fun StampCameraView(
+    position: TimestampPosition,
+    logo: ImageBitmap?,
+    onCapture: (File) -> Unit,
+    newCaptureFile: () -> File,
+    onError: () -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setResolutionSelector(
+                ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
+            )
+            .build()
+    }
+    var capturing by remember { mutableStateOf(false) }
+
+    // Live clock for the band; the saved photo uses the time of the shutter press.
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = LocalDateTime.now()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val stampFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ENGLISH) }
+
+    BackHandler(onBack = onClose)
+
+    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            // Rectangle the 4:3 (or 3:4 in portrait) frame occupies inside the letterboxed preview.
+            val frameRatio = if (isLandscape) 4f / 3f else 3f / 4f
+            val boxRatio = maxWidth / maxHeight
+            val frameWidth = if (boxRatio > frameRatio) maxHeight * frameRatio else maxWidth
+            val frameHeight = if (boxRatio > frameRatio) maxHeight else maxWidth / frameRatio
+
+            AndroidView(
+                factory = { ctx ->
+                    PreviewView(ctx).apply {
+                        scaleType = PreviewView.ScaleType.FIT_CENTER
+                        val provider = ProcessCameraProvider.getInstance(ctx)
+                        provider.addListener({
+                            try {
+                                val preview = Preview.Builder()
+                                    .setResolutionSelector(
+                                        ResolutionSelector.Builder()
+                                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                                            .build()
+                                    )
+                                    .build()
+                                    .also { it.setSurfaceProvider(surfaceProvider) }
+                                val cameraProvider = provider.get()
+                                cameraProvider.unbindAll()
+                                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                            } catch (e: Exception) {
+                                onError()
+                            }
+                        }, ContextCompat.getMainExecutor(ctx))
+                    }
+                },
+                update = { view -> view.display?.let { imageCapture.targetRotation = it.rotation } },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Overlay drawn on the frame rectangle only, mirroring PhotoStamper's geometry.
+            Box(modifier = Modifier.size(frameWidth, frameHeight).align(Alignment.Center)) {
+                val textSize = frameWidth * PhotoStamper.TEXT_SIZE_FRACTION
+                val padding = frameWidth * PhotoStamper.PADDING_FRACTION
+                val bandHeight = textSize + padding * 2
+                val textSizeSp = with(LocalDensity.current) { textSize.toSp() }
+                Box(
+                    contentAlignment = Alignment.CenterStart,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(bandHeight)
+                        .align(if (position == TimestampPosition.TOP) Alignment.TopCenter else Alignment.BottomCenter)
+                        .background(Color.Black.copy(alpha = PhotoStamper.BAND_ALPHA / 255f))
+                        .padding(horizontal = padding)
+                ) {
+                    Text(
+                        now.format(stampFormatter),
+                        color = Color.White,
+                        fontSize = textSizeSp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+                if (logo != null) {
+                    val logoWidth = frameWidth * PhotoStamper.LOGO_WIDTH_FRACTION
+                    val logoHeight = logoWidth * logo.height / logo.width
+                    val bottomInset = if (position == TimestampPosition.BOTTOM) bandHeight + padding else padding
+                    Image(
+                        bitmap = logo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = padding, bottom = bottomInset)
+                            .size(logoWidth, logoHeight)
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.photo_close_camera), tint = Color.White)
+            }
+            // Shutter
+            Surface(
+                onClick = {
+                    if (capturing) return@Surface
+                    capturing = true
+                    val file = newCaptureFile()
+                    imageCapture.takePicture(
+                        ImageCapture.OutputFileOptions.Builder(file).build(),
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                capturing = false
+                                onCapture(file)
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                capturing = false
+                                file.delete()
+                                onError()
+                            }
+                        }
+                    )
+                },
+                enabled = !capturing,
+                shape = CircleShape,
+                color = Color.White,
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (capturing) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                    } else {
+                        Surface(shape = CircleShape, color = Color.White, border = BorderStroke(3.dp, Color.Black), modifier = Modifier.size(60.dp)) {}
+                    }
+                }
+            }
         }
     }
 }
