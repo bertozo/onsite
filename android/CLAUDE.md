@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-OnSite (package `com.rodolfobertozo.onsite`) — an Android app (Kotlin + Jetpack Compose) for a self-employed tradesperson in Australia to log work sessions per site (GPS or manual entry), keep clients/sites/job types, and generate invoice PDFs. UI strings live in `res/values*/strings.xml` in English (default), Portuguese (`values-pt`) and Spanish (`values-es`); **never hardcode user-facing text in Kotlin** — add a key to all three files. Code comments are in English.
+OnSite (package `com.xbertz.onsite`) — an Android app (Kotlin + Jetpack Compose) for a self-employed tradesperson in Australia to log work sessions per site (GPS or manual entry), keep clients/sites/job types, and generate invoice PDFs. UI strings live in `res/values*/strings.xml` in English (default), Portuguese (`values-pt`) and Spanish (`values-es`); **never hardcode user-facing text in Kotlin** — add a key to all three files. Code comments are in English.
 
 ## Build & run
 
@@ -16,7 +16,7 @@ OnSite (package `com.rodolfobertozo.onsite`) — an Android app (Kotlin + Jetpac
 
 ## Architecture
 
-MVVM, everything under `app/src/main/java/com/rodolfobertozo/onsite/`:
+MVVM, everything under `app/src/main/java/com/xbertz/onsite/`:
 
 - `MainActivity.kt` — **all** Compose UI: `AppRoot` switches between `Screen` values (menu, tracker, reports, companies, sites, job types, profile, settings); each screen is a composable in the same file, plus its dialogs. `MainActivity.attachBaseContext` wraps the context with `LocaleManager` (defined in `AppLocale.kt`, together with `AppLanguage`) so the chosen language applies before resources are read; a language change calls `recreate()` and `AppRoot` keeps the current screen via `rememberSaveable`. Theme colours live in `ui/theme/Theme.kt`.
 - ViewModels are `AndroidViewModel`s, one per area: `LocationTrackerViewModel` (start/stop with GPS, manual sessions, edit/delete), `CompanyViewModel`, `SiteViewModel` (address search with debounce), `JobTypeViewModel`, `ProfileViewModel`, `InvoiceViewModel` (PDF generation + sequential invoice number), `ReportViewModel` (column selection), `SettingsViewModel` (theme + language). UI state flows out via `StateFlow`; screens never mutate state directly.

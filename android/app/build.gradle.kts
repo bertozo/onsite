@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.rodolfobertozo.onsite"
+    namespace = "com.xbertz.onsite"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.rodolfobertozo.onsite"
+        applicationId = "com.xbertz.onsite"
         minSdk = 26
         targetSdk = 34
         versionCode = 1

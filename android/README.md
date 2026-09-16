@@ -24,7 +24,7 @@ From the command line: `./gradlew assembleDebug` (APK) or `./gradlew installDebu
 ## Structure
 
 ```
-app/src/main/java/com/rodolfobertozo/onsite/
+app/src/main/java/com/xbertz/onsite/
 ├── MainActivity.kt            # all Compose UI (menu, screens, dialogs)
 ├── *ViewModel.kt              # one ViewModel per area (tracker, companies, sites, job types, profile, invoice, report, settings)
 ├── AppLocale.kt               # language selection (SharedPreferences + attachBaseContext)
