@@ -222,4 +222,6 @@
     <string name="photo_camera_permission">Camera permission is needed to take photos.</string>
     <string name="photo_close_camera">Close camera</string>
     <string name="photo_camera_error">The camera could not be started.</string>
+    <string name="photo_label">Label</string>
+    <string name="photo_label_hint">Printed above the date, e.g. site name or what the photo shows</string>
 </resources>

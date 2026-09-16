@@ -22,6 +22,8 @@ import java.util.Locale
 
 data class PhotoUiState(
     val position: TimestampPosition = TimestampPosition.BOTTOM,
+    /** Free text printed above the date/time (site name, what the photo shows...); blank = not printed. */
+    val label: String = "",
     /** Absolute path of the logo file, or null when no logo is set (photos are then saved without one). */
     val logoPath: String? = null,
     /** Gallery Uri of the last stamped photo, for the preview and the share button. */
@@ -44,6 +46,7 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
         PhotoUiState(
             position = runCatching { TimestampPosition.valueOf(prefs.getString(KEY_POSITION, null) ?: "") }
                 .getOrDefault(TimestampPosition.BOTTOM),
+            label = prefs.getString(KEY_LABEL, null).orEmpty(),
             logoPath = logoFile.takeIf { it.exists() }?.absolutePath
         )
     )
@@ -52,6 +55,11 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
     fun setPosition(position: TimestampPosition) {
         prefs.edit().putString(KEY_POSITION, position.name).apply()
         _uiState.update { it.copy(position = position) }
+    }
+
+    fun setLabel(label: String) {
+        prefs.edit().putString(KEY_LABEL, label).apply()
+        _uiState.update { it.copy(label = label) }
     }
 
     fun onLogoPicked(uri: Uri) {
@@ -93,7 +101,7 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val bitmap = PhotoStamper.stamp(
-                        application, Uri.fromFile(file), takenAt.format(STAMP_FORMAT), state.position, state.logoPath
+                        application, Uri.fromFile(file), stampLines(state.label, takenAt), state.position, state.logoPath
                     )
                     try {
                         PhotoStamper.saveToGallery(application, bitmap, "OnSite_${takenAt.format(FILE_FORMAT)}.jpg")
@@ -112,12 +120,17 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private companion object {
-        const val TAG = "PhotoViewModel"
-        const val KEY_POSITION = "photo_timestamp_position"
-        const val LOGO_FILE = "stamp_logo.png"
-        const val CAPTURE_DIR = "photos"
-        val STAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ENGLISH)
-        val FILE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.ENGLISH)
+    companion object {
+        private const val TAG = "PhotoViewModel"
+        private const val KEY_POSITION = "photo_timestamp_position"
+        private const val KEY_LABEL = "photo_label"
+        val STAMP_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss", Locale.ENGLISH)
+
+        /** The lines printed on a photo, top to bottom: the label when set, then the date/time. */
+        fun stampLines(label: String, takenAt: LocalDateTime): List<String> =
+            listOfNotNull(label.trim().ifBlank { null }, takenAt.format(STAMP_FORMAT))
+        private const val LOGO_FILE = "stamp_logo.png"
+        private const val CAPTURE_DIR = "photos"
+        private val FILE_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss", Locale.ENGLISH)
     }
 }

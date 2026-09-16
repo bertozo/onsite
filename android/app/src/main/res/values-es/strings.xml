@@ -218,4 +218,6 @@
     <string name="photo_camera_permission">Se necesita el permiso de la cámara para tomar fotos.</string>
     <string name="photo_close_camera">Cerrar cámara</string>
     <string name="photo_camera_error">No se pudo iniciar la cámara.</string>
+    <string name="photo_label">Etiqueta</string>
+    <string name="photo_label_hint">Impresa sobre la fecha, p. ej. nombre del sitio o qué muestra la foto</string>
 </resources>

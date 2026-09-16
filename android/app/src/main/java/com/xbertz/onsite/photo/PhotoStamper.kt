@@ -9,6 +9,8 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.text.TextPaint
+import android.text.TextUtils
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
@@ -21,8 +23,9 @@ import java.io.IOException
 enum class TimestampPosition { TOP, BOTTOM }
 
 /**
- * Draws the capture date/time (and, when a logo file is set, the logo in the bottom-right
- * corner) onto a photo and saves the result to the device gallery.
+ * Draws the stamp lines (optional label + capture date/time, white with a dark outline so they
+ * read on any background) and, when a logo file is set, the logo in the bottom-right corner
+ * onto a photo, then saves the result to the device gallery.
  *
  * Sizes are relative to the image width so the stamp looks the same on any camera resolution.
  */
@@ -35,12 +38,20 @@ object PhotoStamper {
     // viewfinder shows exactly what will be saved.
     const val TEXT_SIZE_FRACTION = 1f / 26f
     const val PADDING_FRACTION = TEXT_SIZE_FRACTION * 0.6f
+    const val LINE_HEIGHT_FACTOR = 1.25f
+    const val STROKE_FACTOR = 0.08f
     const val LOGO_WIDTH_FRACTION = 0.18f
-    const val BAND_ALPHA = 150
 
-    /** Decodes [source] (honouring EXIF rotation) and returns a new bitmap with the stamp drawn on it. */
+    /** Height of the text block for [lineCount] lines, in the same unit as [width]. */
+    fun textBlockHeight(width: Float, lineCount: Int): Float =
+        width * PADDING_FRACTION * 2 + lineCount * width * TEXT_SIZE_FRACTION * LINE_HEIGHT_FACTOR
+
+    /**
+     * Decodes [source] (honouring EXIF rotation) and returns a new bitmap with [lines] (label and
+     * date/time, top to bottom) and the logo drawn on it.
+     */
     @Throws(IOException::class)
-    fun stamp(context: Context, source: Uri, timestamp: String, position: TimestampPosition, logoPath: String?): Bitmap {
+    fun stamp(context: Context, source: Uri, lines: List<String>, position: TimestampPosition, logoPath: String?): Bitmap {
         val photo = decodeUpright(context, source)
         val canvas = Canvas(photo)
         val width = photo.width.toFloat()
@@ -48,27 +59,40 @@ object PhotoStamper {
 
         val textSize = width * TEXT_SIZE_FRACTION
         val padding = width * PADDING_FRACTION
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val lineHeight = textSize * LINE_HEIGHT_FACTOR
+        val typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        val fillPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             this.textSize = textSize
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            setShadowLayer(textSize / 10f, 0f, textSize / 20f, Color.argb(160, 0, 0, 0))
+            this.typeface = typeface
+            setShadowLayer(textSize / 8f, 0f, textSize / 16f, Color.argb(180, 0, 0, 0))
         }
-        val bandPaint = Paint().apply { color = Color.argb(BAND_ALPHA, 0, 0, 0) }
+        val strokePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            this.textSize = textSize
+            this.typeface = typeface
+            style = Paint.Style.STROKE
+            strokeWidth = textSize * STROKE_FACTOR
+            strokeJoin = Paint.Join.ROUND
+        }
 
-        val bandHeight = textSize + padding * 2
-        val bandTop = if (position == TimestampPosition.TOP) 0f else height - bandHeight
-        canvas.drawRect(0f, bandTop, width, bandTop + bandHeight, bandPaint)
-        val metrics = textPaint.fontMetrics
-        val baseline = bandTop + bandHeight / 2 - (metrics.ascent + metrics.descent) / 2
-        canvas.drawText(timestamp, padding, baseline, textPaint)
+        val blockHeight = textBlockHeight(width, lines.size)
+        val blockTop = if (position == TimestampPosition.TOP) 0f else height - blockHeight
+        val metrics = fillPaint.fontMetrics
+        lines.forEachIndexed { index, raw ->
+            val line = TextUtils.ellipsize(raw, fillPaint, width - padding * 2, TextUtils.TruncateAt.END).toString()
+            val lineTop = blockTop + padding + index * lineHeight
+            val baseline = lineTop + lineHeight / 2 - (metrics.ascent + metrics.descent) / 2
+            canvas.drawText(line, padding, baseline, strokePaint)
+            canvas.drawText(line, padding, baseline, fillPaint)
+        }
 
         val logo = logoPath?.let { BitmapFactory.decodeFile(it) }
         if (logo != null) {
             val logoWidth = width * LOGO_WIDTH_FRACTION
             val logoHeight = logoWidth * logo.height / logo.width
-            // Sit the logo above the band when the band is at the bottom so the two never overlap.
-            val bottom = if (position == TimestampPosition.BOTTOM) bandTop - padding else height - padding
+            // Sit the logo above the text block when the text is at the bottom so the two never overlap.
+            val bottom = if (position == TimestampPosition.BOTTOM) blockTop - padding else height - padding
             val left = width - logoWidth - padding
             val scaled = Bitmap.createScaledBitmap(logo, logoWidth.toInt().coerceAtLeast(1), logoHeight.toInt().coerceAtLeast(1), true)
             canvas.drawBitmap(scaled, left, bottom - logoHeight, Paint(Paint.FILTER_BITMAP_FLAG))

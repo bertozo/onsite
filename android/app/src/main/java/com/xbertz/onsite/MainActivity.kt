@@ -97,6 +97,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -106,9 +109,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -1195,6 +1201,7 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
     if (cameraOpen) {
         StampCameraView(
             position = uiState.position,
+            label = uiState.label,
             logo = logoBitmap,
             onCapture = { file ->
                 cameraOpen = false
@@ -1245,6 +1252,17 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
                         subtitle = null,
                         selected = uiState.position == TimestampPosition.BOTTOM,
                         onClick = { viewModel.setPosition(TimestampPosition.BOTTOM) }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    OutlinedTextField(
+                        value = uiState.label,
+                        onValueChange = viewModel::setLabel,
+                        label = { Text(stringResource(R.string.photo_label)) },
+                        supportingText = { Text(stringResource(R.string.photo_label_hint)) },
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
                     )
 
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
@@ -1393,6 +1411,7 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
 @Composable
 private fun StampCameraView(
     position: TimestampPosition,
+    label: String,
     logo: ImageBitmap?,
     onCapture: (File) -> Unit,
     newCaptureFile: () -> File,
@@ -1419,7 +1438,7 @@ private fun StampCameraView(
             kotlinx.coroutines.delay(1000)
         }
     }
-    val stampFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ENGLISH) }
+    val lines = PhotoViewModel.stampLines(label, now)
 
     BackHandler(onBack = onClose)
 
@@ -1463,29 +1482,50 @@ private fun StampCameraView(
             Box(modifier = Modifier.size(frameWidth, frameHeight).align(Alignment.Center)) {
                 val textSize = frameWidth * PhotoStamper.TEXT_SIZE_FRACTION
                 val padding = frameWidth * PhotoStamper.PADDING_FRACTION
-                val bandHeight = textSize + padding * 2
-                val textSizeSp = with(LocalDensity.current) { textSize.toSp() }
-                Box(
-                    contentAlignment = Alignment.CenterStart,
+                val lineHeight = textSize * PhotoStamper.LINE_HEIGHT_FACTOR
+                val blockHeight = padding * 2 + lineHeight * lines.size
+                val density = LocalDensity.current
+                val textSizeSp = with(density) { textSize.toSp() }
+                val lineHeightSp = with(density) { lineHeight.toSp() }
+                val strokePx = with(density) { (textSize * PhotoStamper.STROKE_FACTOR).toPx() }
+                val shadowPx = with(density) { (textSize / 8f).toPx() }
+                val baseStyle = TextStyle(
+                    fontSize = textSizeSp,
+                    lineHeight = lineHeightSp,
+                    fontWeight = FontWeight.Bold,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                )
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(bandHeight)
                         .align(if (position == TimestampPosition.TOP) Alignment.TopCenter else Alignment.BottomCenter)
-                        .background(Color.Black.copy(alpha = PhotoStamper.BAND_ALPHA / 255f))
-                        .padding(horizontal = padding)
+                        .padding(padding)
                 ) {
-                    Text(
-                        now.format(stampFormatter),
-                        color = Color.White,
-                        fontSize = textSizeSp,
-                        fontWeight = FontWeight.Bold,
-                        maxLines = 1
-                    )
+                    lines.forEach { line ->
+                        // Dark outline + white fill, same as PhotoStamper, so the text reads on any background.
+                        Box(modifier = Modifier.height(lineHeight), contentAlignment = Alignment.CenterStart) {
+                            Text(
+                                line,
+                                style = baseStyle.copy(color = Color.Black, drawStyle = Stroke(width = strokePx)),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                line,
+                                style = baseStyle.copy(
+                                    color = Color.White,
+                                    shadow = Shadow(Color.Black.copy(alpha = 0.7f), Offset(0f, shadowPx / 2), shadowPx)
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
                 if (logo != null) {
                     val logoWidth = frameWidth * PhotoStamper.LOGO_WIDTH_FRACTION
                     val logoHeight = logoWidth * logo.height / logo.width
-                    val bottomInset = if (position == TimestampPosition.BOTTOM) bandHeight + padding else padding
+                    val bottomInset = if (position == TimestampPosition.BOTTOM) blockHeight + padding else padding
                     Image(
                         bitmap = logo,
                         contentDescription = null,
