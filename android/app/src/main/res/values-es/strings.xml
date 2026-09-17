@@ -20,8 +20,8 @@
     <string name="menu_companies_subtitle">Gestionar clientes</string>
     <string name="menu_sites">Sitios</string>
     <string name="menu_sites_subtitle">Gestionar ubicaciones</string>
-    <string name="menu_job_types">Tipos de trabajo</string>
-    <string name="menu_job_types_subtitle">Gestionar servicios</string>
+    <string name="menu_job_types">Servicios</string>
+    <string name="menu_job_types_subtitle">Lo que haces en la obra</string>
     <string name="menu_profile">Perfil</string>
     <string name="menu_profile_subtitle">Tus datos</string>
     <string name="session_in_progress">Sesión en curso</string>
@@ -33,7 +33,7 @@
     <string name="setup_profile">Añade tu nombre al perfil</string>
     <string name="setup_company">Registra una empresa</string>
     <string name="setup_site">Registra un sitio</string>
-    <string name="setup_job_type">Registra un tipo de trabajo</string>
+    <string name="setup_job_type">Registra un servicio</string>
     <string name="notification_channel_session">Sesión activa</string>
     <string name="notification_session_title">Registrando: %1$s</string>
 
@@ -69,7 +69,7 @@
     <string name="leave_blank_hours_only">Déjalo en blanco para listar solo las horas</string>
     <string name="invoice_no_days_for_company">No hay días trabajados para %1$s en el período seleccionado.</string>
     <string name="invoice_days_to_invoice">Se facturarán %1$d día(s) trabajado(s).</string>
-    <string name="job_type">Tipo de trabajo</string>
+    <string name="job_type">Servicio</string>
     <string name="columns">Columnas</string>
     <string name="report_columns">Columnas del informe</string>
     <string name="report_columns_hint">Fecha y Horas se muestran siempre. El PDF de la factura usa las mismas columnas.</string>
@@ -102,12 +102,12 @@
     <string name="recent_combos">Recientes</string>
 
     <!-- Tipos de trabajo -->
-    <string name="new_job_type">Nuevo tipo de trabajo</string>
-    <string name="job_type_hint">Tipo de trabajo (p. ej. Limpieza de ventanas)</string>
-    <string name="save_job_type">Guardar tipo de trabajo</string>
-    <string name="registered_job_types">Tipos de trabajo registrados</string>
-    <string name="edit_job_type">Editar tipo de trabajo</string>
-    <string name="job_types_empty">Aún no hay tipos de trabajo. Añade el primero arriba.</string>
+    <string name="new_job_type">Nuevo servicio</string>
+    <string name="job_type_hint">Servicio (p. ej. Alicatado)</string>
+    <string name="save_job_type">Guardar servicio</string>
+    <string name="registered_job_types">Servicios registrados</string>
+    <string name="edit_job_type">Editar servicio</string>
+    <string name="job_types_empty">Aún no hay servicios. Añade el primero arriba.</string>
 
     <!-- Sitios -->
     <string name="new_site">Nuevo sitio</string>
@@ -139,14 +139,14 @@
     <string name="location_permission_required">Se necesita acceso a la ubicación para usar OnSite.</string>
     <string name="missing_companies">empresas</string>
     <string name="missing_sites">sitios</string>
-    <string name="missing_job_types">tipos de trabajo</string>
+    <string name="missing_job_types">servicios</string>
     <string name="setup_missing_banner">Configura %1$s desde el menú principal antes de iniciar una sesión.</string>
     <string name="session_details">Detalles de la sesión</string>
     <string name="company">Empresa</string>
     <string name="site">Sitio</string>
     <string name="select_site">Selecciona un sitio</string>
-    <string name="job_description">Descripción del trabajo</string>
-    <string name="select_job_type">Selecciona un tipo de trabajo</string>
+    <string name="job_description">Servicio</string>
+    <string name="select_job_type">Selecciona un servicio</string>
     <string name="start">Iniciar</string>
     <string name="stop">Detener</string>
     <string name="history">Historial</string>
@@ -168,7 +168,7 @@
     <string name="session_finished">Sesión finalizada</string>
     <string name="session_site">Sitio: %1$s</string>
     <string name="session_company">Empresa: %1$s</string>
-    <string name="session_job_type">Tipo de trabajo: %1$s</string>
+    <string name="session_job_type">Servicio: %1$s</string>
     <string name="session_start">Inicio: %1$s</string>
     <string name="session_end">Fin: %1$s</string>
     <string name="session_duration">Duración: %1$dh %2$dmin</string>

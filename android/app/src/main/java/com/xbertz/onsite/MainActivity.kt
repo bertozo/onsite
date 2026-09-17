@@ -2807,12 +2807,15 @@ fun JobTypesScreen(onBack: () -> Unit, viewModel: JobTypeViewModel = viewModel()
         )
     }
 
+    var formExpanded by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_job_types), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.new_job_type), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
+            NewEntityCard(
+                title = stringResource(R.string.new_job_type),
+                expanded = formExpanded,
+                onToggle = { formExpanded = !formExpanded }
+            ) {
                     OutlinedTextField(
                         value = uiState.name,
                         onValueChange = { viewModel.onNameChanged(it) },
@@ -2824,7 +2827,10 @@ fun JobTypesScreen(onBack: () -> Unit, viewModel: JobTypeViewModel = viewModel()
                     )
                     Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = { viewModel.saveJobType() },
+                        onClick = {
+                            viewModel.saveJobType()
+                            formExpanded = false
+                        },
                         enabled = uiState.name.isNotBlank(),
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth().height(48.dp)
@@ -2833,10 +2839,9 @@ fun JobTypesScreen(onBack: () -> Unit, viewModel: JobTypeViewModel = viewModel()
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.save_job_type))
                     }
-                }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
             SectionHeader(title = stringResource(R.string.registered_job_types), count = jobTypes.size)
             Spacer(Modifier.height(8.dp))
 

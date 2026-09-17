@@ -22,8 +22,8 @@
     <string name="menu_companies_subtitle">Manage clients</string>
     <string name="menu_sites">Sites</string>
     <string name="menu_sites_subtitle">Manage locations</string>
-    <string name="menu_job_types">Job Types</string>
-    <string name="menu_job_types_subtitle">Manage services</string>
+    <string name="menu_job_types">Services</string>
+    <string name="menu_job_types_subtitle">What you do on site</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_profile_subtitle">Your details</string>
     <string name="session_in_progress">Session in progress</string>
@@ -35,7 +35,7 @@
     <string name="setup_profile">Add your name to the profile</string>
     <string name="setup_company">Register a company</string>
     <string name="setup_site">Register a site</string>
-    <string name="setup_job_type">Register a job type</string>
+    <string name="setup_job_type">Register a service</string>
     <string name="notification_channel_session">Active session</string>
     <string name="notification_session_title">Tracking: %1$s</string>
 
@@ -71,7 +71,7 @@
     <string name="leave_blank_hours_only">Leave blank to list hours only</string>
     <string name="invoice_no_days_for_company">No worked days for %1$s in the selected period.</string>
     <string name="invoice_days_to_invoice">%1$d worked day(s) will be invoiced.</string>
-    <string name="job_type">Job type</string>
+    <string name="job_type">Service</string>
     <string name="columns">Columns</string>
     <string name="report_columns">Report columns</string>
     <string name="report_columns_hint">Date and Hours are always shown. The invoice PDF uses the same columns.</string>
@@ -106,12 +106,12 @@
     <string name="recent_combos">Recent</string>
 
     <!-- Job types -->
-    <string name="new_job_type">New job type</string>
-    <string name="job_type_hint">Job type (e.g. Window Cleaning)</string>
-    <string name="save_job_type">Save job type</string>
-    <string name="registered_job_types">Registered job types</string>
-    <string name="edit_job_type">Edit job type</string>
-    <string name="job_types_empty">No job types yet. Add your first one above.</string>
+    <string name="new_job_type">New service</string>
+    <string name="job_type_hint">Service (e.g. Tiling)</string>
+    <string name="save_job_type">Save service</string>
+    <string name="registered_job_types">Registered services</string>
+    <string name="edit_job_type">Edit service</string>
+    <string name="job_types_empty">No services yet. Add your first one above.</string>
 
     <!-- Sites -->
     <string name="new_site">New site</string>
@@ -143,14 +143,14 @@
     <string name="location_permission_required">Location access is required to use OnSite.</string>
     <string name="missing_companies">companies</string>
     <string name="missing_sites">sites</string>
-    <string name="missing_job_types">job types</string>
+    <string name="missing_job_types">services</string>
     <string name="setup_missing_banner">Set up %1$s from the home menu before starting a session.</string>
     <string name="session_details">Session details</string>
     <string name="company">Company</string>
     <string name="site">Site</string>
     <string name="select_site">Select a site</string>
-    <string name="job_description">Job description</string>
-    <string name="select_job_type">Select a job type</string>
+    <string name="job_description">Service</string>
+    <string name="select_job_type">Select a service</string>
     <string name="start">Start</string>
     <string name="stop">Stop</string>
     <string name="history">History</string>
@@ -172,7 +172,7 @@
     <string name="session_finished">Session finished</string>
     <string name="session_site">Site: %1$s</string>
     <string name="session_company">Company: %1$s</string>
-    <string name="session_job_type">Job type: %1$s</string>
+    <string name="session_job_type">Service: %1$s</string>
     <string name="session_start">Start: %1$s</string>
     <string name="session_end">End: %1$s</string>
     <string name="session_duration">Duration: %1$dh %2$dmin</string>
