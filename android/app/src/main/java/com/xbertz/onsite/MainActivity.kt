@@ -216,9 +216,8 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         )
         is AuthUiState.LoggedIn -> SignedInAppRoot(
             settingsViewModel = settingsViewModel,
-            accountEmail = state.email,
-            onLogout = authViewModel::logout,
-            onSyncNow = authViewModel::syncNow
+            authViewModel = authViewModel,
+            authState = state
         )
     }
 }
@@ -226,16 +225,15 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
 @Composable
 private fun SignedInAppRoot(
     settingsViewModel: SettingsViewModel,
-    accountEmail: String,
-    onLogout: () -> Unit,
-    onSyncNow: () -> Unit
+    authViewModel: AuthViewModel,
+    authState: AuthUiState.LoggedIn
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) onSyncNow()
+            if (event == Lifecycle.Event.ON_RESUME) authViewModel.syncNow()
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -270,16 +268,18 @@ private fun SignedInAppRoot(
         Screen.COMPANIES -> CompaniesScreen(
             onBack = { screen = Screen.MENU },
             onReviewInvoice = { screen = Screen.INVOICE_REVIEW },
-            onOpenReports = { screen = Screen.REPORTS }
+            onOpenReports = { screen = Screen.REPORTS },
+            canManage = authState.isOwner
         )
-        Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU })
-        Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU })
+        Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU }, canManage = authState.isOwner)
+        Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU }, canManage = authState.isOwner)
         Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
         Screen.SETTINGS -> SettingsScreen(
             onBack = { screen = Screen.MENU },
             viewModel = settingsViewModel,
-            accountEmail = accountEmail,
-            onLogout = onLogout
+            authViewModel = authViewModel,
+            authState = authState,
+            onLogout = authViewModel::logout
         )
         Screen.PLANNING -> PlanningScreen(onBack = { screen = Screen.MENU })
         Screen.PHOTO -> PhotoScreen(onBack = { screen = Screen.MENU })
@@ -363,7 +363,14 @@ internal fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, 
 
 /** Collapsible "add new" form: closed by default so the list below gets the screen, opens on tap. */
 @Composable
-internal fun NewEntityCard(title: String, expanded: Boolean, onToggle: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+internal fun NewEntityCard(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    visible: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    if (!visible) return
     ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
         Column(modifier = Modifier.animateContentSize()) {
             Row(
@@ -395,7 +402,7 @@ internal fun EntityListItem(
     title: String,
     subtitle: String?,
     onEdit: (() -> Unit)? = null,
-    onDelete: () -> Unit,
+    onDelete: (() -> Unit)? = null,
     onClick: (() -> Unit)? = null
 ) {
     val cardModifier = Modifier.fillMaxWidth()
@@ -435,8 +442,10 @@ internal fun EntityListItem(
                     Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
                 }
             }
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+                }
             }
         }
     }
@@ -2217,12 +2226,16 @@ private fun rememberBitmapFromUri(uri: Uri?): ImageBitmap? {
 fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel,
-    accountEmail: String,
+    authViewModel: AuthViewModel,
+    authState: AuthUiState.LoggedIn,
     onLogout: () -> Unit
 ) {
     val themeMode by viewModel.themeMode.collectAsState()
     val language by viewModel.language.collectAsState()
+    val pendingInvites by authViewModel.pendingInvites.collectAsState()
     val context = LocalContext.current
+
+    LaunchedEffect(Unit) { authViewModel.loadPendingInvites() }
 
     // The locale is applied in MainActivity.attachBaseContext, so the Activity must be rebuilt.
     val selectLanguage: (AppLanguage) -> Unit = { picked ->
@@ -2324,7 +2337,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                     )
                     Text(
-                        stringResource(R.string.account_signed_in_as, accountEmail),
+                        stringResource(R.string.account_signed_in_as, authState.email),
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.padding(horizontal = 20.dp)
                     )
@@ -2342,6 +2355,104 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.width(16.dp))
                         Text(stringResource(R.string.logout_button), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            if (authState.memberships.size > 1) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.team_working_as),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        authState.memberships.forEach { membership ->
+                            val roleLabel = if (membership.role == "OWNER") {
+                                stringResource(R.string.team_role_owner)
+                            } else {
+                                stringResource(R.string.team_role_worker)
+                            }
+                            SettingsOptionRow(
+                                icon = if (membership.role == "OWNER") Icons.Filled.Home else Icons.Filled.Groups,
+                                title = membership.accountName,
+                                subtitle = roleLabel,
+                                selected = membership.accountId == authState.activeAccountId,
+                                onClick = { authViewModel.switchAccount(membership.accountId) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (pendingInvites.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.team_pending_invites),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        pendingInvites.forEach { invite ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(invite.accountName, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { authViewModel.acceptInvite(invite.id) }) {
+                                    Text(stringResource(R.string.team_invite_accept))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (authState.isOwner) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            stringResource(R.string.team_section),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        var inviteEmail by rememberSaveable { mutableStateOf("") }
+                        var inviteResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                        OutlinedTextField(
+                            value = inviteEmail,
+                            onValueChange = { inviteEmail = it; inviteResult = null },
+                            label = { Text(stringResource(R.string.team_invite_email_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                authViewModel.inviteWorker(inviteEmail) { success ->
+                                    inviteResult = success
+                                    if (success) inviteEmail = ""
+                                }
+                            },
+                            enabled = inviteEmail.contains("@"),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.team_invite_button))
+                        }
+                        inviteResult?.let { success ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(if (success) R.string.team_invite_sent else R.string.team_invite_failed),
+                                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                 }
             }
@@ -2604,6 +2715,7 @@ fun CompaniesScreen(
     onBack: () -> Unit,
     onReviewInvoice: () -> Unit,
     onOpenReports: () -> Unit,
+    canManage: Boolean = true,
     viewModel: CompanyViewModel = viewModel(),
     trackerViewModel: LocationTrackerViewModel = viewModel(),
     invoiceViewModel: InvoiceViewModel = viewModel(),
@@ -2654,6 +2766,7 @@ fun CompaniesScreen(
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_companies), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             NewEntityCard(
+                visible = canManage,
                 title = stringResource(R.string.new_company),
                 expanded = formExpanded,
                 onToggle = { formExpanded = !formExpanded }
@@ -2765,8 +2878,8 @@ fun CompaniesScreen(
                                 company.phone?.takeIf { it.isNotBlank() },
                                 company.email?.takeIf { it.isNotBlank() }
                             ).joinToString("  •  ").ifBlank { null },
-                            onEdit = { viewModel.startEditingCompany(company) },
-                            onDelete = { viewModel.deleteCompany(company) },
+                            onEdit = if (canManage) { { viewModel.startEditingCompany(company) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteCompany(company) } } else null,
                             onClick = { sheetCompany = company }
                         )
                     }
@@ -2882,7 +2995,7 @@ fun EditCompanyDialog(
 // ---------------------------------------------------------------------------
 
 @Composable
-fun JobTypesScreen(onBack: () -> Unit, viewModel: JobTypeViewModel = viewModel()) {
+fun JobTypesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: JobTypeViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val jobTypes by viewModel.jobTypes.collectAsState()
     val editState by viewModel.editState.collectAsState()
@@ -2901,6 +3014,7 @@ fun JobTypesScreen(onBack: () -> Unit, viewModel: JobTypeViewModel = viewModel()
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_job_types), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             NewEntityCard(
+                visible = canManage,
                 title = stringResource(R.string.new_job_type),
                 expanded = formExpanded,
                 onToggle = { formExpanded = !formExpanded }
@@ -2947,8 +3061,8 @@ fun JobTypesScreen(onBack: () -> Unit, viewModel: JobTypeViewModel = viewModel()
                             icon = Icons.Filled.Work,
                             title = jobType.name,
                             subtitle = null,
-                            onEdit = { viewModel.startEditingJobType(jobType) },
-                            onDelete = { viewModel.deleteJobType(jobType) }
+                            onEdit = if (canManage) { { viewModel.startEditingJobType(jobType) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteJobType(jobType) } } else null
                         )
                     }
                 }
@@ -2997,7 +3111,7 @@ fun EditJobTypeDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SitesScreen(onBack: () -> Unit, viewModel: SiteViewModel = viewModel()) {
+fun SitesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: SiteViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val suggestions by viewModel.suggestions.collectAsState()
     val sites by viewModel.sites.collectAsState()
@@ -3022,6 +3136,7 @@ fun SitesScreen(onBack: () -> Unit, viewModel: SiteViewModel = viewModel()) {
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_sites), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             NewEntityCard(
+                visible = canManage,
                 title = stringResource(R.string.new_site),
                 expanded = formExpanded,
                 onToggle = { formExpanded = !formExpanded }
@@ -3114,8 +3229,8 @@ fun SitesScreen(onBack: () -> Unit, viewModel: SiteViewModel = viewModel()) {
                             icon = Icons.Filled.Place,
                             title = site.label,
                             subtitle = site.address,
-                            onEdit = { viewModel.startEditingSite(site) },
-                            onDelete = { viewModel.deleteSite(site) }
+                            onEdit = if (canManage) { { viewModel.startEditingSite(site) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteSite(site) } } else null
                         )
                     }
                 }

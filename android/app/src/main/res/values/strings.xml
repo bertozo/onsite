@@ -307,4 +307,14 @@
     <string name="account_section">Account</string>
     <string name="account_signed_in_as">Signed in as %1$s</string>
     <string name="logout_button">Log out</string>
+    <string name="team_working_as">Working as</string>
+    <string name="team_role_owner">Owner</string>
+    <string name="team_role_worker">Worker</string>
+    <string name="team_pending_invites">Pending invites</string>
+    <string name="team_invite_accept">Accept</string>
+    <string name="team_section">Invite a worker</string>
+    <string name="team_invite_email_label">Worker\'s email</string>
+    <string name="team_invite_button">Send invite</string>
+    <string name="team_invite_sent">Invite sent.</string>
+    <string name="team_invite_failed">Could not send the invite. Try again.</string>
 </resources>

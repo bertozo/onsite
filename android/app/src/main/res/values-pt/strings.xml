@@ -303,4 +303,14 @@
     <string name="account_section">Conta</string>
     <string name="account_signed_in_as">Conectado como %1$s</string>
     <string name="logout_button">Sair</string>
+    <string name="team_working_as">Trabalhando como</string>
+    <string name="team_role_owner">Dono</string>
+    <string name="team_role_worker">Funcionário</string>
+    <string name="team_pending_invites">Convites pendentes</string>
+    <string name="team_invite_accept">Aceitar</string>
+    <string name="team_section">Convidar funcionário</string>
+    <string name="team_invite_email_label">E-mail do funcionário</string>
+    <string name="team_invite_button">Enviar convite</string>
+    <string name="team_invite_sent">Convite enviado.</string>
+    <string name="team_invite_failed">Não foi possível enviar o convite. Tente de novo.</string>
 </resources>

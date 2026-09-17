@@ -50,6 +50,24 @@ suspend fun runSync(db: AppDatabase, token: String) {
     pullPlannedJobs(db, sync, token)
 }
 
+/**
+ * Switching which account the app acts as (see `AuthViewModel.switchAccount`) means Room can
+ * no longer hold both accounts' rows at once - there is no account_id column on the local
+ * tables, this app has only ever been single-tenant on-device. So a switch pushes whatever is
+ * pending against the account being left, wipes the local catalog, and re-syncs fresh against
+ * the new one. Anything not yet synced at the moment of switching is pushed first and so isn't
+ * lost - only local identity (sync_mapping) resets, not data on the server.
+ */
+suspend fun wipeLocalDomainData(db: AppDatabase) {
+    db.companyDao().deleteAll()
+    db.siteDao().deleteAll()
+    db.jobTypeDao().deleteAll()
+    db.invoiceDao().deleteAll()
+    db.trackingSessionDao().deleteAll()
+    db.plannedJobDao().deleteAll()
+    db.syncDao().clearAll()
+}
+
 private suspend fun pushCompanies(db: AppDatabase, sync: SyncDao, token: String) {
     val dao = db.companyDao()
     val localRows = dao.getAll().first()

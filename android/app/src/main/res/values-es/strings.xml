@@ -303,4 +303,14 @@
     <string name="account_section">Cuenta</string>
     <string name="account_signed_in_as">Conectado como %1$s</string>
     <string name="logout_button">Cerrar sesión</string>
+    <string name="team_working_as">Trabajando como</string>
+    <string name="team_role_owner">Propietario</string>
+    <string name="team_role_worker">Trabajador</string>
+    <string name="team_pending_invites">Invitaciones pendientes</string>
+    <string name="team_invite_accept">Aceptar</string>
+    <string name="team_section">Invitar a un trabajador</string>
+    <string name="team_invite_email_label">Correo del trabajador</string>
+    <string name="team_invite_button">Enviar invitación</string>
+    <string name="team_invite_sent">Invitación enviada.</string>
+    <string name="team_invite_failed">No se pudo enviar la invitación. Inténtalo de nuevo.</string>
 </resources>

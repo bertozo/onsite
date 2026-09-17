@@ -28,12 +28,20 @@ class SessionStore(context: Context) {
     val email: String? get() = prefs.getString(KEY_EMAIL, null)
     val accountId: String? get() = prefs.getString(KEY_ACCOUNT_ID, null)
 
+    /** Which account the app is currently acting as; null means "my own account". */
+    val activeAccountId: String? get() = prefs.getString(KEY_ACTIVE_ACCOUNT_ID, null)
+
     fun save(token: String, email: String, accountId: String) {
         prefs.edit()
             .putString(KEY_TOKEN, token)
             .putString(KEY_EMAIL, email)
             .putString(KEY_ACCOUNT_ID, accountId)
+            .remove(KEY_ACTIVE_ACCOUNT_ID)
             .apply()
+    }
+
+    fun setActiveAccount(accountId: String?) {
+        prefs.edit().putString(KEY_ACTIVE_ACCOUNT_ID, accountId).apply()
     }
 
     fun clear() {
@@ -44,5 +52,6 @@ class SessionStore(context: Context) {
         const val KEY_TOKEN = "token"
         const val KEY_EMAIL = "email"
         const val KEY_ACCOUNT_ID = "account_id"
+        const val KEY_ACTIVE_ACCOUNT_ID = "active_account_id"
     }
 }

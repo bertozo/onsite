@@ -14,6 +14,9 @@ interface InvoiceDao {
     @Update
     suspend fun update(invoice: Invoice)
 
+    @Query("DELETE FROM invoices")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM invoices ORDER BY issueDateEpochDay DESC, id DESC")
     fun getAll(): Flow<List<Invoice>>
 

@@ -15,4 +15,7 @@ interface SyncDao {
 
     @Query("DELETE FROM sync_mapping WHERE entityType = :entityType AND localId = :localId")
     suspend fun deleteMapping(entityType: String, localId: Long)
+
+    @Query("DELETE FROM sync_mapping")
+    suspend fun clearAll()
 }

@@ -46,6 +46,19 @@ data class MeResponse(
 )
 
 @Serializable
+data class CreateInviteRequest(val email: String)
+
+@Serializable
+data class InviteDto(
+    val id: String,
+    val accountId: String,
+    val accountName: String,
+    val email: String,
+    val role: String,
+    val status: String,
+)
+
+@Serializable
 data class CompanyRequest(
     val id: String,
     val name: String,
@@ -121,6 +134,12 @@ data class PlannedJobRequest(
 )
 
 object BackendApi {
+    /**
+     * Which account the caller is acting as, sent as X-Account-Id on every call once set.
+     * Null means "my own account" - the backend defaults to that when the header is absent.
+     */
+    var activeAccountId: String? = null
+
     private val client = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
@@ -137,6 +156,20 @@ object BackendApi {
 
     suspend fun bootstrap(token: String): MeResponse =
         client.post("$BASE_URL/v1/me/bootstrap") { bearerAuth(token) }.body()
+
+    suspend fun me(token: String): MeResponse =
+        client.get("$BASE_URL/v1/me") { bearerAuth(token) }.body()
+
+    suspend fun createInvite(token: String, accountId: String, email: String): InviteDto =
+        client.post("$BASE_URL/v1/accounts/$accountId/invites") {
+            bearerAuth(token); jsonBody(CreateInviteRequest(email))
+        }.body()
+
+    suspend fun listMyInvites(token: String): List<InviteDto> =
+        client.get("$BASE_URL/v1/me/invites") { bearerAuth(token) }.body()
+
+    suspend fun acceptInvite(token: String, inviteId: String): InviteDto =
+        client.post("$BASE_URL/v1/me/invites/$inviteId/accept") { bearerAuth(token) }.body()
 
     suspend fun createCompany(token: String, req: CompanyRequest) {
         client.post("$BASE_URL/v1/companies") { bearerAuth(token); jsonBody(req) }
@@ -227,6 +260,7 @@ object BackendApi {
 
 private fun io.ktor.client.request.HttpRequestBuilder.bearerAuth(token: String) {
     header("Authorization", "Bearer $token")
+    BackendApi.activeAccountId?.let { header("X-Account-Id", it) }
 }
 
 private inline fun <reified T> io.ktor.client.request.HttpRequestBuilder.jsonBody(body: T) {

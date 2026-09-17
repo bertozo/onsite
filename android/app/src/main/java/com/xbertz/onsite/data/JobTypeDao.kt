@@ -21,6 +21,9 @@ interface JobTypeDao {
     @Query("DELETE FROM job_types WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM job_types")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM job_types ORDER BY name ASC")
     fun getAll(): Flow<List<JobType>>
 }

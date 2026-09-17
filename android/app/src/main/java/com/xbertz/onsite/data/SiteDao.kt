@@ -21,6 +21,9 @@ interface SiteDao {
     @Query("DELETE FROM sites WHERE id = :id")
     suspend fun deleteById(id: Long)
 
+    @Query("DELETE FROM sites")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM sites ORDER BY label ASC")
     fun getAll(): Flow<List<Site>>
 }
