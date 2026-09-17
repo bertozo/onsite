@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -72,7 +73,8 @@ fun CompanySheet(
     val recentInvoices = remember(invoices, company) { invoices.filter { it.companyName == company.name }.take(3) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    // Insets are handled by the column below (navigationBarsPadding), so the sheet itself takes none.
+    ModalBottomSheet(onDismissRequest = onDismiss, windowInsets = WindowInsets(0, 0, 0, 0)) {
         Column(modifier = Modifier.padding(horizontal = 24.dp).navigationBarsPadding().padding(bottom = 24.dp)) {
             Text(company.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             company.hourlyRate?.let { rate ->
