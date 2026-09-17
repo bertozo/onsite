@@ -11,6 +11,7 @@ data class AppConfig(
     val supabaseJwtSecret: String,
     val supabaseJwtIssuer: String,
     val port: Int,
+    val devAuthEnabled: Boolean,
 ) {
     companion object {
         fun fromEnv(): AppConfig {
@@ -24,6 +25,7 @@ data class AppConfig(
                 supabaseJwtSecret = required("SUPABASE_JWT_SECRET"),
                 supabaseJwtIssuer = System.getenv("SUPABASE_JWT_ISSUER") ?: "supabase",
                 port = System.getenv("PORT")?.toIntOrNull() ?: 8080,
+                devAuthEnabled = System.getenv("DEV_AUTH_ENABLED")?.toBoolean() ?: false,
             )
         }
     }

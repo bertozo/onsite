@@ -32,16 +32,24 @@ set -a; source .env; set +a
 ./gradlew run
 ```
 
-There is no real Supabase project yet, so there is nothing to sign up against. To exercise
-the auth flow anyway, `tools/make_dev_jwt.py` mints a token shaped like a Supabase one,
-signed with the same `SUPABASE_JWT_SECRET` the server is configured with:
+There is no real Supabase project yet, so there is nothing to sign up against. Two ways to
+get a token in the meantime, both signed with `SUPABASE_JWT_SECRET` and shaped exactly like
+a Supabase one:
 
-```bash
-python tools/make_dev_jwt.py demo@example.com dev-only-secret-change-me
-```
+- `tools/make_dev_jwt.py demo@example.com dev-only-secret-change-me` - offline, prints
+  ready-to-run `curl` commands for `POST /v1/me/bootstrap` (creates the personal account on
+  first call, idempotent after that) and `GET /v1/me`.
+- `POST /v1/dev/auth/login` with `{"email": "demo@example.com"}` - a real HTTP endpoint the
+  Android app's login screen calls today, gated by `DEV_AUTH_ENABLED=true`. No password: it
+  mints a session for any email. **Never enable this outside a local dev machine.**
 
-It prints ready-to-run `curl` commands for `POST /v1/me/bootstrap` (creates the personal
-account on first call, idempotent after that) and `GET /v1/me`.
+### Testing from a physical Android device
+
+A real device on the same USB cable as this machine reaches the backend through
+`adb reverse tcp:8080 tcp:8080`, which makes the device's own `localhost:8080` forward to
+this machine's `localhost:8080`. The app is already configured to call
+`http://127.0.0.1:8080` and allows cleartext traffic to that address only
+(`res/xml/network_security_config.xml` in `on-site-app`).
 
 ## Switching to a real Supabase project
 

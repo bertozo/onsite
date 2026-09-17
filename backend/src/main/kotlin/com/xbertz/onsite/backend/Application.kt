@@ -1,6 +1,7 @@
 package com.xbertz.onsite.backend
 
 import com.xbertz.onsite.backend.auth.configureSupabaseJwt
+import com.xbertz.onsite.backend.auth.devAuthRoutes
 import com.xbertz.onsite.backend.config.AppConfig
 import com.xbertz.onsite.backend.db.DatabaseFactory
 import com.xbertz.onsite.backend.domain.CompaniesRepository
@@ -68,6 +69,7 @@ fun Application.module(config: AppConfig) {
     val plannedJobsRepository = PlannedJobsRepository()
 
     routing {
+        devAuthRoutes(config)
         identityRoutes(identityRepository)
         companyRoutes(companiesRepository)
         siteRoutes(sitesRepository)
