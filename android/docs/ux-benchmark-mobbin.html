@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OnSite Benchmark Mobbin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#F3F4F1; --surface:#FFFFFF; --surface-2:#EBEDE8; --ink:#172029; --muted:#5C6771; --line:#D6DBD5;
+  --accent:#E8611A; --accent-ink:#FFFFFF; --accent-soft:#FBE9DE; --steel:#2E5C8A; --steel-soft:#E2ECF6;
+  --good:#2F8F5B; --good-soft:#E1F2E8; --warn:#B8790F; --warn-soft:#F8EDD3; --bad:#B3392E; --bad-soft:#F6E1DE;
+  --display:"Barlow Condensed","Arial Narrow",Impact,sans-serif;
+  --body:"Source Sans 3","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:"IBM Plex Mono",Consolas,"Courier New",monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151B; --surface:#182027; --surface-2:#1F2931; --ink:#E6EAED; --muted:#98A3AD; --line:#2A343D;
+    --accent:#FF7A33; --accent-ink:#1A0D05; --accent-soft:#3A2418; --steel:#6FA3D9; --steel-soft:#1C2E40;
+    --good:#5CC58A; --good-soft:#173324; --warn:#E3A83A; --warn-soft:#3A2C10; --bad:#E5705F; --bad-soft:#3D1B17;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#10151B; --surface:#182027; --surface-2:#1F2931; --ink:#E6EAED; --muted:#98A3AD; --line:#2A343D;
+  --accent:#FF7A33; --accent-ink:#1A0D05; --accent-soft:#3A2418; --steel:#6FA3D9; --steel-soft:#1C2E40;
+  --good:#5CC58A; --good-soft:#173324; --warn:#E3A83A; --warn-soft:#3A2C10; --bad:#E5705F; --bad-soft:#3D1B17;
+}
+*{box-sizing:border-box}
+html{color-scheme:light dark}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased}
+a{color:var(--steel);text-decoration-thickness:1px;text-underline-offset:2px}
+a:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding-inline:20px;padding-block:0 64px}
+h1,h2,h3,h4{font-family:var(--display);line-height:1.05;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:clamp(2.6rem,6vw,4.4rem);font-weight:700}
+h2{font-size:clamp(1.8rem,3.4vw,2.5rem);font-weight:700}
+h3{font-size:1.45rem;font-weight:600}
+h4{font-size:1.15rem;font-weight:600}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:500}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.masthead{border-bottom:3px solid var(--ink);padding-block:36px 28px;display:grid;gap:18px}
+.masthead .tag{display:inline-flex;align-items:center;gap:10px;font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.masthead .tag b{display:inline-block;background:var(--accent);color:var(--accent-ink);padding:2px 8px;font-weight:500;letter-spacing:.06em}
+.lede{font-size:1.15rem;max-width:68ch;color:var(--muted)}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:6px}
+.fact{border-top:2px solid var(--line);padding-top:8px}
+.fact .v{font-family:var(--display);font-size:2rem;font-weight:700;line-height:1}
+.fact .k{font-size:.85rem;color:var(--muted)}
+
+/* layout with side nav */
+.layout{display:grid;grid-template-columns:220px 1fr;gap:40px;align-items:start;margin-top:32px}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);display:grid;gap:4px;font-size:.92rem}
+.toc a{color:var(--ink);text-decoration:none;padding:6px 10px;border-left:2px solid var(--line)}
+.toc a:hover{border-color:var(--accent);background:var(--surface)}
+.toc .sub{padding-left:22px;font-size:.85rem;color:var(--muted)}
+main{display:grid;gap:56px;min-width:0}
+section{display:grid;gap:18px;scroll-margin-top:16px}
+.section-head{display:grid;gap:6px}
+.section-head p{max-width:70ch}
+
+/* callouts */
+.note{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--steel);padding:14px 18px;display:grid;gap:6px;max-width:80ch}
+.note.warn{border-left-color:var(--warn)}
+.note h4{font-size:1.05rem}
+
+/* app cards */
+.apps{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.app{background:var(--surface);border:1px solid var(--line);padding:16px 18px;display:grid;gap:10px;align-content:start}
+.app header{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.app .plat{font-family:var(--mono);font-size:.72rem;color:var(--muted);letter-spacing:.06em}
+.app .why{font-size:.95rem}
+.app ul{margin:0;padding-left:18px;font-size:.92rem;display:grid;gap:3px}
+.app .links{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:.85rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font-family:var(--mono);font-size:.72rem;padding:2px 8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);border-radius:2px;white-space:nowrap}
+.chip.acc{background:var(--accent-soft);border-color:transparent;color:var(--ink)}
+
+/* pattern blocks */
+.pattern{background:var(--surface);border:1px solid var(--line);display:grid;grid-template-columns:1fr;gap:0}
+.pattern > div{padding:16px 18px;display:grid;gap:8px;align-content:start}
+.pattern .best{border-bottom:1px solid var(--line)}
+.pattern .now{background:var(--surface-2);border-bottom:1px solid var(--line)}
+.pattern .rec{border-top:3px solid var(--accent)}
+.pattern h4{display:flex;align-items:center;gap:8px}
+.pattern ul{margin:0;padding-left:18px;display:grid;gap:5px;font-size:.95rem}
+.pattern li b{font-weight:600}
+.src{font-size:.82rem;color:var(--muted)}
+.src a{color:var(--muted)}
+@media (min-width:900px){
+  .pattern{grid-template-columns:1.25fr .9fr 1.1fr}
+  .pattern .best,.pattern .now{border-bottom:0;border-right:1px solid var(--line)}
+  .pattern .rec{border-top:0;border-left:3px solid var(--accent)}
+}
+
+/* tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.93rem}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+.pill{display:inline-block;font-family:var(--mono);font-size:.72rem;padding:2px 8px;border-radius:2px;white-space:nowrap}
+.pill.hi{background:var(--good-soft);color:var(--good)}
+.pill.md{background:var(--warn-soft);color:var(--warn)}
+.pill.lo{background:var(--steel-soft);color:var(--steel)}
+.pill.effort-hi{background:var(--bad-soft);color:var(--bad)}
+
+/* bar list */
+.bars{display:grid;gap:8px;max-width:640px}
+.bar{display:grid;grid-template-columns:150px 1fr 48px;align-items:center;gap:10px;font-size:.9rem}
+.bar .track{height:14px;background:var(--surface-2);border:1px solid var(--line)}
+.bar .fill{height:100%;background:var(--steel)}
+.bar .fill.acc{background:var(--accent)}
+.bar .n{font-family:var(--mono);font-size:.8rem;text-align:right}
+
+/* method steps */
+.steps{display:grid;gap:10px;counter-reset:s}
+.step{display:grid;grid-template-columns:38px 1fr;gap:12px;align-items:start}
+.step::before{counter-increment:s;content:counter(s);font-family:var(--display);font-size:1.5rem;font-weight:700;color:var(--accent);line-height:1.1}
+
+/* refs */
+.refs{columns:2;column-gap:32px;font-size:.88rem}
+.refs li{break-inside:avoid;margin-bottom:6px}
+footer{margin-top:48px;padding-top:16px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+
+@media (max-width:900px){
+  .layout{grid-template-columns:1fr;gap:24px}
+  .toc{position:static;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));border:1px solid var(--line);background:var(--surface);padding:8px}
+  .toc .sub{display:none}
+  .refs{columns:1}
+  .bar{grid-template-columns:110px 1fr 44px}
+}
+@media (prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="masthead">
+  <div class="tag"><b>BENCHMARK UX</b> Mobbin · setembro 2026 · para o app OnSite (Android)</div>
+  <h1>O que os melhores apps de tracking, organização, invoices e relatórios estão fazendo</h1>
+  <p class="lede">Estudo de padrões de interface a partir da biblioteca do Mobbin, cruzado com as descrições oficiais dos apps líderes para tradies na Austrália. Cada padrão termina numa recomendação concreta para o OnSite, com prioridade.</p>
+  <div class="facts">
+    <div class="fact"><div class="v num">71</div><div class="k">páginas do Mobbin analisadas</div></div>
+    <div class="fact"><div class="v num">376</div><div class="k">telas descritas (iOS, Android, web)</div></div>
+    <div class="fact"><div class="v num">195</div><div class="k">apps diferentes na amostra</div></div>
+    <div class="fact"><div class="v num">10</div><div class="k">recomendações priorizadas</div></div>
+  </div>
+</header>
+
+<div class="layout">
+<nav class="toc" aria-label="Sumário">
+  <a href="#resumo">Resumo</a>
+  <a href="#metodo">Como foi feito</a>
+  <a href="#apps">Apps de referência</a>
+  <a href="#tracking">1. Tracking de horas</a>
+  <a href="#organizacao">2. Organização</a>
+  <a href="#invoices">3. Invoices</a>
+  <a href="#relatorios">4. Relatórios</a>
+  <a href="#transversal">5. Padrões transversais</a>
+  <a href="#roadmap">Roadmap sugerido</a>
+  <a href="#refs">Referências</a>
+</nav>
+
+<main>
+
+<section id="resumo">
+  <div class="section-head">
+    <span class="eyebrow">Resumo</span>
+    <h2>Cinco conclusões</h2>
+  </div>
+  <div class="steps">
+    <div class="step"><div><b>O timer é a tela inicial, não uma tela interna.</b> Toggl Track, ClickUp e Upwork abrem no cronômetro com a lista do dia logo abaixo. No OnSite o tracker fica atrás do menu. A recomendação de maior retorno é um cartão de sessão em andamento no menu, com retomada em um toque.</div></div>
+    <div class="step"><div><b>Entradas de tempo têm "favoritos".</b> O Toggl deixa salvar uma combinação (descrição, projeto, tags, billable) e reiniciar com um toque. No OnSite a combinação site + empresa + tipo de serviço se repete todo dia e é digitada de novo.</div></div>
+    <div class="step"><div><b>Invoice é um objeto com estado, não só um PDF.</b> Square, Wave, PayPal e Stripe mostram lista com colunas Data, Cliente, Nº, Status e Valor, filtro por status e ações por linha. O OnSite gera o PDF e não guarda nada: não dá para saber o que já foi cobrado nem o que está pago.</div></div>
+    <div class="step"><div><b>Relatório começa por três números.</b> O relatório do Toggl (Android) abre com horas totais, horas faturáveis e valor. Bonsai destaca horas não faturadas. Só depois vem a tabela. O OnSite mostra a tabela direto.</div></div>
+    <div class="step"><div><b>Os líderes do nicho vendem o fluxo orçamento → job → invoice → pagamento.</b> ServiceM8 (4,5★, 5.300+ avaliações) e Jobber (4,6★) são organizados em torno desse pipeline, com dashboard de "Workflow". O OnSite não precisa copiar o pipeline inteiro, mas ganha muito em ligar sessões a invoices e dar visibilidade do que falta cobrar.</div></div>
+  </div>
+</section>
+
+<section id="metodo">
+  <div class="section-head">
+    <span class="eyebrow">Método</span>
+    <h2>Como foi feito e o que dá para confiar</h2>
+  </div>
+  <div class="note warn">
+    <h4>Limitação importante</h4>
+    <p>A extensão do Chrome não estava conectada nesta sessão, então o Mobbin foi consultado pelas páginas públicas de <em>explore</em> (telas, fluxos e categorias), que expõem título, descrição, padrões marcados e telas relacionadas de cada item, mas não as imagens em alta nem o passo a passo completo dos fluxos, que exigem login. As afirmações abaixo vêm dessas descrições e das telas relacionadas que o próprio Mobbin agrupa. Onde a fonte é a descrição oficial do app na App Store, isso está indicado.</p>
+  </div>
+  <div class="steps">
+    <div class="step"><div>Busca de telas e fluxos no Mobbin para os temas timer, time entry, calendar, invoice, billing, dashboard, charts e reporting, além de páginas de apps específicos (Toggl Track, Jobber, Square, Wave, Stripe, Todoist, Timepage, Google Calendar, Expensify, HoneyBook, Midday).</div></div>
+    <div class="step"><div>Extração automática das descrições de 71 páginas (376 telas, 195 apps) e leitura manual para agrupar por funcionalidade.</div></div>
+    <div class="step"><div>Cruzamento com a descrição e nota dos apps líderes para o público do OnSite na App Store australiana: ServiceM8, Jobber, Invoice Simple e Toggl Track. A página do Tradify não abriu.</div></div>
+    <div class="step"><div>Comparação com o estado atual do OnSite (menu, tracker, planner, reports, invoice PDF) e priorização por impacto e esforço dentro da arquitetura existente (Compose, Room, MVVM).</div></div>
+  </div>
+  <div>
+    <h3>Padrões mais frequentes nas telas coletadas</h3>
+    <p class="muted" style="margin-bottom:10px">Contagem das tags de padrão do Mobbin na amostra. Serve para mostrar onde a amostra é densa e onde é rala, não como ranking de importância.</p>
+    <div class="bars">
+      <div class="bar"><span>Billing</span><div class="track"><div class="fill acc" style="width:100%"></div></div><span class="n">48</span></div>
+      <div class="bar"><span>Charts</span><div class="track"><div class="fill acc" style="width:83%"></div></div><span class="n">40</span></div>
+      <div class="bar"><span>Date &amp; Time</span><div class="track"><div class="fill" style="width:56%"></div></div><span class="n">27</span></div>
+      <div class="bar"><span>Dashboard</span><div class="track"><div class="fill" style="width:42%"></div></div><span class="n">20</span></div>
+      <div class="bar"><span>Timer &amp; Clock</span><div class="track"><div class="fill acc" style="width:40%"></div></div><span class="n">19</span></div>
+      <div class="bar"><span>Event Detail</span><div class="track"><div class="fill" style="width:40%"></div></div><span class="n">19</span></div>
+      <div class="bar"><span>Goal &amp; Task</span><div class="track"><div class="fill" style="width:35%"></div></div><span class="n">17</span></div>
+      <div class="bar"><span>Calendar</span><div class="track"><div class="fill acc" style="width:33%"></div></div><span class="n">16</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="apps">
+  <div class="section-head">
+    <span class="eyebrow">Apps de referência</span>
+    <h2>Quem foi estudado e por quê</h2>
+    <p class="muted">Apps com telas no Mobbin diretamente ligadas às quatro funcionalidades. Notas e contagens são da App Store australiana em setembro de 2026.</p>
+  </div>
+  <div class="apps">
+    <article class="app">
+      <header><h3>Toggl Track</h3><span class="plat">iOS · Android · Web</span></header>
+      <p class="why">Referência de time tracking para freelancers. 4,8★ (855 avaliações AU). Layout "limpo e minimalista" é o elogio mais comum.</p>
+      <ul>
+        <li>Report Summary (Android): horas totais, horas faturáveis e valor.</li>
+        <li>Confirm Favorite (iOS): salvar entrada favorita com tags e flag billable.</li>
+        <li>Calendar View (web): entradas como blocos, favorito recém-criado visível.</li>
+        <li>Fluxos: tracking no calendário, Pomodoro, dividir entrada, apagar com confirmação.</li>
+        <li>Modal de entrada não sincronizada (offline).</li>
+      </ul>
+      <div class="chips"><span class="chip acc">timer</span><span class="chip">favoritos</span><span class="chip">calendário</span><span class="chip">relatório</span></div>
+      <div class="links"><a href="https://mobbin.com/explore/screens/cefed243-84bc-4c3b-b6e2-95ceaae96048">Report Summary</a><a href="https://mobbin.com/explore/screens/3fd43913-04a3-4ba7-9998-410979472846">Confirm Favorite</a><a href="https://mobbin.com/explore/flows/b9ffc188-d104-4ec5-8980-a13f4f99ac0f">Fluxo calendário</a></div>
+    </article>
+    <article class="app">
+      <header><h3>Jobber</h3><span class="plat">Web · iOS</span></header>
+      <p class="why">Gestão de serviços de campo. 4,6★ (244 avaliações AU), 250 mil usuários ativos. O mais próximo do nicho do OnSite.</p>
+      <ul>
+        <li>Dashboard Home: "Workflow", to-dos, compromissos do dia e feed de atividade.</li>
+        <li>Revenue and Jobs: receita por origem e valor de jobs agendados.</li>
+        <li>Job Profitability: itens, mão de obra e despesas por job.</li>
+        <li>Quote Details: endereço da propriedade + contato + itens; seção de desconto e total.</li>
+        <li>App Store: dark mode recente, fila de sincronização offline, timesheet manual, anular invoice mantendo auditoria.</li>
+      </ul>
+      <div class="chips"><span class="chip acc">dashboard</span><span class="chip">orçamento</span><span class="chip">lucratividade</span><span class="chip">offline</span></div>
+      <div class="links"><a href="https://mobbin.com/explore/screens/26563ea4-1b26-4a35-8c59-f9e8aab7de5c">Dashboard Home</a><a href="https://mobbin.com/explore/screens/ec192e2b-3bdf-4e0c-be32-1478f4620300">Revenue and Jobs</a><a href="https://mobbin.com/explore/screens/587c9e57-f66c-41dd-90e0-ecd72201ff14">Quote Details</a></div>
+    </article>
+    <article class="app">
+      <header><h3>ServiceM8</h3><span class="plat">iOS (App Store)</span></header>
+      <p class="why">Líder australiano para tradies. 4,5★ (5.300+ avaliações). Sem telas no Mobbin; fonte é a descrição oficial.</p>
+      <ul>
+        <li>Job cards digitais, agenda, orçamentos, invoices e pagamento (Tap to Pay).</li>
+        <li>Tempo de deslocamento, tempo no local e pausas registrados por job.</li>
+        <li>Fotos e vídeos com anotação (texto e formas sobre a imagem).</li>
+        <li>Orçamento e invoice gerados por IA a partir das notas do job.</li>
+      </ul>
+      <div class="chips"><span class="chip acc">job card</span><span class="chip">fotos</span><span class="chip">pagamento</span></div>
+      <div class="links"><a href="https://apps.apple.com/au/app/servicem8-field-service-app/id378062736">App Store</a></div>
+    </article>
+    <article class="app">
+      <header><h3>Invoice Simple</h3><span class="plat">iOS · Android</span></header>
+      <p class="why">O app de invoice mais bem avaliado da amostra: 4,8★ com 16.000 avaliações. Vende velocidade: fazer a invoice "ao lado do cliente".</p>
+      <ul>
+        <li>Invoice, orçamento e recibo a partir do mesmo formulário.</li>
+        <li>Cliente puxado dos contatos do telefone, auto-preenchimento.</li>
+        <li>Envio por e-mail, SMS, WhatsApp ou PDF; recibo de leitura e aviso de pagamento.</li>
+        <li>Logo, imposto, desconto, fotos anexadas, assinatura.</li>
+      </ul>
+      <div class="chips"><span class="chip acc">invoice</span><span class="chip">envio</span><span class="chip">status</span></div>
+      <div class="links"><a href="https://apps.apple.com/au/app/invoice-simple-invoice-maker/id694831622">App Store</a></div>
+    </article>
+    <article class="app">
+      <header><h3>Square · Wave · PayPal · Stripe</h3><span class="plat">Web</span></header>
+      <p class="why">Definem o padrão de lista e criação de invoice que todo mundo copia.</p>
+      <ul>
+        <li>Square Invoice Table: colunas Data, Cliente, ID, Título, Status, Valor.</li>
+        <li>Square Invoice Dashboard: visão geral + ações rápidas.</li>
+        <li>Wave: escolher cliente preenche a invoice; filtro por status; lista filtrada por cliente.</li>
+        <li>Stripe: fluxo preencher → revisar → enviar.</li>
+        <li>PayPal: detalhe com atividade e memo; HoneyBook: marcar pagamento como pago.</li>
+      </ul>
+      <div class="chips"><span class="chip acc">lista</span><span class="chip">status</span><span class="chip">revisar antes de enviar</span></div>
+      <div class="links"><a href="https://mobbin.com/explore/screens/a818c369-423d-4051-889a-56b4609731a6">Square tabela</a><a href="https://mobbin.com/explore/screens/a4add5d4-4e3f-488b-9298-785901c81b5a">Wave invoice</a><a href="https://mobbin.com/explore/flows/d90ff8ae-09c8-41cd-88b5-3aec47f56afa">Stripe fluxo</a></div>
+    </article>
+    <article class="app">
+      <header><h3>Timepage · Google Calendar · Todoist</h3><span class="plat">iOS · Android</span></header>
+      <p class="why">Referências de calendário e agendamento em mobile.</p>
+      <ul>
+        <li>Timepage: mês como heatmap (intensidade por dia); detalhe do evento com clima; recorrência diária/semanal/mensal com data final.</li>
+        <li>Google Calendar Android: dia com blocos coloridos; mês vazio com ilustração e botão de adicionar.</li>
+        <li>Todoist: agendador com calendário + hora + fuso; troca de visão lista/board.</li>
+      </ul>
+      <div class="chips"><span class="chip acc">calendário</span><span class="chip">heatmap</span><span class="chip">empty state</span></div>
+      <div class="links"><a href="https://mobbin.com/explore/screens/7a594242-d1f2-42bd-be5a-3073f824f744">Timepage heatmap</a><a href="https://mobbin.com/explore/screens/784c0eef-c99d-4a36-828f-b211b6caa55d">GCal dia</a><a href="https://mobbin.com/explore/screens/b5662e71-a68d-4605-9286-46242ec62301">Todoist scheduler</a></div>
+    </article>
+    <article class="app">
+      <header><h3>Midday · Bonsai · HoneyBook</h3><span class="plat">Web</span></header>
+      <p class="why">Ferramentas "tudo em um" para autônomos. Mostram como juntar horas, invoice e caixa numa tela.</p>
+      <ul>
+        <li>Midday: dashboard com gráfico de receita por período, gastos e invoices; invoice com logo no canto e seção de pagamento.</li>
+        <li>Bonsai: gráfico de horas rastreadas separando faturadas e não faturadas; lucro/prejuízo em popup.</li>
+        <li>HoneyBook: checklist de setup na dashboard; contato com ações "criar projeto / invoice"; marcar pagamento como pago.</li>
+      </ul>
+      <div class="chips"><span class="chip acc">não faturado</span><span class="chip">checklist</span><span class="chip">cliente</span></div>
+      <div class="links"><a href="https://mobbin.com/explore/screens/fa47d11e-0857-4ddc-a515-c837358b7c68">Midday</a><a href="https://mobbin.com/explore/screens/0da1d3f0-1202-403e-8f48-8706d9c54c1f">HoneyBook</a></div>
+    </article>
+    <article class="app">
+      <header><h3>Outros na amostra</h3><span class="plat">Mobbin</span></header>
+      <p class="why">Telas pontuais que confirmam os mesmos padrões.</p>
+      <ul>
+        <li>ClickUp (iOS): time tracker mostrando a tarefa selecionada e subtarefas; timer com tempo decorrido.</li>
+        <li>Upwork (iOS): timesheet com horas e valor por contrato.</li>
+        <li>Harvest (web): horas da semana por dia e projeto. Jira (web): formulário data + início + descrição + tempo gasto.</li>
+        <li>Stripe Dashboard (iOS): saldo disponível, em trânsito, a liberar e histórico de repasses.</li>
+        <li>Origin (iOS): fluxo de caixa dos últimos 6 meses em barras; Ubank: total + gráfico + seletor de período.</li>
+      </ul>
+      <div class="chips"><span class="chip">timesheet</span><span class="chip">gráfico de período</span></div>
+    </article>
+  </div>
+</section>
+
+<section id="tracking">
+  <div class="section-head">
+    <span class="eyebrow">Funcionalidade 1</span>
+    <h2>Tracking de horas</h2>
+    <p class="muted">Como os apps de referência tratam iniciar, parar, corrigir e reaproveitar sessões.</p>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Timer na primeira tela.</b> O Toggl abre na "Timer Page" com o cronômetro em cima e as entradas do dia abaixo (tela web em dark, rolada para mostrar mais entradas). ClickUp mostra tarefa selecionada + tempo decorrido.</li>
+        <li><b>Um toque para começar.</b> Start/stop com um toque, widgets na home e lock screen, Siri (App Store Toggl).</li>
+        <li><b>Estado sempre visível.</b> Timer correndo aparece em notificação, widget e no topo da lista.</li>
+      </ul>
+      <p class="src">Fontes: Toggl Track "Timer Page Scrolled" (web), ClickUp "Time Tracker" e "Elapsed Timer" (iOS), App Store Toggl.</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Menu principal com botão "Iniciar tracking" e ações secundárias; a sessão em andamento só é visível dentro do Tracker.</li>
+        <li>Início e fim usam GPS em primeiro plano; não há widget nem notificação com o tempo decorrido.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li>Cartão de <b>sessão em andamento</b> no topo do menu: site, empresa, tempo decorrido em tabular-nums e botão Parar. Quando não há sessão, o mesmo cartão vira "Retomar última sessão" (mesmo site/empresa/serviço).</li>
+        <li>Notificação persistente com o cronômetro enquanto a sessão está aberta (foreground service simples, sem localização em background).</li>
+        <li>Fase 2: widget de home do Android com Iniciar/Parar.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Favoritos de entrada.</b> Toggl: modal "Confirm Favorite" salva descrição + projeto + tags + billable; o calendário mostra o favorito recém-criado pronto para reuso.</li>
+        <li><b>Sugestões e auto-complete</b> com base no histórico (App Store Toggl).</li>
+        <li><b>Flag billable</b> por entrada, com o admin podendo forçar.</li>
+      </ul>
+      <p class="src">Fontes: Toggl "Confirm Favorite" (iOS), "Calendar View" (web), App Store Toggl.</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Toda sessão exige escolher empresa, site e tipo de serviço em dropdowns.</li>
+        <li>Não existe conceito de "faturável" na sessão; a taxa horária é digitada só na hora da invoice.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li><b>Favoritos</b> = combinação empresa + site + serviço salva com nome curto ("Bondi, Smith Builders, tiling"). Chips no topo do Tracker; um toque preenche tudo e inicia.</li>
+        <li>Pré-selecionar automaticamente a combinação da última sessão no mesmo site (o site já tem coordenadas: usar o GPS para sugerir o site mais próximo).</li>
+        <li>Opcional: campo <b>taxa horária padrão na empresa</b>, herdado pela invoice.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Edição manual completa.</b> Jira: formulário com data, hora de início, descrição e tempo gasto. Wrike: timesheet com entrada atualizada. Jobber: timesheet com entrada manual.</li>
+        <li><b>Dividir e apagar com contexto.</b> Toggl: fluxo "Splitting a time entry"; modal de exclusão mostra os detalhes da entrada antes de confirmar.</li>
+        <li><b>Entradas no calendário.</b> Toggl (iOS) cria entradas a partir de eventos do calendário; Google Calendar mostra o dia com blocos coloridos.</li>
+        <li><b>Offline explícito.</b> Toggl marca entrada não sincronizada; Jobber mostra fila de sincronização.</li>
+      </ul>
+      <p class="src">Fontes: Jira "Time Tracking Details", Toggl "Delete time entry", "Unsynced Entry Modal", fluxo "Splitting a time entry"; Google Calendar "Daily Calendar" (Android).</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Sessão manual e edição de duração/horários já existem, com confirmação de exclusão nomeada.</li>
+        <li>Planner lista as sessões do dia e o total diário, mas como lista, não como blocos de tempo.</li>
+        <li>Tudo é local (Room), então não há problema de sincronização.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li><b>Dividir sessão</b> em um ponto (almoço) e <b>pausa</b> durante a sessão; ServiceM8 registra deslocamento, tempo no local e pausas separadamente.</li>
+        <li>No Planner, mostrar as sessões do dia como <b>blocos na linha do tempo</b> (6h–20h) coloridos por empresa, mantendo a lista abaixo.</li>
+        <li>Agrupar o histórico do Tracker por dia com <b>total do dia</b> no cabeçalho (padrão Toggl/Harvest).</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="organizacao">
+  <div class="section-head">
+    <span class="eyebrow">Funcionalidade 2</span>
+    <h2>Organização: agenda, clientes e sites</h2>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Dashboard de fluxo de trabalho.</b> Jobber: "Workflow" (orçamentos, jobs, invoices por etapa), to-dos, compromissos de hoje e feed de atividade; versão em dark mode.</li>
+        <li><b>Checklist de setup em vez de banner.</b> HoneyBook, Bonsai, Deel e Circle mostram um checklist com progresso e a próxima ação.</li>
+        <li><b>Cliente como hub.</b> HoneyBook "Contact Details" tem ações "criar projeto" e "criar invoice"; Jobber "Quote Details" junta endereço da propriedade, contato e itens.</li>
+      </ul>
+      <p class="src">Fontes: Jobber "Dashboard Home", "Dark Mode Dashboard"; HoneyBook "Dashboard", "Contact Details"; Deel "Onboarding Checklist".</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Menu é uma lista de ações; o Tracker mostra um banner "faltam empresas/sites/serviços" quando o cadastro está incompleto.</li>
+        <li>Empresas, sites e serviços são listas simples de cadastro; não há tela de "cliente" com histórico.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li>Transformar o menu em <b>home com estado</b>: sessão atual, horas da semana, próximos jobs planejados e "a faturar" por empresa.</li>
+        <li>Trocar o banner por <b>checklist de configuração</b> (perfil, empresa, site, serviço) com progresso e link direto; some quando completo.</li>
+        <li><b>Ficha da empresa</b>: sessões recentes, horas não faturadas, invoices emitidas, botão "Gerar invoice". Fica natural com os dados que o app já tem.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Mês como heatmap.</b> Timepage colore cada dia pela intensidade; Not Boring Habits e stoic. usam marcadores por dia.</li>
+        <li><b>Dia com blocos.</b> Google Calendar Android e Toggl mostram o dia como blocos coloridos; Timepage inclui clima no dia e no evento.</li>
+        <li><b>Empty state com ação.</b> Google Calendar: mês sem eventos com ilustração; LINE: mês vazio com botão de novo evento; FAB para adicionar é padrão.</li>
+        <li><b>Recorrência.</b> Timepage: diária/semanal/mensal/anual com data final; Revolut/bunq: data de início + frequência.</li>
+      </ul>
+      <p class="src">Fontes: Timepage "Month Heatmap", "Recurrence Settings", fluxo "Day schedule (with weather)"; Google Calendar "Calendar View" e "Daily Calendar" (Android); LINE "Month Calendar".</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Planner com calendário expansível, jobs planejados por dia com marcadores coloridos por data, lista de sessões do dia e total.</li>
+        <li>Job planejado tem hora de fim opcional e notas; não há recorrência.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li>Marcadores do mês passam a codificar <b>horas trabalhadas</b> (heatmap em 4 níveis) além dos jobs planejados; o usuário enxerga a semana pesada de longe.</li>
+        <li><b>Repetir job</b> semanalmente até uma data (obra recorrente), gerando <code>PlannedJob</code> por ocorrência para não mudar o modelo.</li>
+        <li>Dia sem nada: empty state curto com botão "Planejar job" e "Registrar sessão manual".</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="invoices">
+  <div class="section-head">
+    <span class="eyebrow">Funcionalidade 3</span>
+    <h2>Invoices</h2>
+    <p class="muted">A maior distância entre o OnSite e os apps de referência está aqui.</p>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Lista de invoices com status.</b> Square: Data, Cliente, ID, Título, Status, Valor. Miro: data de emissão, pagamento, descrição, preço, status e download. Wave: filtro por status e lista filtrada por cliente. PayPal: busca + filtro.</li>
+        <li><b>Ações por linha.</b> Menu com ver, baixar e apagar (Squarespace); Jobber anula invoice mantendo o histórico.</li>
+        <li><b>Visão geral.</b> Square "Invoice Dashboard": resumo + ações rápidas.</li>
+      </ul>
+      <p class="src">Fontes: Square "Invoice Table" e "Invoice Dashboard"; Miro "Invoices List"; Wave "Status Filter", "Filtered Invoices"; Squarespace "Invoice List"; App Store Jobber.</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>A invoice é gerada em PDF a partir das sessões de uma empresa e compartilhada; só o próximo número é guardado em SharedPreferences.</li>
+        <li>Não há lista de invoices, status, nem marcação de quais sessões já foram cobradas.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação (prioridade alta)</h4>
+      <ul>
+        <li>Nova entidade <b>Invoice</b> no Room: número, empresa, período, horas, taxa, total, status (rascunho / enviada / paga), data de emissão, caminho do PDF. Sessões ganham <code>invoiceId</code> nulo até serem cobradas.</li>
+        <li>Tela <b>Invoices</b>: lista com chip de status colorido, filtro por status e por empresa, ações abrir PDF / compartilhar / marcar como paga / anular.</li>
+        <li>Guardar o PDF em <code>filesDir/invoices/</code> em vez de cache, para reabrir depois.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Preencher → revisar → enviar.</b> Stripe cria a invoice em três passos com pré-visualização; Midday tem "Invoice Preview" com itens, quantidades e totais.</li>
+        <li><b>Cliente preenche a invoice.</b> Wave: escolher o cliente traz nome e e-mail; Midday coloca o logo no canto superior direito e tem seção de pagamento.</li>
+        <li><b>Detalhe rico.</b> PayPal: número, datas, valores, dados de cobrança, itens, atividade e memo. Contra: PDF para download. Medium: editar ou imprimir.</li>
+        <li><b>Confirmação de envio e pagamento.</b> Invoice Simple: recibo de leitura e aviso quando pago; envio por e-mail, SMS ou WhatsApp.</li>
+      </ul>
+      <p class="src">Fontes: fluxo Stripe "Creating an invoice"; Midday "Invoice Preview", "Invoice With Logo", "Invoice With Payment"; Wave "Invoice With Customer"; PayPal "Invoice Details"; App Store Invoice Simple.</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Diálogo com empresa, número, taxa opcional e colunas; o PDF sai direto, sem pré-visualização.</li>
+        <li>O template A4 já inclui dados do perfil, empresa, tabela por dia, total e dados bancários (BSB, conta).</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li><b>Passo de revisão</b> antes de gerar: cabeçalho da invoice, tabela de dias (a mesma <code>ReportTable</code>) e total; botão "Gerar e compartilhar".</li>
+        <li>Permitir <b>descartar dias</b> na revisão (checkbox por linha) e adicionar <b>nota/memo</b> impresso no PDF.</li>
+        <li>Ao marcar como paga, gravar a data; a ficha da empresa mostra "em aberto" e "recebido".</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="relatorios">
+  <div class="section-head">
+    <span class="eyebrow">Funcionalidade 4</span>
+    <h2>Relatórios</h2>
+  </div>
+
+  <div class="pattern">
+    <div class="best"><h4>O que os melhores fazem</h4>
+      <ul>
+        <li><b>Três números antes da tabela.</b> Toggl Android "Report Summary": horas totais, horas faturáveis e valor. Upwork: horas e valor por contrato.</li>
+        <li><b>Faturado vs. não faturado.</b> Bonsai: gráfico de horas rastreadas com unbilled e billed; Midday mostra receita e invoices no mesmo dashboard.</li>
+        <li><b>Seletor de período.</b> Ubank e Origin usam segmented control (semana / mês / 6 meses) sobre um gráfico de barras; Midday e Deel usam intervalo de datas.</li>
+        <li><b>Quebra por dimensão.</b> Jobber: receita por origem; Harvest: horas por dia e projeto; Plata: alocação em pizza + lista.</li>
+        <li><b>Exportar.</b> Toggl: relatórios com período customizado e exportação (App Store).</li>
+      </ul>
+      <p class="src">Fontes: Toggl "Report Summary" (Android); Bonsai "Time Tracking Chart"; Ubank "Dashboard View"; Origin "Cash Flow Report", "Expense BarGraph"; Jobber "Revenue and Jobs"; Harvest "Weekly Hours Detail".</p>
+    </div>
+    <div class="now"><h4>OnSite hoje</h4>
+      <ul>
+        <li>Reports mostra a tabela de dias com seleção de colunas (data, site, endereço, empresa, serviço, início, fim, horas) e total de horas.</li>
+        <li>A mesma coluna template alimenta o PDF, o que é bom: uma fonte de verdade.</li>
+      </ul>
+    </div>
+    <div class="rec"><h4>Recomendação</h4>
+      <ul>
+        <li><b>Cabeçalho de resumo</b>: horas, dias trabalhados, valor estimado (taxa da empresa) e horas não faturadas em destaque laranja.</li>
+        <li><b>Chips de período</b>: esta semana / este mês / mês passado / personalizado, aplicados à tabela e ao resumo.</li>
+        <li><b>Barras por semana</b> (Canvas ou Compose) com o total do período; abaixo, <b>quebra por site</b> em lista com barra proporcional. Sem biblioteca de gráficos.</li>
+        <li>Exportar CSV pelo mesmo <code>FileProvider</code> do PDF.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="transversal">
+  <div class="section-head">
+    <span class="eyebrow">Funcionalidade 5</span>
+    <h2>Padrões transversais que aparecem em todos</h2>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>Padrão</th><th>Onde aparece</th><th>Aplicação no OnSite</th></tr></thead>
+      <tbody>
+        <tr><td><b>Status como cor + texto</b></td><td>Badges em Square, Miro, Wave, HoneyBook (pago, enviado, rascunho, vencido)</td><td>Chips de status na lista de invoices e na ficha da empresa; nunca só cor.</td></tr>
+        <tr><td><b>Bottom sheet para edição rápida</b></td><td>19.000+ telas no Mobbin; Craft, Polywork e IKEA usam para data/duração</td><td>Editar horário/duração da sessão e favoritos em bottom sheet, sem trocar de tela.</td></tr>
+        <tr><td><b>FAB para a ação primária</b></td><td>Google Calendar, LINE, Clover, KakaoBank</td><td>FAB "Iniciar" no Tracker e "Planejar" no Planner; ações secundárias na barra.</td></tr>
+        <tr><td><b>Empty state com ação</b></td><td>Google Calendar, LINE, Krea AI billing, glossário do Mobbin</td><td>Relatórios, invoices e planner vazios apontam a próxima ação em vez de só "nada aqui".</td></tr>
+        <tr><td><b>Dark mode</b></td><td>Jobber (novidade destacada na App Store), Toggl, Cron, Teams</td><td>Já existe; garantir contraste dos marcadores do calendário e dos chips.</td></tr>
+        <tr><td><b>Confirmação com contexto</b></td><td>Toggl "Delete time entry" mostra os dados da entrada</td><td>Já feito na exclusão de sessão; replicar para invoices (anular, não apagar).</td></tr>
+        <tr><td><b>Números tabulares</b></td><td>Todos os relatórios e listas financeiras</td><td>Usar <code>FontFeature</code> tnum nas colunas de horas e valores da tabela e do PDF.</td></tr>
+        <tr><td><b>Sucesso explícito</b></td><td>Jobber "Quotes Page Confirmation", Toggl "Sign-up confirmation"</td><td>Snackbar "Invoice #12 gerada" com ação "Compartilhar" em vez de abrir o share direto.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="roadmap">
+  <div class="section-head">
+    <span class="eyebrow">Priorização</span>
+    <h2>Roadmap sugerido</h2>
+    <p class="muted">Impacto pensado para o dia a dia de um tradie autônomo; esforço estimado dentro da arquitetura atual (uma migração Room conta como médio).</p>
+  </div>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>#</th><th>Item</th><th>Impacto</th><th>Esforço</th><th>Toca em</th></tr></thead>
+      <tbody>
+        <tr><td class="num">1</td><td>Cartão de sessão em andamento / retomar última no menu</td><td><span class="pill hi">alto</span></td><td><span class="pill lo">baixo</span></td><td>MainMenuScreen, LocationTrackerViewModel</td></tr>
+        <tr><td class="num">2</td><td>Favoritos de sessão (empresa + site + serviço) com chips no Tracker</td><td><span class="pill hi">alto</span></td><td><span class="pill md">médio</span></td><td>Nova entidade ou SharedPreferences, TrackerScreen</td></tr>
+        <tr><td class="num">3</td><td>Invoice persistida com status, lista e marcar como paga</td><td><span class="pill hi">alto</span></td><td><span class="pill md">médio</span></td><td>AppDatabase v11, InvoiceViewModel, nova tela</td></tr>
+        <tr><td class="num">4</td><td>Resumo no topo dos relatórios + chips de período + horas não faturadas</td><td><span class="pill hi">alto</span></td><td><span class="pill md">médio</span></td><td>ReportsScreen, ReportViewModel (depende do 3 para "não faturado")</td></tr>
+        <tr><td class="num">5</td><td>Revisão antes de gerar o PDF, com descartar dias e memo</td><td><span class="pill md">médio</span></td><td><span class="pill lo">baixo</span></td><td>Diálogo de invoice, InvoiceData, template</td></tr>
+        <tr><td class="num">6</td><td>Heatmap de horas no calendário do Planner</td><td><span class="pill md">médio</span></td><td><span class="pill lo">baixo</span></td><td>CalendarPanel, PlanningViewModel</td></tr>
+        <tr><td class="num">7</td><td>Checklist de configuração no lugar do banner</td><td><span class="pill md">médio</span></td><td><span class="pill lo">baixo</span></td><td>MainMenuScreen, TrackerScreen</td></tr>
+        <tr><td class="num">8</td><td>Ficha da empresa (horas, em aberto, invoices, gerar)</td><td><span class="pill md">médio</span></td><td><span class="pill md">médio</span></td><td>CompaniesScreen, nova tela, depende do 3</td></tr>
+        <tr><td class="num">9</td><td>Notificação persistente com cronômetro</td><td><span class="pill md">médio</span></td><td><span class="pill md">médio</span></td><td>Foreground service, permissão de notificação (API 33+)</td></tr>
+        <tr><td class="num">10</td><td>Dividir sessão / pausa; barras por semana e quebra por site</td><td><span class="pill lo">baixo</span></td><td><span class="pill md">médio</span></td><td>Tracker, Reports</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">
+    <h4>Ordem prática</h4>
+    <p>Itens 1, 5, 6 e 7 são entregas de um dia cada e não mudam o banco. O item 3 é a mudança estrutural que destrava 4 e 8; vale fazer antes de qualquer refinamento visual em relatórios.</p>
+  </div>
+</section>
+
+<section id="refs">
+  <div class="section-head">
+    <span class="eyebrow">Referências</span>
+    <h2>Telas e fluxos citados</h2>
+    <p class="muted">Links públicos do Mobbin; as imagens em alta exigem conta.</p>
+  </div>
+  <ul class="refs">
+    <li><a href="https://mobbin.com/explore/screens/cefed243-84bc-4c3b-b6e2-95ceaae96048">Toggl Track Android · Report Summary</a></li>
+    <li><a href="https://mobbin.com/explore/screens/3fd43913-04a3-4ba7-9998-410979472846">Toggl Track iOS · Confirm Favorite</a></li>
+    <li><a href="https://mobbin.com/explore/screens/1e8a16a2-40f9-4696-b6f8-6fed6994b63a">Toggl Track Web · Calendar View</a></li>
+    <li><a href="https://mobbin.com/explore/screens/a507bbe1-9329-47af-a764-a00aa34f7708">Toggl Track Web · Delete time entry</a></li>
+    <li><a href="https://mobbin.com/explore/screens/5fb0aa1f-6d36-4a29-9cc2-306bcfe7d9e6">Toggl Track Web · Unsynced Entry Modal</a></li>
+    <li><a href="https://mobbin.com/explore/flows/b9ffc188-d104-4ec5-8980-a13f4f99ac0f">Toggl Track iOS · Tracking time on calendar (fluxo)</a></li>
+    <li><a href="https://mobbin.com/explore/flows/b9954846-af25-412f-856b-74fb74503c04">Toggl Track iOS · Pomodoro (fluxo)</a></li>
+    <li><a href="https://mobbin.com/explore/flows/19371f00-a45c-4cea-b954-bc81dcb5e944">Toggl Track Web · Splitting a time entry (fluxo)</a></li>
+    <li><a href="https://mobbin.com/explore/web/screens/time-tracker">Mobbin · Time Tracker (web, categoria)</a></li>
+    <li><a href="https://mobbin.com/explore/mobile/app-categories/time-tracking">Mobbin · Time Tracking apps (mobile)</a></li>
+    <li><a href="https://mobbin.com/explore/screens/26563ea4-1b26-4a35-8c59-f9e8aab7de5c">Jobber Web · Dashboard Home</a></li>
+    <li><a href="https://mobbin.com/explore/screens/9de47309-e37f-40db-b3c8-847d17392de7">Jobber Web · Dark Mode Dashboard</a></li>
+    <li><a href="https://mobbin.com/explore/screens/839dd83a-4d45-424f-8a1b-ec841114a7d6">Jobber Web · Updated Dashboard</a></li>
+    <li><a href="https://mobbin.com/explore/screens/ec192e2b-3bdf-4e0c-be32-1478f4620300">Jobber Web · Revenue and Jobs</a></li>
+    <li><a href="https://mobbin.com/explore/screens/587c9e57-f66c-41dd-90e0-ecd72201ff14">Jobber Web · Quote Details</a></li>
+    <li><a href="https://mobbin.com/explore/screens/68291b5a-feff-416e-8481-56e5360282c3">Jobber Web · Quote Discount</a></li>
+    <li><a href="https://mobbin.com/explore/screens/a818c369-423d-4051-889a-56b4609731a6">Square Web · Invoice Table</a></li>
+    <li><a href="https://mobbin.com/explore/screens/cec3ecdd-ab58-4b4c-9013-9d0deb6b8a34">Square Web · Invoice Dashboard</a></li>
+    <li><a href="https://mobbin.com/explore/screens/a4add5d4-4e3f-488b-9298-785901c81b5a">Wave Web · Invoice With Customer</a></li>
+    <li><a href="https://mobbin.com/explore/screens/c96d349e-4ada-4561-ab9c-8436ad3c2f19">Wave Web · Invoice Creation Modal</a></li>
+    <li><a href="https://mobbin.com/explore/flows/d90ff8ae-09c8-41cd-88b5-3aec47f56afa">Stripe Web · Creating an invoice (fluxo)</a></li>
+    <li><a href="https://mobbin.com/explore/screens/97fe7e54-3634-4895-8ee3-767694227c01">Miro Web · Invoices List</a></li>
+    <li><a href="https://mobbin.com/explore/screens/ccaddb20-2889-4be2-bc56-01ca250f390d">Squarespace Web · Invoice List</a></li>
+    <li><a href="https://mobbin.com/explore/screens/985b932c-dbcc-40d9-a47f-97bb01d40c63">Vercel Web · Invoice Details</a></li>
+    <li><a href="https://mobbin.com/explore/screens/6e2b9a39-5f7d-4d82-8aed-34eb2b1e733c">Medium Web · Invoice details</a></li>
+    <li><a href="https://mobbin.com/explore/screens/d737c92f-f35a-4056-b7a2-971ab8d9b609">Faire Web · Invoice Detail</a></li>
+    <li><a href="https://mobbin.com/explore/screens/fa47d11e-0857-4ddc-a515-c837358b7c68">Midday Web · Dashboard Overview</a></li>
+    <li><a href="https://mobbin.com/explore/screens/0da1d3f0-1202-403e-8f48-8706d9c54c1f">HoneyBook Web · Dashboard</a></li>
+    <li><a href="https://mobbin.com/explore/screens/d9f49fbc-87c3-4e69-a96c-c5b7cc317acf">Steep Web · Overview Dashboard (com Jobber Insights relacionado)</a></li>
+    <li><a href="https://mobbin.com/explore/screens/4faf8630-06a3-4a56-8271-b6cd5bec3a25">Stripe Dashboard iOS · Balances Overview</a></li>
+    <li><a href="https://mobbin.com/explore/screens/7a594242-d1f2-42bd-be5a-3073f824f744">Timepage iOS · Month Heatmap</a></li>
+    <li><a href="https://mobbin.com/explore/screens/202e187d-b3e9-4d24-84be-fc4a8a282c9a">Timepage iOS · Monthly Calendar View</a></li>
+    <li><a href="https://mobbin.com/explore/screens/8ac925a0-93df-49dd-b19c-61d8f39523b0">Timepage iOS · Recurrence Settings</a></li>
+    <li><a href="https://mobbin.com/explore/screens/784c0eef-c99d-4a36-828f-b211b6caa55d">Google Calendar Android · Daily Calendar</a></li>
+    <li><a href="https://mobbin.com/explore/screens/fd3a38c6-6056-4a6f-a1e8-b3521011b3a8">Google Calendar Android · Calendar View (vazio)</a></li>
+    <li><a href="https://mobbin.com/explore/screens/b5662e71-a68d-4605-9286-46242ec62301">Todoist iOS · Scheduler</a></li>
+    <li><a href="https://mobbin.com/explore/screens/78a6a8a4-ab7e-4a5d-886d-8d5c70a01031">Todoist iOS · Calendar view</a></li>
+    <li><a href="https://mobbin.com/explore/mobile/screens/dashboard">Mobbin · Dashboard (mobile, categoria)</a></li>
+    <li><a href="https://mobbin.com/explore/mobile/screens/charts">Mobbin · Charts (mobile, categoria)</a></li>
+    <li><a href="https://mobbin.com/explore/mobile/screens/calendar">Mobbin · Calendar (mobile, categoria)</a></li>
+    <li><a href="https://mobbin.com/explore/mobile/screens/timer-clock">Mobbin · Timer &amp; Clock (mobile, categoria)</a></li>
+    <li><a href="https://mobbin.com/explore/web/screens/billing">Mobbin · Billing (web, categoria)</a></li>
+    <li><a href="https://mobbin.com/glossary/empty-state">Mobbin · Glossário Empty State</a></li>
+    <li><a href="https://apps.apple.com/au/app/servicem8-field-service-app/id378062736">App Store AU · ServiceM8</a></li>
+    <li><a href="https://apps.apple.com/au/app/jobber-field-service-software/id1014146758">App Store AU · Jobber</a></li>
+    <li><a href="https://apps.apple.com/au/app/invoice-simple-invoice-maker/id694831622">App Store AU · Invoice Simple</a></li>
+    <li><a href="https://apps.apple.com/au/app/toggl-track-hours-time-log/id1291898086">App Store AU · Toggl Track</a></li>
+  </ul>
+</section>
+
+</main>
+</div>
+
+<footer>Relatório gerado em 17 de setembro de 2026 a partir de páginas públicas do Mobbin e da App Store. Notas e contagens de avaliações mudam com o tempo.</footer>
+</div>
+</body>
+</html>
