@@ -98,6 +98,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -133,6 +134,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xbertz.onsite.data.Company
 import com.xbertz.onsite.data.JobType
@@ -207,14 +210,15 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         AuthUiState.CheckingSession -> FullScreenProgress()
         is AuthUiState.LoggedOut -> LoginScreen(loading = false, error = state.error, onLogin = authViewModel::login)
         AuthUiState.LoggingIn -> LoginScreen(loading = true, error = null, onLogin = authViewModel::login)
-        AuthUiState.MigratingData -> FullScreenProgress(
-            title = stringResource(R.string.migrating_title),
-            subtitle = stringResource(R.string.migrating_subtitle)
+        AuthUiState.SyncingData -> FullScreenProgress(
+            title = stringResource(R.string.syncing_title),
+            subtitle = stringResource(R.string.syncing_subtitle)
         )
         is AuthUiState.LoggedIn -> SignedInAppRoot(
             settingsViewModel = settingsViewModel,
             accountEmail = state.email,
-            onLogout = authViewModel::logout
+            onLogout = authViewModel::logout,
+            onSyncNow = authViewModel::syncNow
         )
     }
 }
@@ -223,9 +227,19 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
 private fun SignedInAppRoot(
     settingsViewModel: SettingsViewModel,
     accountEmail: String,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onSyncNow: () -> Unit
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) onSyncNow()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     if (screen != Screen.MENU) {
         // The invoice review is reached from Reports, so back returns there; every other screen returns home.

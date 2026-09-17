@@ -18,6 +18,9 @@ interface TrackingSessionDao {
     @Delete
     suspend fun delete(session: TrackingSession)
 
+    @Query("DELETE FROM tracking_sessions WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("SELECT * FROM tracking_sessions ORDER BY startTimestampMillis DESC, id DESC")
     fun getAll(): Flow<List<TrackingSession>>
 

@@ -18,6 +18,9 @@ interface PlannedJobDao {
     @Delete
     suspend fun delete(job: PlannedJob)
 
+    @Query("DELETE FROM planned_jobs WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("SELECT * FROM planned_jobs ORDER BY dateEpochDay ASC, startMinute ASC, id ASC")
     fun getAll(): Flow<List<PlannedJob>>
 

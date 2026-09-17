@@ -4,8 +4,11 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.request.delete
+import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
+import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
@@ -139,25 +142,87 @@ object BackendApi {
         client.post("$BASE_URL/v1/companies") { bearerAuth(token); jsonBody(req) }
     }
 
+    suspend fun updateCompany(token: String, id: String, req: CompanyRequest) {
+        client.put("$BASE_URL/v1/companies/$id") { bearerAuth(token); jsonBody(req) }
+    }
+
+    suspend fun deleteCompany(token: String, id: String) {
+        client.delete("$BASE_URL/v1/companies/$id") { bearerAuth(token) }
+    }
+
+    suspend fun listCompanies(token: String): List<CompanyRequest> =
+        client.get("$BASE_URL/v1/companies") { bearerAuth(token) }.body()
+
     suspend fun createSite(token: String, req: SiteRequest) {
         client.post("$BASE_URL/v1/sites") { bearerAuth(token); jsonBody(req) }
     }
+
+    suspend fun updateSite(token: String, id: String, req: SiteRequest) {
+        client.put("$BASE_URL/v1/sites/$id") { bearerAuth(token); jsonBody(req) }
+    }
+
+    suspend fun deleteSite(token: String, id: String) {
+        client.delete("$BASE_URL/v1/sites/$id") { bearerAuth(token) }
+    }
+
+    suspend fun listSites(token: String): List<SiteRequest> =
+        client.get("$BASE_URL/v1/sites") { bearerAuth(token) }.body()
 
     suspend fun createJobType(token: String, req: JobTypeRequest) {
         client.post("$BASE_URL/v1/job-types") { bearerAuth(token); jsonBody(req) }
     }
 
+    suspend fun updateJobType(token: String, id: String, req: JobTypeRequest) {
+        client.put("$BASE_URL/v1/job-types/$id") { bearerAuth(token); jsonBody(req) }
+    }
+
+    suspend fun deleteJobType(token: String, id: String) {
+        client.delete("$BASE_URL/v1/job-types/$id") { bearerAuth(token) }
+    }
+
+    suspend fun listJobTypes(token: String): List<JobTypeRequest> =
+        client.get("$BASE_URL/v1/job-types") { bearerAuth(token) }.body()
+
     suspend fun createInvoice(token: String, req: InvoiceRequest) {
         client.post("$BASE_URL/v1/invoices") { bearerAuth(token); jsonBody(req) }
     }
+
+    suspend fun updateInvoice(token: String, id: String, req: InvoiceRequest) {
+        client.put("$BASE_URL/v1/invoices/$id") { bearerAuth(token); jsonBody(req) }
+    }
+
+    suspend fun listInvoices(token: String): List<InvoiceRequest> =
+        client.get("$BASE_URL/v1/invoices") { bearerAuth(token) }.body()
 
     suspend fun createTrackingSession(token: String, req: TrackingSessionRequest) {
         client.post("$BASE_URL/v1/sessions") { bearerAuth(token); jsonBody(req) }
     }
 
+    suspend fun updateTrackingSession(token: String, id: String, req: TrackingSessionRequest) {
+        client.put("$BASE_URL/v1/sessions/$id") { bearerAuth(token); jsonBody(req) }
+    }
+
+    suspend fun deleteTrackingSession(token: String, id: String) {
+        client.delete("$BASE_URL/v1/sessions/$id") { bearerAuth(token) }
+    }
+
+    suspend fun listTrackingSessions(token: String): List<TrackingSessionRequest> =
+        client.get("$BASE_URL/v1/sessions") { bearerAuth(token) }.body()
+
     suspend fun createPlannedJob(token: String, req: PlannedJobRequest) {
         client.post("$BASE_URL/v1/planned-jobs") { bearerAuth(token); jsonBody(req) }
     }
+
+    suspend fun updatePlannedJob(token: String, id: String, req: PlannedJobRequest) {
+        client.put("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token); jsonBody(req) }
+    }
+
+    suspend fun deletePlannedJob(token: String, id: String) {
+        client.delete("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token) }
+    }
+
+    suspend fun listPlannedJobs(token: String): List<PlannedJobRequest> =
+        client.get("$BASE_URL/v1/planned-jobs") { bearerAuth(token) }.body()
 }
 
 private fun io.ktor.client.request.HttpRequestBuilder.bearerAuth(token: String) {

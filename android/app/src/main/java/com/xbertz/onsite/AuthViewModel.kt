@@ -5,7 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.backend.BackendApi
 import com.xbertz.onsite.backend.SessionStore
-import com.xbertz.onsite.backend.uploadLocalDataToBackend
+import com.xbertz.onsite.backend.runSync
 import com.xbertz.onsite.data.AppDatabase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,7 +16,7 @@ sealed interface AuthUiState {
     data object CheckingSession : AuthUiState
     data class LoggedOut(val error: UiMessage? = null) : AuthUiState
     data object LoggingIn : AuthUiState
-    data object MigratingData : AuthUiState
+    data object SyncingData : AuthUiState
     data class LoggedIn(val email: String, val accountId: String) : AuthUiState
 }
 
@@ -52,16 +52,22 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val personalAccount = me.memberships.first()
                 sessionStore.save(token, me.email, personalAccount.accountId)
 
-                if (!sessionStore.hasMigratedLocalData) {
-                    _state.value = AuthUiState.MigratingData
-                    uploadLocalDataToBackend(db, token)
-                    sessionStore.markMigrated()
-                }
+                _state.value = AuthUiState.SyncingData
+                runCatching { runSync(db, token) }
 
                 _state.value = AuthUiState.LoggedIn(me.email, personalAccount.accountId)
             } catch (e: Exception) {
                 _state.value = AuthUiState.LoggedOut(UiMessage(R.string.login_error_failed))
             }
+        }
+    }
+
+    /** Best-effort, silent: called opportunistically (e.g. app resume) while already signed in. */
+    fun syncNow() {
+        val token = sessionStore.token ?: return
+        if (_state.value !is AuthUiState.LoggedIn) return
+        viewModelScope.launch {
+            runCatching { runSync(db, token) }
         }
     }
 

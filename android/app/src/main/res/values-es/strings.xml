@@ -298,8 +298,8 @@
     <string name="login_button">Iniciar sesión</string>
     <string name="login_error_invalid_email">Introduce un correo válido.</string>
     <string name="login_error_failed">No se pudo iniciar sesión. Verifica que el backend esté accesible e inténtalo de nuevo.</string>
-    <string name="migrating_title">Enviando tus datos</string>
-    <string name="migrating_subtitle">Esto ocurre una sola vez.</string>
+    <string name="syncing_title">Enviando tus datos</string>
+    <string name="syncing_subtitle">Esto ocurre una sola vez.</string>
     <string name="account_section">Cuenta</string>
     <string name="account_signed_in_as">Conectado como %1$s</string>
     <string name="logout_button">Cerrar sesión</string>

@@ -27,7 +27,6 @@ class SessionStore(context: Context) {
     val token: String? get() = prefs.getString(KEY_TOKEN, null)
     val email: String? get() = prefs.getString(KEY_EMAIL, null)
     val accountId: String? get() = prefs.getString(KEY_ACCOUNT_ID, null)
-    val hasMigratedLocalData: Boolean get() = prefs.getBoolean(KEY_MIGRATED, false)
 
     fun save(token: String, email: String, accountId: String) {
         prefs.edit()
@@ -35,10 +34,6 @@ class SessionStore(context: Context) {
             .putString(KEY_EMAIL, email)
             .putString(KEY_ACCOUNT_ID, accountId)
             .apply()
-    }
-
-    fun markMigrated() {
-        prefs.edit().putBoolean(KEY_MIGRATED, true).apply()
     }
 
     fun clear() {
@@ -49,6 +44,5 @@ class SessionStore(context: Context) {
         const val KEY_TOKEN = "token"
         const val KEY_EMAIL = "email"
         const val KEY_ACCOUNT_ID = "account_id"
-        const val KEY_MIGRATED = "migrated_local_data"
     }
 }

@@ -10,9 +10,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 @Database(
     entities = [
         TrackingSession::class, Company::class, Profile::class, Site::class, JobType::class,
-        PlannedJob::class, Invoice::class
+        PlannedJob::class, Invoice::class, SyncMapping::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -23,6 +23,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun jobTypeDao(): JobTypeDao
     abstract fun plannedJobDao(): PlannedJobDao
     abstract fun invoiceDao(): InvoiceDao
+    abstract fun syncDao(): SyncDao
 
     companion object {
         @Volatile
@@ -221,6 +222,20 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Maps a local row to the backend's UUID for it, per entity type - see SyncEngine.
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS sync_mapping (" +
+                        "entityType TEXT NOT NULL, " +
+                        "localId INTEGER NOT NULL, " +
+                        "remoteId TEXT NOT NULL, " +
+                        "lastSyncedAtMillis INTEGER NOT NULL, " +
+                        "PRIMARY KEY (entityType, localId))"
+                )
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -229,7 +244,8 @@ abstract class AppDatabase : RoomDatabase() {
                     "onsite.db"
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
-                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11
+                    MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
+                    MIGRATION_11_12
                 ).build().also { INSTANCE = it }
             }
         }
