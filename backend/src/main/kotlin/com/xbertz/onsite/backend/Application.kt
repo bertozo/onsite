@@ -3,6 +3,18 @@ package com.xbertz.onsite.backend
 import com.xbertz.onsite.backend.auth.configureSupabaseJwt
 import com.xbertz.onsite.backend.config.AppConfig
 import com.xbertz.onsite.backend.db.DatabaseFactory
+import com.xbertz.onsite.backend.domain.CompaniesRepository
+import com.xbertz.onsite.backend.domain.InvoicesRepository
+import com.xbertz.onsite.backend.domain.JobTypesRepository
+import com.xbertz.onsite.backend.domain.PlannedJobsRepository
+import com.xbertz.onsite.backend.domain.SitesRepository
+import com.xbertz.onsite.backend.domain.TrackingSessionsRepository
+import com.xbertz.onsite.backend.domain.companyRoutes
+import com.xbertz.onsite.backend.domain.invoiceRoutes
+import com.xbertz.onsite.backend.domain.jobTypeRoutes
+import com.xbertz.onsite.backend.domain.plannedJobRoutes
+import com.xbertz.onsite.backend.domain.siteRoutes
+import com.xbertz.onsite.backend.domain.trackingSessionRoutes
 import com.xbertz.onsite.backend.identity.IdentityRepository
 import com.xbertz.onsite.backend.identity.identityRoutes
 import com.xbertz.onsite.backend.plugins.configureStatusPages
@@ -38,6 +50,7 @@ fun Application.module(config: AppConfig) {
         anyHost() // tightened once the web app's real origin is known (Phase 6)
         allowHeader("Authorization")
         allowHeader("Content-Type")
+        allowHeader("X-Account-Id")
     }
 
     install(Authentication) {
@@ -47,8 +60,20 @@ fun Application.module(config: AppConfig) {
     configureStatusPages()
 
     val identityRepository = IdentityRepository()
+    val companiesRepository = CompaniesRepository()
+    val sitesRepository = SitesRepository()
+    val jobTypesRepository = JobTypesRepository()
+    val invoicesRepository = InvoicesRepository()
+    val trackingSessionsRepository = TrackingSessionsRepository()
+    val plannedJobsRepository = PlannedJobsRepository()
 
     routing {
         identityRoutes(identityRepository)
+        companyRoutes(companiesRepository)
+        siteRoutes(sitesRepository)
+        jobTypeRoutes(jobTypesRepository)
+        invoiceRoutes(invoicesRepository)
+        trackingSessionRoutes(trackingSessionsRepository)
+        plannedJobRoutes(plannedJobsRepository)
     }
 }
