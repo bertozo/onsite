@@ -317,4 +317,15 @@
     <string name="team_invite_button">Send invite</string>
     <string name="team_invite_sent">Invite sent.</string>
     <string name="team_invite_failed">Could not send the invite. Try again.</string>
+    <string name="connection_section">Connect a contractor</string>
+    <string name="connection_invite_email_label">Contractor\'s email</string>
+    <string name="connection_invite_button">Send connection request</string>
+    <string name="connection_invite_sent">Connection request sent.</string>
+    <string name="connection_invite_failed">Could not send it. Try again.</string>
+    <string name="connection_pending_title">Pending connections</string>
+    <string name="connection_pick_company">Which of your clients is this?</string>
+    <string name="connection_accept">Connect</string>
+    <string name="connection_accept_failed">Could not connect. Make sure that company has synced and try again.</string>
+    <string name="connection_my_connections_title">Connected clients</string>
+    <string name="connection_revoke">Disconnect</string>
 </resources>

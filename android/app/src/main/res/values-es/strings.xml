@@ -313,4 +313,15 @@
     <string name="team_invite_button">Enviar invitación</string>
     <string name="team_invite_sent">Invitación enviada.</string>
     <string name="team_invite_failed">No se pudo enviar la invitación. Inténtalo de nuevo.</string>
+    <string name="connection_section">Conectar un contratista</string>
+    <string name="connection_invite_email_label">Correo del contratista</string>
+    <string name="connection_invite_button">Enviar solicitud de conexión</string>
+    <string name="connection_invite_sent">Solicitud enviada.</string>
+    <string name="connection_invite_failed">No se pudo enviar. Inténtalo de nuevo.</string>
+    <string name="connection_pending_title">Conexiones pendientes</string>
+    <string name="connection_pick_company">¿Cuál de tus clientes es este?</string>
+    <string name="connection_accept">Conectar</string>
+    <string name="connection_accept_failed">No se pudo conectar. Verifica que esa empresa ya se haya sincronizado e inténtalo de nuevo.</string>
+    <string name="connection_my_connections_title">Clientes conectados</string>
+    <string name="connection_revoke">Desconectar</string>
 </resources>

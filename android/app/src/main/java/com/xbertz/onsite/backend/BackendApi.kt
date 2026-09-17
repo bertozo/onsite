@@ -59,6 +59,32 @@ data class InviteDto(
 )
 
 @Serializable
+data class CreateConnectionInviteRequest(val email: String)
+
+@Serializable
+data class ConnectionInviteDto(
+    val id: String,
+    val employerAccountId: String,
+    val employerAccountName: String,
+    val email: String,
+    val status: String,
+)
+
+@Serializable
+data class AcceptConnectionInviteRequest(val companyId: String)
+
+@Serializable
+data class ConnectionDto(
+    val id: String,
+    val employerAccountId: String,
+    val employerAccountName: String,
+    val workerAccountId: String,
+    val workerCompanyId: String,
+    val workerCompanyName: String,
+    val status: String,
+)
+
+@Serializable
 data class CompanyRequest(
     val id: String,
     val name: String,
@@ -170,6 +196,26 @@ object BackendApi {
 
     suspend fun acceptInvite(token: String, inviteId: String): InviteDto =
         client.post("$BASE_URL/v1/me/invites/$inviteId/accept") { bearerAuth(token) }.body()
+
+    suspend fun createConnectionInvite(token: String, accountId: String, email: String): ConnectionInviteDto =
+        client.post("$BASE_URL/v1/accounts/$accountId/connection-invites") {
+            bearerAuth(token); jsonBody(CreateConnectionInviteRequest(email))
+        }.body()
+
+    suspend fun listMyConnectionInvites(token: String): List<ConnectionInviteDto> =
+        client.get("$BASE_URL/v1/me/connection-invites") { bearerAuth(token) }.body()
+
+    suspend fun acceptConnectionInvite(token: String, inviteId: String, companyId: String): ConnectionDto =
+        client.post("$BASE_URL/v1/me/connection-invites/$inviteId/accept") {
+            bearerAuth(token); jsonBody(AcceptConnectionInviteRequest(companyId))
+        }.body()
+
+    suspend fun listMyConnections(token: String): List<ConnectionDto> =
+        client.get("$BASE_URL/v1/me/connections") { bearerAuth(token) }.body()
+
+    suspend fun revokeConnection(token: String, connectionId: String) {
+        client.delete("$BASE_URL/v1/connections/$connectionId") { bearerAuth(token) }
+    }
 
     suspend fun createCompany(token: String, req: CompanyRequest) {
         client.post("$BASE_URL/v1/companies") { bearerAuth(token); jsonBody(req) }

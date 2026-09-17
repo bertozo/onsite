@@ -5,6 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.backend.AccountMembershipDto
 import com.xbertz.onsite.backend.BackendApi
+import com.xbertz.onsite.backend.ConnectionDto
+import com.xbertz.onsite.backend.ConnectionInviteDto
 import com.xbertz.onsite.backend.InviteDto
 import com.xbertz.onsite.backend.SessionStore
 import com.xbertz.onsite.backend.runSync
@@ -50,6 +52,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingInvites = MutableStateFlow<List<InviteDto>>(emptyList())
     val pendingInvites: StateFlow<List<InviteDto>> = _pendingInvites.asStateFlow()
 
+    private val _pendingConnectionInvites = MutableStateFlow<List<ConnectionInviteDto>>(emptyList())
+    val pendingConnectionInvites: StateFlow<List<ConnectionInviteDto>> = _pendingConnectionInvites.asStateFlow()
+
+    private val _connections = MutableStateFlow<List<ConnectionDto>>(emptyList())
+    val connections: StateFlow<List<ConnectionDto>> = _connections.asStateFlow()
+
     init {
         val token = sessionStore.token
         val email = sessionStore.email
@@ -60,6 +68,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             viewModelScope.launch {
                 refreshMe(token, email)
                 loadPendingInvites()
+                loadPendingConnectionInvites()
+                loadConnections()
             }
         }
     }
@@ -104,6 +114,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                     me.email, personalAccount.accountId, personalAccount.accountName, personalAccount.role, me.memberships
                 )
                 loadPendingInvites()
+                loadPendingConnectionInvites()
+                loadConnections()
             } catch (e: Exception) {
                 _state.value = AuthUiState.LoggedOut(UiMessage(R.string.login_error_failed))
             }
@@ -169,10 +181,64 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun loadPendingConnectionInvites() {
+        val token = sessionStore.token ?: return
+        viewModelScope.launch {
+            _pendingConnectionInvites.value = runCatching { BackendApi.listMyConnectionInvites(token) }.getOrDefault(emptyList())
+        }
+    }
+
+    fun loadConnections() {
+        val token = sessionStore.token ?: return
+        viewModelScope.launch {
+            _connections.value = runCatching { BackendApi.listMyConnections(token) }.getOrDefault(emptyList())
+        }
+    }
+
+    /**
+     * [localCompanyId] is one of the caller's own companies (their Room row id) - which of
+     * their clients this link is. The backend only knows companies by their synced UUID, so
+     * this resolves that first; it fails if the company hasn't synced yet.
+     */
+    fun acceptConnectionInvite(inviteId: String, localCompanyId: Long, onResult: (success: Boolean) -> Unit) {
+        val token = sessionStore.token ?: return
+        viewModelScope.launch {
+            val remoteCompanyId = db.syncDao().mappingsFor("company").firstOrNull { it.localId == localCompanyId }?.remoteId
+            val result = if (remoteCompanyId == null) {
+                Result.failure(IllegalStateException("company not synced yet"))
+            } else {
+                runCatching { BackendApi.acceptConnectionInvite(token, inviteId, remoteCompanyId) }
+            }
+            loadPendingConnectionInvites()
+            loadConnections()
+            onResult(result.isSuccess)
+        }
+    }
+
+    fun revokeConnection(connectionId: String) {
+        val token = sessionStore.token ?: return
+        viewModelScope.launch {
+            runCatching { BackendApi.revokeConnection(token, connectionId) }
+            loadConnections()
+        }
+    }
+
+    /** A client invites one of their contractors by email, linking a company the contractor picks. */
+    fun inviteContractor(email: String, onResult: (success: Boolean) -> Unit) {
+        val token = sessionStore.token ?: return
+        val current = _state.value as? AuthUiState.LoggedIn ?: return
+        viewModelScope.launch {
+            val result = runCatching { BackendApi.createConnectionInvite(token, current.activeAccountId, email.trim()) }
+            onResult(result.isSuccess)
+        }
+    }
+
     fun logout() {
         sessionStore.clear()
         BackendApi.activeAccountId = null
         _pendingInvites.value = emptyList()
+        _pendingConnectionInvites.value = emptyList()
+        _connections.value = emptyList()
         _state.value = AuthUiState.LoggedOut()
     }
 }

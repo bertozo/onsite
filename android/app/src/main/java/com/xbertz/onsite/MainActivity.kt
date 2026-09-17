@@ -2228,14 +2228,22 @@ fun SettingsScreen(
     viewModel: SettingsViewModel,
     authViewModel: AuthViewModel,
     authState: AuthUiState.LoggedIn,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    companyViewModel: CompanyViewModel = viewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsState()
     val language by viewModel.language.collectAsState()
     val pendingInvites by authViewModel.pendingInvites.collectAsState()
+    val pendingConnectionInvites by authViewModel.pendingConnectionInvites.collectAsState()
+    val connections by authViewModel.connections.collectAsState()
+    val myCompanies by companyViewModel.companies.collectAsState()
     val context = LocalContext.current
 
-    LaunchedEffect(Unit) { authViewModel.loadPendingInvites() }
+    LaunchedEffect(Unit) {
+        authViewModel.loadPendingInvites()
+        authViewModel.loadPendingConnectionInvites()
+        authViewModel.loadConnections()
+    }
 
     // The locale is applied in MainActivity.attachBaseContext, so the Activity must be rebuilt.
     val selectLanguage: (AppLanguage) -> Unit = { picked ->
@@ -2456,7 +2464,156 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            if (pendingConnectionInvites.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            stringResource(R.string.connection_pending_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        pendingConnectionInvites.forEach { invite ->
+                            Spacer(Modifier.height(12.dp))
+                            ConnectionInviteRow(
+                                employerName = invite.employerAccountName,
+                                companies = myCompanies,
+                                onAccept = { companyId, onResult -> authViewModel.acceptConnectionInvite(invite.id, companyId, onResult) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (connections.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.connection_my_connections_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        connections.forEach { connection ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(connection.employerAccountName, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        connection.workerCompanyName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                TextButton(onClick = { authViewModel.revokeConnection(connection.id) }) {
+                                    Text(stringResource(R.string.connection_revoke), color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (authState.isOwner) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            stringResource(R.string.connection_section),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        var connectionEmail by rememberSaveable { mutableStateOf("") }
+                        var connectionResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                        OutlinedTextField(
+                            value = connectionEmail,
+                            onValueChange = { connectionEmail = it; connectionResult = null },
+                            label = { Text(stringResource(R.string.connection_invite_email_label)) },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                authViewModel.inviteContractor(connectionEmail) { success ->
+                                    connectionResult = success
+                                    if (success) connectionEmail = ""
+                                }
+                            },
+                            enabled = connectionEmail.contains("@"),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.connection_invite_button))
+                        }
+                        connectionResult?.let { success ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(if (success) R.string.connection_invite_sent else R.string.connection_invite_failed),
+                                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConnectionInviteRow(
+    employerName: String,
+    companies: List<Company>,
+    onAccept: (companyId: Long, onResult: (Boolean) -> Unit) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<Company?>(null) }
+    var failed by remember { mutableStateOf(false) }
+
+    Text(employerName, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(8.dp))
+    Text(stringResource(R.string.connection_pick_company), style = MaterialTheme.typography.bodySmall)
+    Spacer(Modifier.height(4.dp))
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            readOnly = true,
+            value = selected?.name ?: "",
+            onValueChange = {},
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            shape = MaterialTheme.shapes.small
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            companies.forEach { company ->
+                DropdownMenuItem(text = { Text(company.name) }, onClick = { selected = company; expanded = false })
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = {
+            val company = selected ?: return@Button
+            failed = false
+            onAccept(company.id) { success -> failed = !success }
+        },
+        enabled = selected != null,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(stringResource(R.string.connection_accept))
+    }
+    if (failed) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.connection_accept_failed),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
     }
 }
 
