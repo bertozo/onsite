@@ -85,6 +85,7 @@ object TrackingSessions : Table("tracking_sessions") {
     val stopLongitude = double("stop_longitude").nullable()
     val hourlyRate = double("hourly_rate").nullable()
     val invoiceId = uuid("invoice_id").references(Invoices.id).nullable()
+    val createdByUserId = uuid("created_by_user_id").references(Users.id).nullable()
     val updatedAt = timestamp("updated_at")
     val deletedAt = timestamp("deleted_at").nullable()
 
@@ -101,6 +102,8 @@ object PlannedJobs : Table("planned_jobs") {
     val siteLabel = text("site_label").nullable()
     val jobTypeLabel = text("job_type_label").nullable()
     val notes = text("notes").nullable()
+    val createdByUserId = uuid("created_by_user_id").references(Users.id).nullable()
+    val assignedUserId = uuid("assigned_user_id").references(Users.id).nullable()
     val updatedAt = timestamp("updated_at")
     val deletedAt = timestamp("deleted_at").nullable()
 

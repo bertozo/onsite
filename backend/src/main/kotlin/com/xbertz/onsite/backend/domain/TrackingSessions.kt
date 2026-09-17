@@ -4,7 +4,7 @@ import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
 import com.xbertz.onsite.backend.db.tables.TrackingSessions
 import com.xbertz.onsite.backend.identity.requestedAccountId
-import com.xbertz.onsite.backend.identity.resolveActiveAccountId
+import com.xbertz.onsite.backend.identity.resolveActiveAccount
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -23,6 +23,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.insert
@@ -46,6 +47,7 @@ data class TrackingSessionDto(
     val stopLongitude: Double?,
     val hourlyRate: Double?,
     val invoiceId: String?,
+    val createdByUserId: String?,
     val updatedAt: String,
 )
 
@@ -78,19 +80,23 @@ private fun ResultRow.toDto() = TrackingSessionDto(
     stopLongitude = this[TrackingSessions.stopLongitude],
     hourlyRate = this[TrackingSessions.hourlyRate],
     invoiceId = this[TrackingSessions.invoiceId]?.toString(),
+    createdByUserId = this[TrackingSessions.createdByUserId]?.toString(),
     updatedAt = this[TrackingSessions.updatedAt].toString(),
 )
 
 class TrackingSessionsRepository {
-    fun list(accountId: UUID): List<TrackingSessionDto> = transaction {
-        TrackingSessions.selectAll()
+    /** [ownerOnlyUserId] scopes the list to one user's own rows - a WORKER's view of the account. */
+    fun list(accountId: UUID, ownerOnlyUserId: UUID?): List<TrackingSessionDto> = transaction {
+        var query = TrackingSessions.selectAll()
             .where { TrackingSessions.accountId eq accountId }
             .andWhere { TrackingSessions.deletedAt.isNull() }
-            .orderBy(TrackingSessions.startTimestampMillis, SortOrder.DESC)
-            .map { it.toDto() }
+        if (ownerOnlyUserId != null) {
+            query = query.andWhere { TrackingSessions.createdByUserId eq ownerOnlyUserId }
+        }
+        query.orderBy(TrackingSessions.startTimestampMillis, SortOrder.DESC).map { it.toDto() }
     }
 
-    fun create(accountId: UUID, req: TrackingSessionRequest): TrackingSessionDto = transaction {
+    fun create(accountId: UUID, createdByUserId: UUID, req: TrackingSessionRequest): TrackingSessionDto = transaction {
         val id = UUID.fromString(req.id)
         TrackingSessions.insert {
             it[TrackingSessions.id] = id
@@ -106,13 +112,16 @@ class TrackingSessionsRepository {
             it[stopLongitude] = req.stopLongitude
             it[hourlyRate] = req.hourlyRate
             it[invoiceId] = req.invoiceId?.let(UUID::fromString)
+            it[TrackingSessions.createdByUserId] = createdByUserId
             it[updatedAt] = Instant.now()
         }
         TrackingSessions.selectAll().where { TrackingSessions.id eq id }.single().toDto()
     }
 
-    fun update(accountId: UUID, id: UUID, req: TrackingSessionRequest): TrackingSessionDto? = transaction {
-        val updated = TrackingSessions.update({ (TrackingSessions.id eq id) and (TrackingSessions.accountId eq accountId) }) {
+    fun update(accountId: UUID, id: UUID, ownerOnlyUserId: UUID?, req: TrackingSessionRequest): TrackingSessionDto? = transaction {
+        var condition = (TrackingSessions.id eq id) and (TrackingSessions.accountId eq accountId)
+        if (ownerOnlyUserId != null) condition = condition and (TrackingSessions.createdByUserId eq ownerOnlyUserId)
+        val updated = TrackingSessions.update({ condition }) {
             it[companyName] = req.companyName
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
@@ -129,8 +138,10 @@ class TrackingSessionsRepository {
         if (updated == 0) null else TrackingSessions.selectAll().where { TrackingSessions.id eq id }.single().toDto()
     }
 
-    fun softDelete(accountId: UUID, id: UUID): Boolean = transaction {
-        TrackingSessions.update({ (TrackingSessions.id eq id) and (TrackingSessions.accountId eq accountId) }) {
+    fun softDelete(accountId: UUID, id: UUID, ownerOnlyUserId: UUID?): Boolean = transaction {
+        var condition = (TrackingSessions.id eq id) and (TrackingSessions.accountId eq accountId)
+        if (ownerOnlyUserId != null) condition = condition and (TrackingSessions.createdByUserId eq ownerOnlyUserId)
+        TrackingSessions.update({ condition }) {
             it[deletedAt] = Instant.now()
             it[updatedAt] = Instant.now()
         } > 0
@@ -142,28 +153,31 @@ fun Route.trackingSessionRoutes(repository: TrackingSessionsRepository) {
         route("/v1/sessions") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
-                call.respond(withContext(Dispatchers.IO) { repository.list(accountId) })
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val ownOnly = if (active.isOwner) null else user.userId
+                call.respond(withContext(Dispatchers.IO) { repository.list(active.accountId, ownOnly) })
             }
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
                 val req = call.receive<TrackingSessionRequest>()
-                call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(accountId, req) })
+                call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(active.accountId, user.userId, req) })
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<TrackingSessionRequest>()
-                val result = withContext(Dispatchers.IO) { repository.update(accountId, id, req) }
+                val result = withContext(Dispatchers.IO) { repository.update(active.accountId, id, ownOnly, req) }
                 if (result == null) call.respond(HttpStatusCode.NotFound) else call.respond(result)
             }
             delete("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
-                val deleted = withContext(Dispatchers.IO) { repository.softDelete(accountId, id) }
+                val deleted = withContext(Dispatchers.IO) { repository.softDelete(active.accountId, id, ownOnly) }
                 call.respond(if (deleted) HttpStatusCode.NoContent else HttpStatusCode.NotFound)
             }
         }

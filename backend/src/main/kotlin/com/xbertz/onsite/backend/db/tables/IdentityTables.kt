@@ -42,3 +42,19 @@ object Memberships : Table("memberships") {
     const val ROLE_OWNER = "OWNER"
     const val ROLE_WORKER = "WORKER"
 }
+
+object Invites : Table("invites") {
+    val id = uuid("id")
+    val accountId = uuid("account_id").references(Accounts.id)
+    val email = text("email")
+    val role = varchar("role", 16)
+    val status = varchar("status", 16)
+    val createdAt = timestamp("created_at")
+    val acceptedAt = timestamp("accepted_at").nullable()
+
+    override val primaryKey = PrimaryKey(id)
+
+    const val STATUS_PENDING = "PENDING"
+    const val STATUS_ACCEPTED = "ACCEPTED"
+    const val STATUS_REVOKED = "REVOKED"
+}

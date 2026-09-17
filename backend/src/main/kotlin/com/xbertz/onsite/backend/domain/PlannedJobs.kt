@@ -4,7 +4,7 @@ import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
 import com.xbertz.onsite.backend.db.tables.PlannedJobs
 import com.xbertz.onsite.backend.identity.requestedAccountId
-import com.xbertz.onsite.backend.identity.resolveActiveAccountId
+import com.xbertz.onsite.backend.identity.resolveActiveAccount
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -23,9 +23,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.insert
+import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
@@ -42,6 +44,8 @@ data class PlannedJobDto(
     val siteLabel: String?,
     val jobTypeLabel: String?,
     val notes: String?,
+    val createdByUserId: String?,
+    val assignedUserId: String?,
     val updatedAt: String,
 )
 
@@ -55,6 +59,7 @@ data class PlannedJobRequest(
     val siteLabel: String? = null,
     val jobTypeLabel: String? = null,
     val notes: String? = null,
+    val assignedUserId: String? = null,
 )
 
 private fun ResultRow.toDto() = PlannedJobDto(
@@ -66,19 +71,26 @@ private fun ResultRow.toDto() = PlannedJobDto(
     siteLabel = this[PlannedJobs.siteLabel],
     jobTypeLabel = this[PlannedJobs.jobTypeLabel],
     notes = this[PlannedJobs.notes],
+    createdByUserId = this[PlannedJobs.createdByUserId]?.toString(),
+    assignedUserId = this[PlannedJobs.assignedUserId]?.toString(),
     updatedAt = this[PlannedJobs.updatedAt].toString(),
 )
 
 class PlannedJobsRepository {
-    fun list(accountId: UUID): List<PlannedJobDto> = transaction {
-        PlannedJobs.selectAll()
+    /** [ownOnlyUserId] scopes to jobs a WORKER created or was assigned - their view of the calendar. */
+    fun list(accountId: UUID, ownOnlyUserId: UUID?): List<PlannedJobDto> = transaction {
+        var query = PlannedJobs.selectAll()
             .where { PlannedJobs.accountId eq accountId }
             .andWhere { PlannedJobs.deletedAt.isNull() }
-            .orderBy(PlannedJobs.dateEpochDay, SortOrder.ASC)
-            .map { it.toDto() }
+        if (ownOnlyUserId != null) {
+            query = query.andWhere {
+                (PlannedJobs.createdByUserId eq ownOnlyUserId) or (PlannedJobs.assignedUserId eq ownOnlyUserId)
+            }
+        }
+        query.orderBy(PlannedJobs.dateEpochDay, SortOrder.ASC).map { it.toDto() }
     }
 
-    fun create(accountId: UUID, req: PlannedJobRequest): PlannedJobDto = transaction {
+    fun create(accountId: UUID, createdByUserId: UUID, assignedUserId: UUID?, req: PlannedJobRequest): PlannedJobDto = transaction {
         val id = UUID.fromString(req.id)
         PlannedJobs.insert {
             it[PlannedJobs.id] = id
@@ -90,13 +102,19 @@ class PlannedJobsRepository {
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[notes] = req.notes
+            it[PlannedJobs.createdByUserId] = createdByUserId
+            it[PlannedJobs.assignedUserId] = assignedUserId
             it[updatedAt] = Instant.now()
         }
         PlannedJobs.selectAll().where { PlannedJobs.id eq id }.single().toDto()
     }
 
-    fun update(accountId: UUID, id: UUID, req: PlannedJobRequest): PlannedJobDto? = transaction {
-        val updated = PlannedJobs.update({ (PlannedJobs.id eq id) and (PlannedJobs.accountId eq accountId) }) {
+    fun update(accountId: UUID, id: UUID, ownOnlyUserId: UUID?, req: PlannedJobRequest): PlannedJobDto? = transaction {
+        var condition = (PlannedJobs.id eq id) and (PlannedJobs.accountId eq accountId)
+        if (ownOnlyUserId != null) {
+            condition = condition and ((PlannedJobs.createdByUserId eq ownOnlyUserId) or (PlannedJobs.assignedUserId eq ownOnlyUserId))
+        }
+        val updated = PlannedJobs.update({ condition }) {
             it[dateEpochDay] = req.dateEpochDay
             it[startMinute] = req.startMinute
             it[endMinute] = req.endMinute
@@ -109,8 +127,12 @@ class PlannedJobsRepository {
         if (updated == 0) null else PlannedJobs.selectAll().where { PlannedJobs.id eq id }.single().toDto()
     }
 
-    fun softDelete(accountId: UUID, id: UUID): Boolean = transaction {
-        PlannedJobs.update({ (PlannedJobs.id eq id) and (PlannedJobs.accountId eq accountId) }) {
+    fun softDelete(accountId: UUID, id: UUID, ownOnlyUserId: UUID?): Boolean = transaction {
+        var condition = (PlannedJobs.id eq id) and (PlannedJobs.accountId eq accountId)
+        if (ownOnlyUserId != null) {
+            condition = condition and ((PlannedJobs.createdByUserId eq ownOnlyUserId) or (PlannedJobs.assignedUserId eq ownOnlyUserId))
+        }
+        PlannedJobs.update({ condition }) {
             it[deletedAt] = Instant.now()
             it[updatedAt] = Instant.now()
         } > 0
@@ -122,28 +144,36 @@ fun Route.plannedJobRoutes(repository: PlannedJobsRepository) {
         route("/v1/planned-jobs") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
-                call.respond(withContext(Dispatchers.IO) { repository.list(accountId) })
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val ownOnly = if (active.isOwner) null else user.userId
+                call.respond(withContext(Dispatchers.IO) { repository.list(active.accountId, ownOnly) })
             }
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
                 val req = call.receive<PlannedJobRequest>()
-                call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(accountId, req) })
+                // A WORKER can only ever schedule for themselves, whatever the request says.
+                val assignedUserId = if (active.isOwner) req.assignedUserId?.let(UUID::fromString) else user.userId
+                call.respond(
+                    HttpStatusCode.Created,
+                    withContext(Dispatchers.IO) { repository.create(active.accountId, user.userId, assignedUserId, req) }
+                )
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<PlannedJobRequest>()
-                val result = withContext(Dispatchers.IO) { repository.update(accountId, id, req) }
+                val result = withContext(Dispatchers.IO) { repository.update(active.accountId, id, ownOnly, req) }
                 if (result == null) call.respond(HttpStatusCode.NotFound) else call.respond(result)
             }
             delete("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
-                val deleted = withContext(Dispatchers.IO) { repository.softDelete(accountId, id) }
+                val deleted = withContext(Dispatchers.IO) { repository.softDelete(active.accountId, id, ownOnly) }
                 call.respond(if (deleted) HttpStatusCode.NoContent else HttpStatusCode.NotFound)
             }
         }

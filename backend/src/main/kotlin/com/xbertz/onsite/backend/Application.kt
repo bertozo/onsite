@@ -17,7 +17,9 @@ import com.xbertz.onsite.backend.domain.plannedJobRoutes
 import com.xbertz.onsite.backend.domain.siteRoutes
 import com.xbertz.onsite.backend.domain.trackingSessionRoutes
 import com.xbertz.onsite.backend.identity.IdentityRepository
+import com.xbertz.onsite.backend.identity.InviteRepository
 import com.xbertz.onsite.backend.identity.identityRoutes
+import com.xbertz.onsite.backend.identity.inviteRoutes
 import com.xbertz.onsite.backend.plugins.configureStatusPages
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -61,6 +63,7 @@ fun Application.module(config: AppConfig) {
     configureStatusPages()
 
     val identityRepository = IdentityRepository()
+    val inviteRepository = InviteRepository()
     val companiesRepository = CompaniesRepository()
     val sitesRepository = SitesRepository()
     val jobTypesRepository = JobTypesRepository()
@@ -71,6 +74,7 @@ fun Application.module(config: AppConfig) {
     routing {
         devAuthRoutes(config)
         identityRoutes(identityRepository)
+        inviteRoutes(inviteRepository)
         companyRoutes(companiesRepository)
         siteRoutes(sitesRepository)
         jobTypeRoutes(jobTypesRepository)

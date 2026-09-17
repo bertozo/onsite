@@ -10,9 +10,18 @@ packages per domain (`identity/`, and future `domain/` for companies/sites/sessi
 Every table carries `id`, `account_id` (where applicable), `created_at`, `updated_at`, and
 will carry `deleted_at` once Phase 1 sync support lands.
 
-Identity model: `accounts` (a personal workspace or a business workspace) + `users` (mirrors
-a Supabase Auth user) + `memberships` (`user_id` + `account_id` + `role`, `OWNER` or
-`WORKER`). A user gets a personal `OWNER` account automatically on first login.
+Identity model: `accounts` (a personal workspace or a team workspace - both created the same
+way, there is no separate "business" signup flow) + `users` (mirrors a Supabase Auth user) +
+`memberships` (`user_id` + `account_id` + `role`, `OWNER` or `WORKER`). A user gets a
+personal `OWNER` account automatically on first login. An `OWNER` invites a `WORKER` into
+their account by email (`invites` table, `POST /v1/accounts/{id}/invites`); the invited user
+sees it under `GET /v1/me/invites` and accepts it with `POST /v1/me/invites/{id}/accept`,
+which is what actually creates their `WORKER` membership. Every domain write route checks
+the caller's role in the *active* account (`X-Account-Id` header, see `AccountContext.kt`) -
+a `WORKER` can read the shared catalog (companies/sites/job types/invoices) but not create,
+edit or delete it; sessions and planned jobs carry `created_by_user_id` (and planned jobs an
+`assigned_user_id`) so a `WORKER`'s own list is scoped to their rows while an `OWNER` sees
+everyone's.
 
 ## Local development
 

@@ -4,6 +4,7 @@ import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
 import com.xbertz.onsite.backend.db.tables.Companies
 import com.xbertz.onsite.backend.identity.requestedAccountId
+import com.xbertz.onsite.backend.identity.resolveActiveAccount
 import com.xbertz.onsite.backend.identity.resolveActiveAccountId
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -122,13 +123,13 @@ fun Route.companyRoutes(repository: CompaniesRepository) {
             }
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
                 val req = call.receive<CompanyRequest>()
                 call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(accountId, req) })
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<CompanyRequest>()
                 val result = withContext(Dispatchers.IO) { repository.update(accountId, id, req) }
@@ -136,7 +137,7 @@ fun Route.companyRoutes(repository: CompaniesRepository) {
             }
             delete("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
                 val id = UUID.fromString(call.parameters["id"])
                 val deleted = withContext(Dispatchers.IO) { repository.softDelete(accountId, id) }
                 call.respond(if (deleted) HttpStatusCode.NoContent else HttpStatusCode.NotFound)
