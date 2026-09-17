@@ -250,6 +250,7 @@
     <string name="pdf_missing">El archivo PDF ya no está disponible.</string>
     <string name="pdf_notes">NOTAS</string>
     <string name="period_this_week">Esta semana</string>
+    <string name="period_fortnight">Quincena</string>
     <string name="period_this_month">Este mes</string>
     <string name="period_last_month">Mes pasado</string>
     <string name="period_custom">Personalizado</string>

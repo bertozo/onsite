@@ -105,6 +105,7 @@ fun ReportsScreen(
     val zone = remember { ZoneId.systemDefault() }
     var showColumnsDialog by remember { mutableStateOf(false) }
     var companyMenuOpen by remember { mutableStateOf(false) }
+    var periodMenuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
@@ -159,12 +160,27 @@ fun ReportsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // Period presets
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                PeriodChip(ReportPeriod.THIS_WEEK, R.string.period_this_week, filters.period) { reportViewModel.setPeriod(it) }
-                PeriodChip(ReportPeriod.THIS_MONTH, R.string.period_this_month, filters.period) { reportViewModel.setPeriod(it) }
-                PeriodChip(ReportPeriod.LAST_MONTH, R.string.period_last_month, filters.period) { reportViewModel.setPeriod(it) }
-                PeriodChip(ReportPeriod.CUSTOM, R.string.period_custom, filters.period) { reportViewModel.setPeriod(it) }
+            // Period preset: one dropdown instead of a chip row, so it never needs to scroll or wrap
+            // as more presets are added.
+            Box {
+                FilterChip(
+                    selected = true,
+                    onClick = { periodMenuOpen = true },
+                    label = { Text(stringResource(periodLabelRes(filters.period))) },
+                    leadingIcon = { Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp)) },
+                    trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                )
+                DropdownMenu(expanded = periodMenuOpen, onDismissRequest = { periodMenuOpen = false }) {
+                    listOf(
+                        ReportPeriod.THIS_WEEK, ReportPeriod.FORTNIGHT, ReportPeriod.THIS_MONTH,
+                        ReportPeriod.LAST_MONTH, ReportPeriod.CUSTOM
+                    ).forEach { period ->
+                        DropdownMenuItem(
+                            text = { Text(stringResource(periodLabelRes(period))) },
+                            onClick = { reportViewModel.setPeriod(period); periodMenuOpen = false }
+                        )
+                    }
+                }
             }
             if (filters.period == ReportPeriod.CUSTOM) {
                 Spacer(Modifier.height(8.dp))
@@ -323,9 +339,12 @@ fun ReportsScreen(
     }
 }
 
-@Composable
-private fun PeriodChip(period: ReportPeriod, labelRes: Int, selected: ReportPeriod, onSelect: (ReportPeriod) -> Unit) {
-    FilterChip(selected = period == selected, onClick = { onSelect(period) }, label = { Text(stringResource(labelRes)) })
+private fun periodLabelRes(period: ReportPeriod): Int = when (period) {
+    ReportPeriod.THIS_WEEK -> R.string.period_this_week
+    ReportPeriod.FORTNIGHT -> R.string.period_fortnight
+    ReportPeriod.THIS_MONTH -> R.string.period_this_month
+    ReportPeriod.LAST_MONTH -> R.string.period_last_month
+    ReportPeriod.CUSTOM -> R.string.period_custom
 }
 
 /** The four headline numbers; "unbilled" is highlighted because it is the one that means money still to collect. */

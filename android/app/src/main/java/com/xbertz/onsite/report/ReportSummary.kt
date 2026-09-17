@@ -12,13 +12,18 @@ import java.time.temporal.TemporalAdjusters
 
 /** Quick period presets on the Reports screen; CUSTOM keeps whatever dates the user picked. */
 enum class ReportPeriod {
-    THIS_WEEK, THIS_MONTH, LAST_MONTH, CUSTOM;
+    THIS_WEEK, FORTNIGHT, THIS_MONTH, LAST_MONTH, CUSTOM;
 
     /** Inclusive date range for the preset; CUSTOM returns null (the caller keeps its own dates). */
     fun range(today: LocalDate): Pair<LocalDate, LocalDate>? = when (this) {
         THIS_WEEK -> {
             val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
             monday to monday.plusDays(6)
+        }
+        // This week plus the one before it: a Monday-aligned 14-day window, like a fortnightly pay period.
+        FORTNIGHT -> {
+            val monday = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+            monday.minusWeeks(1) to monday.plusDays(6)
         }
         THIS_MONTH -> YearMonth.from(today).let { it.atDay(1) to it.atEndOfMonth() }
         LAST_MONTH -> YearMonth.from(today).minusMonths(1).let { it.atDay(1) to it.atEndOfMonth() }
