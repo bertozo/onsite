@@ -217,6 +217,11 @@
     <string name="planning_details_required">Choose a company, site or job type, or write a note.</string>
     <string name="planning_sessions">Sessions</string>
     <string name="planning_no_sessions">No sessions recorded on this day.</string>
+    <string name="planning_nothing_today">Nothing planned or recorded for this day.</string>
+    <string name="planning_repeat_weekly">Repeat weekly until</string>
+    <string name="planning_repeat_count">%1$d occurrences</string>
+    <string name="calendar_hours_legend">Hours worked</string>
+    <string name="timeline_company_legend">Sessions by company</string>
     <string name="calendar_day_total">Total: %1$s</string>
     <!-- Site photo (timestamp camera) -->
     <string name="menu_photo">Site photo</string>

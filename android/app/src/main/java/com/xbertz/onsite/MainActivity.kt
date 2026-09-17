@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -90,6 +91,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -964,13 +966,60 @@ private fun CalendarPanel(
                             isToday = date == today,
                             dimmed = state.expanded && YearMonth.from(date) != state.visibleMonth,
                             hasSessions = date in state.markedDays,
+                            hoursMillis = state.dayHours[date] ?: 0L,
                             onClick = { onSelectDate(date) },
                             modifier = Modifier.weight(1f)
                         )
                     }
                 }
             }
+
+            if (state.dayHours.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                HeatmapLegend()
+            }
         }
+    }
+}
+
+/** Marker intensity for a past day: none, then four steps up to a full day. */
+private fun heatLevel(hoursMillis: Long): Int {
+    val hours = hoursMillis / 3_600_000.0
+    return when {
+        hoursMillis <= 0L -> 0
+        hours <= 2.0 -> 1
+        hours <= 4.0 -> 2
+        hours <= 8.0 -> 3
+        else -> 4
+    }
+}
+
+private val HeatAlphas = listOf(0f, 0.3f, 0.55f, 0.8f, 1f)
+
+@Composable
+private fun HeatmapLegend() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+    ) {
+        Text(
+            stringResource(R.string.calendar_hours_legend),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(6.dp))
+        (1..4).forEach { level ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = HeatAlphas[level]))
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Text("8h+", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -981,6 +1030,7 @@ private fun CalendarDayCell(
     isToday: Boolean,
     dimmed: Boolean,
     hasSessions: Boolean,
+    hoursMillis: Long,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -1010,11 +1060,18 @@ private fun CalendarDayCell(
                 color = textColor
             )
         }
-        // Marker for days that have jobs: blue when the day is past, green today, red when still ahead.
-        // Kept as an empty slot otherwise so rows stay the same height.
+        // Past days show how much was worked (heatmap); today and future days show planned jobs
+        // (green today, red ahead). Kept as an empty slot otherwise so rows stay the same height.
         val markerColor = when {
+            date.isBefore(today) -> {
+                val level = heatLevel(hoursMillis)
+                if (level == 0) {
+                    if (hasSessions) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.Transparent
+                } else {
+                    MaterialTheme.colorScheme.primary.copy(alpha = HeatAlphas[level])
+                }
+            }
             !hasSessions -> Color.Transparent
-            date.isBefore(today) -> MaterialTheme.colorScheme.primary
             date == today -> PlannerMarkerGreen
             else -> PlannerMarkerRed
         }
@@ -1022,7 +1079,7 @@ private fun CalendarDayCell(
             modifier = Modifier
                 .size(6.dp)
                 .clip(CircleShape)
-                .background(if (dimmed) markerColor.copy(alpha = 0.4f) else markerColor)
+                .background(if (dimmed && markerColor != Color.Transparent) markerColor.copy(alpha = markerColor.alpha * 0.4f) else markerColor)
         )
     }
 }
@@ -1032,7 +1089,11 @@ private fun CalendarDayCell(
 // ---------------------------------------------------------------------------
 
 @Composable
-fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel()) {
+fun PlanningScreen(
+    onBack: () -> Unit,
+    viewModel: PlanningViewModel = viewModel(),
+    trackerViewModel: LocationTrackerViewModel = viewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val companies by viewModel.companies.collectAsState()
     val sites by viewModel.sites.collectAsState()
@@ -1041,6 +1102,7 @@ fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel(
     val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMM", locale) }
 
     var showAddDialog by remember { mutableStateOf(false) }
+    var showAddSessionDialog by remember { mutableStateOf(false) }
     var editingJob by remember { mutableStateOf<PlannedJob?>(null) }
     var deletingJob by remember { mutableStateOf<PlannedJob?>(null) }
 
@@ -1052,10 +1114,26 @@ fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel(
             sites = sites,
             jobTypes = jobTypes,
             onDismiss = { showAddDialog = false },
-            onConfirm = { job ->
-                viewModel.saveJob(job)
+            onConfirm = { job, repeatUntil ->
+                viewModel.saveJob(job, repeatUntil)
                 viewModel.selectDate(job.date)
                 showAddDialog = false
+            }
+        )
+    }
+    if (showAddSessionDialog) {
+        AddSessionDialog(
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            initialCompany = null,
+            initialSite = null,
+            initialJobType = null,
+            initialDate = uiState.calendar.selectedDate,
+            onDismiss = { showAddSessionDialog = false },
+            onConfirm = { company, site, jobType, startMillis, stopMillis, rate ->
+                trackerViewModel.addManualSession(company, site, jobType, startMillis, stopMillis, rate)
+                showAddSessionDialog = false
             }
         )
     }
@@ -1067,7 +1145,7 @@ fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel(
             sites = sites,
             jobTypes = jobTypes,
             onDismiss = { editingJob = null },
-            onConfirm = { updated ->
+            onConfirm = { updated, _ ->
                 viewModel.saveJob(updated)
                 editingJob = null
             }
@@ -1117,7 +1195,37 @@ fun PlanningScreen(onBack: () -> Unit, viewModel: PlanningViewModel = viewModel(
             }
             Spacer(Modifier.height(8.dp))
 
-            if (uiState.dayJobs.isEmpty()) {
+            if (uiState.dayJobs.isEmpty() && uiState.daySessions.isEmpty()) {
+                // Nothing on this day yet: offer the two things the user can do about it.
+                OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            stringResource(R.string.planning_nothing_today),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = { showAddDialog = true }, shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.EventNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.planning_add_job))
+                            }
+                            OutlinedButton(
+                                onClick = { showAddSessionDialog = true },
+                                enabled = companies.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.EditCalendar, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.add_session))
+                            }
+                        }
+                    }
+                }
+            } else if (uiState.dayJobs.isEmpty()) {
                 EmptyState(text = stringResource(R.string.planning_empty))
             } else {
                 uiState.dayJobs.forEachIndexed { index, job ->
@@ -1164,9 +1272,91 @@ private fun PlanningDaySessions(state: PlanningUiState) {
         if (state.daySessions.isEmpty()) {
             EmptyState(text = stringResource(R.string.planning_no_sessions))
         } else {
+            DayTimeline(sessions = state.daySessions)
+            Spacer(Modifier.height(12.dp))
             state.daySessions.forEachIndexed { index, session ->
                 if (index > 0) Spacer(Modifier.height(8.dp))
                 PlanningSessionRow(session)
+            }
+        }
+    }
+}
+
+// Distinct block colours for the day timeline, assigned per company in order of appearance.
+private val TimelinePalette = listOf(
+    Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFFB8C00), Color(0xFF8E24AA),
+    Color(0xFF00897B), Color(0xFFE53935), Color(0xFF6D4C41), Color(0xFF3949AB)
+)
+
+/** The day's sessions as blocks on a 06:00–20:00 strip (stretched when a session falls outside). */
+@Composable
+private fun DayTimeline(sessions: List<TrackingSession>) {
+    val zone = remember { ZoneId.systemDefault() }
+    val ranges = sessions.map { session ->
+        val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone)
+        val stop = Instant.ofEpochMilli(session.stopTimestampMillis ?: session.startTimestampMillis).atZone(zone)
+        val startMin = start.hour * 60 + start.minute
+        // A session past midnight is clipped at the end of the day.
+        val stopMin = if (stop.toLocalDate() == start.toLocalDate()) stop.hour * 60 + stop.minute else 24 * 60
+        Triple(session, startMin, stopMin)
+    }
+    val firstHour = minOf(6, ranges.minOf { it.second } / 60)
+    val lastHour = maxOf(20, ranges.maxOf { (it.third + 59) / 60 }).coerceAtMost(24)
+    val spanMin = ((lastHour - firstHour) * 60).coerceAtLeast(60)
+    val companies = sessions.mapNotNull { it.companyName }.distinct()
+    val colorFor = { name: String? -> TimelinePalette[(companies.indexOf(name).coerceAtLeast(0)) % TimelinePalette.size] }
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            ) {
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val width = maxWidth
+                    ranges.forEach { (session, startMin, stopMin) ->
+                        val left = width * ((startMin - firstHour * 60).toFloat() / spanMin).coerceIn(0f, 1f)
+                        val right = width * ((stopMin - firstHour * 60).toFloat() / spanMin).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .padding(start = left)
+                                .width((right - left).coerceAtLeast(3.dp))
+                                .fillMaxHeight()
+                                .padding(vertical = 3.dp)
+                                .clip(MaterialTheme.shapes.extraSmall)
+                                .background(colorFor(session.companyName))
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // One label every two hours; the last label sits at the right edge.
+                val labels = (firstHour..lastHour step 2).toList()
+                labels.forEachIndexed { index, hour ->
+                    Text(
+                        String.format(Locale.ENGLISH, "%02d", hour),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = if (index == labels.lastIndex) TextAlign.End else TextAlign.Start,
+                        modifier = if (index == labels.lastIndex) Modifier else Modifier.weight(1f)
+                    )
+                }
+            }
+            if (companies.size > 1) {
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    companies.forEach { name ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(colorFor(name)))
+                            Spacer(Modifier.width(4.dp))
+                            Text(name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    }
+                }
             }
         }
     }
@@ -1279,12 +1469,14 @@ private fun EditPlannedJobDialog(
     sites: List<Site>,
     jobTypes: List<JobType>,
     onDismiss: () -> Unit,
-    onConfirm: (PlannedJob) -> Unit
+    onConfirm: (job: PlannedJob, repeatUntil: LocalDate?) -> Unit
 ) {
     val context = LocalContext.current
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
 
+    var repeatWeekly by remember { mutableStateOf(false) }
+    var repeatUntil by remember { mutableStateOf(initialDate.plusWeeks(4)) }
     var companyName by remember { mutableStateOf(existing?.companyName) }
     var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
     var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
@@ -1413,6 +1605,26 @@ private fun EditPlannedJobDialog(
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (existing == null) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Switch(checked = repeatWeekly, onCheckedChange = { repeatWeekly = it })
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.planning_repeat_weekly), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    }
+                    if (repeatWeekly) {
+                        val occurrences = (java.time.temporal.ChronoUnit.WEEKS.between(date, maxOf(date, repeatUntil)) + 1).toInt()
+                        OutlinedButton(
+                            onClick = { showDatePicker(context, repeatUntil) { picked -> if (!picked.isBefore(date)) repeatUntil = picked } },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${repeatUntil.format(dateFormatter)} · ${stringResource(R.string.planning_repeat_count, occurrences)}")
+                        }
+                    }
+                }
                 if (!canSave) {
                     Spacer(Modifier.height(6.dp))
                     Text(
@@ -1436,7 +1648,8 @@ private fun EditPlannedJobDialog(
                             siteLabel = siteLabel,
                             jobTypeLabel = jobTypeLabel,
                             notes = notes.trim().ifBlank { null }
-                        )
+                        ),
+                        if (existing == null && repeatWeekly) repeatUntil else null
                     )
                 },
                 enabled = canSave
@@ -3462,7 +3675,8 @@ fun AddSessionDialog(
     initialSite: Site?,
     initialJobType: JobType?,
     onDismiss: () -> Unit,
-    onConfirm: (company: Company, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long, hourlyRate: Double?) -> Unit
+    onConfirm: (company: Company, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long, hourlyRate: Double?) -> Unit,
+    initialDate: LocalDate = LocalDate.now()
 ) {
     val context = LocalContext.current
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
@@ -3472,7 +3686,7 @@ fun AddSessionDialog(
     var rateText by remember { mutableStateOf("") }
     var site by remember { mutableStateOf(initialSite ?: sites.singleOrNull()) }
     var jobType by remember { mutableStateOf(initialJobType ?: jobTypes.singleOrNull()) }
-    var date by remember { mutableStateOf(LocalDate.now()) }
+    var date by remember { mutableStateOf(initialDate) }
     var startTime by remember { mutableStateOf(LocalTime.of(7, 0)) }
     // Duration is what gets saved; the end time shown is always start + duration, so the
     // three fields stay consistent whichever one the user edits (and shifts can cross midnight).

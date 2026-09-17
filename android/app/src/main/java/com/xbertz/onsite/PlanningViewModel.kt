@@ -40,12 +40,15 @@ class PlanningViewModel(application: Application) : AndroidViewModel(application
         navigator.state, dao.getAll(), db.trackingSessionDao().getAll()
     ) { nav, jobs, sessions ->
         val jobsByDay = jobs.groupBy { it.date }
-        val sessionsOfDay = sessions
-            .filter { it.stopTimestampMillis != null }
+        val completed = sessions.filter { it.stopTimestampMillis != null }
+        val hoursByDay = completed
+            .groupBy { Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate() }
+            .mapValues { (_, list) -> list.sumOf { it.durationMillis ?: 0L } }
+        val sessionsOfDay = completed
             .filter { Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate() == nav.selectedDate }
             .sortedBy { it.startTimestampMillis }
         PlanningUiState(
-            calendar = nav.copy(markedDays = jobsByDay.keys),
+            calendar = nav.copy(markedDays = jobsByDay.keys, dayHours = hoursByDay),
             dayJobs = jobsByDay[nav.selectedDate].orEmpty(),
             daySessions = sessionsOfDay
         )
@@ -64,10 +67,24 @@ class PlanningViewModel(application: Application) : AndroidViewModel(application
     fun shift(forward: Boolean) = navigator.shift(forward)
     fun goToToday() = navigator.goToToday()
 
-    /** Inserts when [job.id] is 0, updates otherwise; the dialog builds the row either way. */
-    fun saveJob(job: PlannedJob) {
+    /**
+     * Inserts when [job.id] is 0, updates otherwise; the dialog builds the row either way.
+     * A new job with [repeatUntil] is copied to the same weekday every week up to that date.
+     */
+    fun saveJob(job: PlannedJob, repeatUntil: LocalDate? = null) {
         viewModelScope.launch {
-            if (job.id == 0L) dao.insert(job) else dao.update(job)
+            if (job.id != 0L) {
+                dao.update(job)
+                return@launch
+            }
+            dao.insert(job)
+            if (repeatUntil != null) {
+                var next = job.date.plusWeeks(1)
+                while (!next.isAfter(repeatUntil)) {
+                    dao.insert(job.copy(id = 0L, dateEpochDay = next.toEpochDay()))
+                    next = next.plusWeeks(1)
+                }
+            }
         }
     }
 

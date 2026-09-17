@@ -21,7 +21,9 @@ data class CalendarUiState(
     val visibleMonth: YearMonth,
     val expanded: Boolean = false,
     /** Days to draw a dot marker under (sessions on the home screen, planned jobs on the planning screen). */
-    val markedDays: Set<LocalDate> = emptySet()
+    val markedDays: Set<LocalDate> = emptySet(),
+    /** Tracked milliseconds per day, drawn as a heatmap on past days. */
+    val dayHours: Map<LocalDate, Long> = emptyMap()
 ) {
     /** Title month: the month of the selected day when the strip shows it, otherwise the week's majority month. */
     val titleMonth: YearMonth

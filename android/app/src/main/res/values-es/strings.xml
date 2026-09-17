@@ -213,6 +213,11 @@
     <string name="planning_details_required">Elige una empresa, sitio o tipo de trabajo, o escribe una nota.</string>
     <string name="planning_sessions">Sesiones</string>
     <string name="planning_no_sessions">Ninguna sesión registrada en este día.</string>
+    <string name="planning_nothing_today">Nada planificado ni registrado para este día.</string>
+    <string name="planning_repeat_weekly">Repetir cada semana hasta</string>
+    <string name="planning_repeat_count">%1$d repeticiones</string>
+    <string name="calendar_hours_legend">Horas trabajadas</string>
+    <string name="timeline_company_legend">Sesiones por empresa</string>
     <string name="calendar_day_total">Total: %1$s</string>
     <!-- Site photo (timestamp camera) -->
     <string name="menu_photo">Foto del sitio</string>
