@@ -3,6 +3,8 @@ package com.xbertz.onsite.backend
 import com.xbertz.onsite.backend.auth.configureSupabaseJwt
 import com.xbertz.onsite.backend.auth.devAuthRoutes
 import com.xbertz.onsite.backend.config.AppConfig
+import com.xbertz.onsite.backend.connections.ConnectionsRepository
+import com.xbertz.onsite.backend.connections.connectionRoutes
 import com.xbertz.onsite.backend.db.DatabaseFactory
 import com.xbertz.onsite.backend.domain.CompaniesRepository
 import com.xbertz.onsite.backend.domain.InvoicesRepository
@@ -64,6 +66,7 @@ fun Application.module(config: AppConfig) {
 
     val identityRepository = IdentityRepository()
     val inviteRepository = InviteRepository()
+    val connectionsRepository = ConnectionsRepository()
     val companiesRepository = CompaniesRepository()
     val sitesRepository = SitesRepository()
     val jobTypesRepository = JobTypesRepository()
@@ -75,6 +78,7 @@ fun Application.module(config: AppConfig) {
         devAuthRoutes(config)
         identityRoutes(identityRepository)
         inviteRoutes(inviteRepository)
+        connectionRoutes(connectionsRepository)
         companyRoutes(companiesRepository)
         siteRoutes(sitesRepository)
         jobTypeRoutes(jobTypesRepository)

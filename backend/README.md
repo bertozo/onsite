@@ -23,6 +23,18 @@ edit or delete it; sessions and planned jobs carry `created_by_user_id` (and pla
 `assigned_user_id`) so a `WORKER`'s own list is scoped to their rows while an `OWNER` sees
 everyone's.
 
+A separate bridge (`connections/`) covers the more common Australian trades case: a
+subcontractor keeps their own account and invoicing, but links one of their own `Company`
+rows (their record of a client) to that client's real account, if the client also uses the
+app - without ever becoming a member of it. The client sends a `connection_invites` row by
+email; the worker accepts it and picks *which* of their own companies it maps to
+(`POST /v1/me/connection-invites/{id}/accept`, body `{companyId}`) - the client never sees
+the worker's company list, only the name after linking. Once active, the client can drop a
+`PlannedJob` onto the worker's own calendar (`POST /v1/connections/{id}/planned-jobs`,
+pre-assigned to the worker, company name resolved server-side) and read that one company's
+sessions (`GET /v1/connections/{id}/sessions` - no rate, no other clients' hours). Either
+side can revoke (`DELETE /v1/connections/{id}`).
+
 ## Local development
 
 Requires Docker Desktop running, and the JDK already used by the Android project
