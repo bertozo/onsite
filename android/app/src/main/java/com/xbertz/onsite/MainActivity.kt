@@ -316,6 +316,34 @@ internal fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, 
     }
 }
 
+/** Collapsible "add new" form: closed by default so the list below gets the screen, opens on tap. */
+@Composable
+internal fun NewEntityCard(title: String, expanded: Boolean, onToggle: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.animateContentSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (expanded) {
+                Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 20.dp), content = content)
+            }
+        }
+    }
+}
+
 @Composable
 internal fun EntityListItem(
     icon: ImageVector,
@@ -2532,12 +2560,15 @@ fun CompaniesScreen(
         )
     }
 
+    var formExpanded by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_companies), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.new_company), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
+            NewEntityCard(
+                title = stringResource(R.string.new_company),
+                expanded = formExpanded,
+                onToggle = { formExpanded = !formExpanded }
+            ) {
                     OutlinedTextField(
                         value = uiState.name,
                         onValueChange = { viewModel.onNameChanged(it) },
@@ -2607,7 +2638,10 @@ fun CompaniesScreen(
                     )
                     Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = { viewModel.saveCompany() },
+                        onClick = {
+                            viewModel.saveCompany()
+                            formExpanded = false
+                        },
                         enabled = uiState.name.isNotBlank() && Validators.abnOk(uiState.abn) &&
                             Validators.phoneOk(uiState.phone) && Validators.emailOk(uiState.email) &&
                             Validators.amountOk(uiState.hourlyRate),
@@ -2618,10 +2652,9 @@ fun CompaniesScreen(
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.save_company))
                     }
-                }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
             SectionHeader(title = stringResource(R.string.registered_companies), count = companies.size)
             Spacer(Modifier.height(8.dp))
 
@@ -2890,12 +2923,15 @@ fun SitesScreen(onBack: () -> Unit, viewModel: SiteViewModel = viewModel()) {
         )
     }
 
+    var formExpanded by rememberSaveable { mutableStateOf(false) }
+
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_sites), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
-            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
-                Column(modifier = Modifier.padding(20.dp)) {
-                    Text(stringResource(R.string.new_site), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(12.dp))
+            NewEntityCard(
+                title = stringResource(R.string.new_site),
+                expanded = formExpanded,
+                onToggle = { formExpanded = !formExpanded }
+            ) {
                     OutlinedTextField(
                         value = uiState.label,
                         onValueChange = { viewModel.onLabelChanged(it) },
@@ -2953,7 +2989,10 @@ fun SitesScreen(onBack: () -> Unit, viewModel: SiteViewModel = viewModel()) {
 
                     Spacer(Modifier.height(16.dp))
                     Button(
-                        onClick = { viewModel.saveSite() },
+                        onClick = {
+                            viewModel.saveSite()
+                            formExpanded = false
+                        },
                         enabled = uiState.label.isNotBlank() && uiState.latitude != null,
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth().height(48.dp)
@@ -2962,10 +3001,9 @@ fun SitesScreen(onBack: () -> Unit, viewModel: SiteViewModel = viewModel()) {
                         Spacer(Modifier.width(8.dp))
                         Text(stringResource(R.string.save_site))
                     }
-                }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(16.dp))
             SectionHeader(title = stringResource(R.string.registered_sites), count = sites.size)
             Spacer(Modifier.height(8.dp))
 
