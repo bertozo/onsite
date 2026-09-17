@@ -292,4 +292,15 @@
     <string name="photo_camera_error">Não foi possível iniciar a câmera.</string>
     <string name="photo_label">Legenda</string>
     <string name="photo_label_hint">Impressa acima da data, ex.: nome do local ou o que a foto mostra</string>
+    <string name="login_title">OnSite</string>
+    <string name="login_subtitle">Login de desenvolvimento — ainda sem senha, só e-mail. O login real chega com o Supabase Auth.</string>
+    <string name="login_email_label">E-mail</string>
+    <string name="login_button">Entrar</string>
+    <string name="login_error_invalid_email">Informe um e-mail válido.</string>
+    <string name="login_error_failed">Não foi possível entrar. Verifique se o backend está acessível e tente de novo.</string>
+    <string name="migrating_title">Enviando seus dados</string>
+    <string name="migrating_subtitle">Isso acontece só uma vez.</string>
+    <string name="account_section">Conta</string>
+    <string name="account_signed_in_as">Conectado como %1$s</string>
+    <string name="logout_button">Sair</string>
 </resources>

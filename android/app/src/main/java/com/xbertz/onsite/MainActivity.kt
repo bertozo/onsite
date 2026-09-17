@@ -60,6 +60,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.AlertDialog
@@ -199,6 +200,31 @@ internal enum class Screen {
 
 @Composable
 fun AppRoot(settingsViewModel: SettingsViewModel) {
+    val authViewModel: AuthViewModel = viewModel()
+    val authState by authViewModel.state.collectAsState()
+
+    when (val state = authState) {
+        AuthUiState.CheckingSession -> FullScreenProgress()
+        is AuthUiState.LoggedOut -> LoginScreen(loading = false, error = state.error, onLogin = authViewModel::login)
+        AuthUiState.LoggingIn -> LoginScreen(loading = true, error = null, onLogin = authViewModel::login)
+        AuthUiState.MigratingData -> FullScreenProgress(
+            title = stringResource(R.string.migrating_title),
+            subtitle = stringResource(R.string.migrating_subtitle)
+        )
+        is AuthUiState.LoggedIn -> SignedInAppRoot(
+            settingsViewModel = settingsViewModel,
+            accountEmail = state.email,
+            onLogout = authViewModel::logout
+        )
+    }
+}
+
+@Composable
+private fun SignedInAppRoot(
+    settingsViewModel: SettingsViewModel,
+    accountEmail: String,
+    onLogout: () -> Unit
+) {
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
 
     if (screen != Screen.MENU) {
@@ -235,7 +261,12 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU })
         Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU })
         Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
-        Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.MENU }, viewModel = settingsViewModel)
+        Screen.SETTINGS -> SettingsScreen(
+            onBack = { screen = Screen.MENU },
+            viewModel = settingsViewModel,
+            accountEmail = accountEmail,
+            onLogout = onLogout
+        )
         Screen.PLANNING -> PlanningScreen(onBack = { screen = Screen.MENU })
         Screen.PHOTO -> PhotoScreen(onBack = { screen = Screen.MENU })
     }
@@ -2169,7 +2200,12 @@ private fun rememberBitmapFromUri(uri: Uri?): ImageBitmap? {
 // ---------------------------------------------------------------------------
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel,
+    accountEmail: String,
+    onLogout: () -> Unit
+) {
     val themeMode by viewModel.themeMode.collectAsState()
     val language by viewModel.language.collectAsState()
     val context = LocalContext.current
@@ -2183,7 +2219,13 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel) {
     }
 
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.settings), onBack = onBack) }) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
             ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(
@@ -2254,6 +2296,39 @@ fun SettingsScreen(onBack: () -> Unit, viewModel: SettingsViewModel) {
                         selected = language == AppLanguage.SPANISH,
                         onClick = { selectLanguage(AppLanguage.SPANISH) }
                     )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        stringResource(R.string.account_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                    Text(
+                        stringResource(R.string.account_signed_in_as, accountEmail),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onLogout)
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Text(stringResource(R.string.logout_button), color = MaterialTheme.colorScheme.error)
+                    }
                 }
             }
         }

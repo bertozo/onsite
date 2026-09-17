@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.kapt")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -75,6 +76,12 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
+
+    implementation("io.ktor:ktor-client-core:2.3.13")
+    implementation("io.ktor:ktor-client-okhttp:2.3.13")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.13")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.13")
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

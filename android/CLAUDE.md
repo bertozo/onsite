@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 OnSite (package `com.xbertz.onsite`) — an Android app (Kotlin + Jetpack Compose) for a self-employed tradesperson in Australia to log work sessions per site (GPS or manual entry), keep clients/sites/job types, and generate invoice PDFs. UI strings live in `res/values*/strings.xml` in English (default), Portuguese (`values-pt`) and Spanish (`values-es`); **never hardcode user-facing text in Kotlin** — add a key to all three files. Code comments are in English.
 
+The app is being migrated from fully local storage to a backend-backed, multi-platform architecture (backend in the sibling `onsite-backend` project; see its README). Room stays the on-device source of truth — the backend adds accounts, login and sync on top, it does not replace the offline behaviour.
+
 ## Build & run
 
 - Open the project root in Android Studio and let it sync Gradle. `gradle/wrapper/gradle-wrapper.jar` is intentionally not committed; Android Studio generates it on first sync.
@@ -27,6 +29,7 @@ MVVM, everything under `app/src/main/java/com/xbertz/onsite/`:
 - `report/ReportColumn.kt` — the single column template used by both the on-screen `ReportTable` and the PDF; enum order is display order, `DATE`/`HOURS` are always shown.
 - `Validators.kt` — ABN (modulus-89 check), BSB, account number, phone, email; blank is valid (fields are optional).
 - `AddressSearch.kt` — Photon (OSM) geocoder, restricted to Australia's bounding box.
+- `backend/` — the client for `onsite-backend`. `BackendApi.kt` is a Ktor `HttpClient` (OkHttp engine) talking to `http://127.0.0.1:8080` (reach it from a real device with `adb reverse tcp:8080 tcp:8080`; cleartext to that address only is allowed by `res/xml/network_security_config.xml`). `SessionStore.kt` keeps the JWT/email/account id in `EncryptedSharedPreferences`. `DataMigration.kt` uploads everything already in Room to the caller's account **once**, the first time they log in (guarded by `SessionStore.hasMigratedLocalData`); it assigns a fresh UUID per row and remaps `TrackingSession.invoiceId` through the new `Invoice` ids, since every other cross-reference in this app is already by name. `AuthViewModel.kt` (root package) drives `AuthUiState` (`CheckingSession` → `LoggedOut`/`LoggingIn` → optional `MigratingData` → `LoggedIn`); `AppRoot` in `MainActivity.kt` gates the whole `Screen` graph behind it, and `SettingsScreen` shows the signed-in email with a logout action. Login itself calls `POST /v1/dev/auth/login`, a **dev-only stand-in for Supabase Auth** that mints a session for any email with no password (see `onsite-backend`'s `DevAuthRoutes.kt`) — swap `BackendApi.devLogin` for the real Supabase SDK call once a project exists; nothing else in this flow needs to change, since the backend only ever verifies a JWT's claims.
 
 ## Things that are easy to break
 
@@ -36,3 +39,5 @@ MVVM, everything under `app/src/main/java/com/xbertz/onsite/`:
 - `CalendarUiState.dayHours` drives the planner heatmap; `CalendarDayCell` paints past days by hours and today/future days by planned jobs. Never `.copy(alpha)` a `Color.Transparent` marker (it turns black).
 - Room schema changes require a new `Migration` in `AppDatabase` and a version bump; `exportSchema` is false.
 - `LocaleManager` reads SharedPreferences `settings`/`language` synchronously — keep it cheap, it runs in `attachBaseContext`.
+- The dev login (`DEV_AUTH_ENABLED`) must never be reachable outside a local backend; it grants a session for any email with no password at all.
+- `DataMigration.kt` only runs once per install (`SessionStore.markMigrated`); it is not the sync engine (that is Phase 3 of the backend roadmap) — editing data after that first upload does not push anywhere yet.

@@ -296,4 +296,15 @@
     <string name="photo_camera_error">The camera could not be started.</string>
     <string name="photo_label">Label</string>
     <string name="photo_label_hint">Printed above the date, e.g. site name or what the photo shows</string>
+    <string name="login_title">OnSite</string>
+    <string name="login_subtitle">Development login — no password yet, only an email. Real sign-in arrives with Supabase Auth.</string>
+    <string name="login_email_label">Email</string>
+    <string name="login_button">Sign in</string>
+    <string name="login_error_invalid_email">Enter a valid email.</string>
+    <string name="login_error_failed">Could not sign in. Check that the backend is reachable and try again.</string>
+    <string name="migrating_title">Sending your data</string>
+    <string name="migrating_subtitle">This only happens once.</string>
+    <string name="account_section">Account</string>
+    <string name="account_signed_in_as">Signed in as %1$s</string>
+    <string name="logout_button">Log out</string>
 </resources>

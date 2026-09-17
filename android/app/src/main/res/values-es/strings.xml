@@ -292,4 +292,15 @@
     <string name="photo_camera_error">No se pudo iniciar la cámara.</string>
     <string name="photo_label">Etiqueta</string>
     <string name="photo_label_hint">Impresa sobre la fecha, p. ej. nombre del sitio o qué muestra la foto</string>
+    <string name="login_title">OnSite</string>
+    <string name="login_subtitle">Inicio de sesión de desarrollo, todavía sin contraseña, solo correo. El inicio real llega con Supabase Auth.</string>
+    <string name="login_email_label">Correo electrónico</string>
+    <string name="login_button">Iniciar sesión</string>
+    <string name="login_error_invalid_email">Introduce un correo válido.</string>
+    <string name="login_error_failed">No se pudo iniciar sesión. Verifica que el backend esté accesible e inténtalo de nuevo.</string>
+    <string name="migrating_title">Enviando tus datos</string>
+    <string name="migrating_subtitle">Esto ocurre una sola vez.</string>
+    <string name="account_section">Cuenta</string>
+    <string name="account_signed_in_as">Conectado como %1$s</string>
+    <string name="logout_button">Cerrar sesión</string>
 </resources>
