@@ -94,6 +94,12 @@
     <string name="companies_empty">Nenhuma empresa ainda. Adicione a primeira acima.</string>
     <string name="abn_value">ABN %1$s</string>
     <string name="edit_company">Editar empresa</string>
+    <string name="company_hourly_rate">Valor por hora padrão (opcional)</string>
+    <string name="rate_per_hour">$%1$s/h</string>
+    <string name="session_rate_default_hint">Padrão da empresa: $%1$s/h</string>
+    <string name="session_rate_no_default">Empresa sem valor por hora cadastrado</string>
+    <string name="edit_session">Editar sessão</string>
+    <string name="recent_combos">Recentes</string>
 
     <!-- Tipos de serviço -->
     <string name="new_job_type">Novo tipo de serviço</string>

@@ -14,5 +14,9 @@ data class TrackingSession(
     val startLongitude: Double,
     val stopTimestampMillis: Long?,
     val stopLatitude: Double?,
-    val stopLongitude: Double?
+    val stopLongitude: Double?,
+    /** Rate for this session only, when it differs from the company default. Null = use the company's. */
+    val hourlyRate: Double? = null,
+    /** Set once the session has been billed on an invoice (see [Invoice]). */
+    val invoiceId: Long? = null
 )

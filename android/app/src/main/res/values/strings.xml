@@ -98,6 +98,12 @@
     <string name="companies_empty">No companies yet. Add your first one above.</string>
     <string name="abn_value">ABN %1$s</string>
     <string name="edit_company">Edit company</string>
+    <string name="company_hourly_rate">Default hourly rate (optional)</string>
+    <string name="rate_per_hour">$%1$s/h</string>
+    <string name="session_rate_default_hint">Company default: $%1$s/h</string>
+    <string name="session_rate_no_default">No default rate for this company</string>
+    <string name="edit_session">Edit session</string>
+    <string name="recent_combos">Recent</string>
 
     <!-- Job types -->
     <string name="new_job_type">New job type</string>

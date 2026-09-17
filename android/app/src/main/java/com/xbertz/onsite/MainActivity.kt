@@ -75,6 +75,7 @@ import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -2537,6 +2538,7 @@ fun CompaniesScreen(onBack: () -> Unit, viewModel: CompanyViewModel = viewModel(
             onAbnChanged = { viewModel.onEditAbnChanged(it) },
             onPhoneChanged = { viewModel.onEditPhoneChanged(it) },
             onEmailChanged = { viewModel.onEditEmailChanged(it) },
+            onHourlyRateChanged = { viewModel.onEditHourlyRateChanged(it) },
             onDismiss = { viewModel.cancelEditingCompany() },
             onConfirm = { viewModel.saveEditedCompany() }
         )
@@ -2600,11 +2602,27 @@ fun CompaniesScreen(onBack: () -> Unit, viewModel: CompanyViewModel = viewModel(
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.hourlyRate,
+                        onValueChange = { viewModel.onHourlyRateChanged(it) },
+                        label = { Text(stringResource(R.string.company_hourly_rate)) },
+                        isError = !Validators.amountOk(uiState.hourlyRate),
+                        supportingText = if (!Validators.amountOk(uiState.hourlyRate)) {
+                            { Text(stringResource(R.string.enter_valid_amount)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Spacer(Modifier.height(16.dp))
                     Button(
                         onClick = { viewModel.saveCompany() },
                         enabled = uiState.name.isNotBlank() && Validators.abnOk(uiState.abn) &&
-                            Validators.phoneOk(uiState.phone) && Validators.emailOk(uiState.email),
+                            Validators.phoneOk(uiState.phone) && Validators.emailOk(uiState.email) &&
+                            Validators.amountOk(uiState.hourlyRate),
                         shape = MaterialTheme.shapes.medium,
                         modifier = Modifier.fillMaxWidth().height(48.dp)
                     ) {
@@ -2632,6 +2650,7 @@ fun CompaniesScreen(onBack: () -> Unit, viewModel: CompanyViewModel = viewModel(
                             icon = Icons.Filled.Business,
                             title = company.name,
                             subtitle = listOfNotNull(
+                                company.hourlyRate?.let { stringResource(R.string.rate_per_hour, formatRateInput(it)) },
                                 company.abn?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.abn_value, it) },
                                 company.phone?.takeIf { it.isNotBlank() },
                                 company.email?.takeIf { it.isNotBlank() }
@@ -2653,6 +2672,7 @@ fun EditCompanyDialog(
     onAbnChanged: (String) -> Unit,
     onPhoneChanged: (String) -> Unit,
     onEmailChanged: (String) -> Unit,
+    onHourlyRateChanged: (String) -> Unit,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
@@ -2711,13 +2731,29 @@ fun EditCompanyDialog(
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
                 )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.hourlyRate,
+                    onValueChange = onHourlyRateChanged,
+                    label = { Text(stringResource(R.string.company_hourly_rate)) },
+                    isError = !Validators.amountOk(state.hourlyRate),
+                    supportingText = if (!Validators.amountOk(state.hourlyRate)) {
+                        { Text(stringResource(R.string.enter_valid_amount)) }
+                    } else null,
+                    leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = onConfirm,
                 enabled = state.name.isNotBlank() && Validators.abnOk(state.abn) &&
-                    Validators.phoneOk(state.phone) && Validators.emailOk(state.email)
+                    Validators.phoneOk(state.phone) && Validators.emailOk(state.email) &&
+                    Validators.amountOk(state.hourlyRate)
             ) {
                 Text(stringResource(R.string.save))
             }
@@ -3287,6 +3323,7 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
     val companies by viewModel.companies.collectAsState()
     val sites by viewModel.sites.collectAsState()
     val jobTypes by viewModel.jobTypes.collectAsState()
+    val recentCombos by viewModel.recentCombos.collectAsState()
     var editingSession by remember { mutableStateOf<TrackingSession?>(null) }
     var deletingSession by remember { mutableStateOf<TrackingSession?>(null) }
     var showAddSessionDialog by remember { mutableStateOf(false) }
@@ -3321,11 +3358,12 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
     }
 
     editingSession?.let { session ->
-        EditDurationDialog(
+        EditSessionDialog(
             session = session,
+            companyRate = companies.firstOrNull { it.name == session.companyName }?.hourlyRate,
             onDismiss = { editingSession = null },
-            onConfirm = { newDurationMillis ->
-                viewModel.updateSessionDuration(session, newDurationMillis)
+            onConfirm = { newDurationMillis, rate ->
+                viewModel.updateSession(session, newDurationMillis, rate)
                 editingSession = null
             }
         )
@@ -3351,8 +3389,8 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
             initialSite = uiState.selectedSite,
             initialJobType = uiState.selectedJobType,
             onDismiss = { showAddSessionDialog = false },
-            onConfirm = { company, site, jobType, startMillis, stopMillis ->
-                viewModel.addManualSession(company, site, jobType, startMillis, stopMillis)
+            onConfirm = { company, site, jobType, startMillis, stopMillis, rate ->
+                viewModel.addManualSession(company, site, jobType, startMillis, stopMillis, rate)
                 showAddSessionDialog = false
             }
         )
@@ -3389,6 +3427,17 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
                 Column(modifier = Modifier.padding(20.dp)) {
                     Text(stringResource(R.string.session_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(12.dp))
+
+                    if (recentCombos.isNotEmpty() && !uiState.isSessionActive) {
+                        RecentCombosRow(
+                            combos = recentCombos,
+                            selected = uiState.let { st -> recentCombos.firstOrNull {
+                                it.company.id == st.selectedCompany?.id && it.site.id == st.selectedSite?.id && it.jobType.id == st.selectedJobType?.id
+                            } },
+                            onSelect = { viewModel.selectCombo(it) }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
 
                     if (companies.isNotEmpty()) {
                         TrackerDropdown(
@@ -3532,21 +3581,98 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
             if (sessions.isEmpty()) {
                 EmptyState(text = stringResource(R.string.sessions_empty))
             } else {
+                // Newest day first; each day gets a header with its total, like a timesheet.
+                val zone = remember { ZoneId.systemDefault() }
+                val days = remember(sessions) {
+                    sessions.groupBy { Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate() }
+                        .toSortedMap(compareByDescending { it })
+                        .map { (date, list) -> date to list }
+                }
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    items(sessions, key = { it.id }) { session ->
-                        SessionRow(
-                            session = session,
-                            onEditClick = { editingSession = session },
-                            onDeleteClick = { deletingSession = session }
-                        )
+                    days.forEach { (date, daySessions) ->
+                        item(key = "day-$date") {
+                            DayHeader(date = date, totalMillis = daySessions.sumOf { it.durationMillis ?: 0L })
+                        }
+                        items(daySessions, key = { it.id }) { session ->
+                            SessionRow(
+                                session = session,
+                                onEditClick = { editingSession = session },
+                                onDeleteClick = { deletingSession = session }
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+/** One-tap chips with the last few company/site/job type combinations. */
+@Composable
+private fun RecentCombosRow(combos: List<SessionCombo>, selected: SessionCombo?, onSelect: (SessionCombo) -> Unit) {
+    Column {
+        Text(
+            stringResource(R.string.recent_combos),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        ) {
+            combos.forEach { combo ->
+                val isSelected = combo == selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelect(combo) },
+                    label = {
+                        Column {
+                            Text(combo.site.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                            Text(
+                                "${combo.company.name} · ${combo.jobType.name}",
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
+                            )
+                        }
+                    },
+                    leadingIcon = if (isSelected) {
+                        { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    modifier = Modifier.height(52.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Date header in the tracker history with the day's total hours. */
+@Composable
+private fun DayHeader(date: LocalDate, totalMillis: Long) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val formatter = remember(locale) { DateTimeFormatter.ofPattern("EEE, d MMM", locale) }
+    val totalText = stringResource(
+        R.string.duration_format,
+        TimeUnit.MILLISECONDS.toHours(totalMillis),
+        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+    )
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+        Text(
+            date.format(formatter).trimEnd('.').replaceFirstChar { it.titlecase(locale) },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            totalText,
+            style = MaterialTheme.typography.labelLarge.tabularNums,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
     }
 }
 
@@ -3561,13 +3687,14 @@ fun AddSessionDialog(
     initialSite: Site?,
     initialJobType: JobType?,
     onDismiss: () -> Unit,
-    onConfirm: (company: Company, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long) -> Unit
+    onConfirm: (company: Company, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long, hourlyRate: Double?) -> Unit
 ) {
     val context = LocalContext.current
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
 
     var company by remember { mutableStateOf(initialCompany ?: companies.singleOrNull()) }
+    var rateText by remember { mutableStateOf("") }
     var site by remember { mutableStateOf(initialSite ?: sites.singleOrNull()) }
     var jobType by remember { mutableStateOf(initialJobType ?: jobTypes.singleOrNull()) }
     var date by remember { mutableStateOf(LocalDate.now()) }
@@ -3585,7 +3712,7 @@ fun AddSessionDialog(
     val zone = ZoneId.systemDefault()
     val startMillis = date.atTime(startTime).atZone(zone).toInstant().toEpochMilli()
     val stopMillis = startMillis + TimeUnit.MINUTES.toMillis(durationMinutes)
-    val canSave = company != null && site != null && jobType != null && durationMinutes > 0
+    val canSave = company != null && site != null && jobType != null && durationMinutes > 0 && Validators.amountOk(rateText)
 
     // Minutes from [from] to [to] on the clock; a "to" at or before "from" is read as the next day.
     fun minutesBetween(from: LocalTime, to: LocalTime): Long {
@@ -3735,11 +3862,14 @@ fun AddSessionDialog(
                         color = MaterialTheme.colorScheme.error
                     )
                 }
+
+                Spacer(Modifier.height(14.dp))
+                SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = company?.hourlyRate)
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(company!!, site!!, jobType!!, startMillis, stopMillis) },
+                onClick = { onConfirm(company!!, site!!, jobType!!, startMillis, stopMillis, Validators.parseAmount(rateText)) },
                 enabled = canSave
             ) {
                 Text(stringResource(R.string.add))
@@ -3785,6 +3915,18 @@ fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick:
                     Text(session.jobTypeLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Text(dateLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                session.hourlyRate?.let { rate ->
+                    Spacer(Modifier.height(2.dp))
+                    Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Text(
+                            stringResource(R.string.rate_per_hour, formatRateInput(rate)),
+                            style = MaterialTheme.typography.labelSmall.tabularNums,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                        )
+                    }
+                }
             }
             Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
                 Text(
@@ -3805,44 +3947,90 @@ fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick:
     }
 }
 
+/** Hourly-rate override input shared by the add/edit session dialogs; blank means "use the company default". */
 @Composable
-fun EditDurationDialog(session: TrackingSession, onDismiss: () -> Unit, onConfirm: (Long) -> Unit) {
+private fun SessionRateField(value: String, onValueChange: (String) -> Unit, companyRate: Double?) {
+    val valid = Validators.amountOk(value)
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(stringResource(R.string.hourly_rate_optional)) },
+        leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+        isError = !valid,
+        supportingText = {
+            Text(
+                when {
+                    !valid -> stringResource(R.string.enter_valid_amount)
+                    companyRate != null -> stringResource(R.string.session_rate_default_hint, formatRateInput(companyRate))
+                    else -> stringResource(R.string.session_rate_no_default)
+                }
+            )
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+/** Edits a completed session's duration and optional rate override. */
+@Composable
+fun EditSessionDialog(
+    session: TrackingSession,
+    companyRate: Double?,
+    onDismiss: () -> Unit,
+    onConfirm: (durationMillis: Long, hourlyRate: Double?) -> Unit
+) {
     val durationMillis = session.durationMillis ?: 0L
     var hoursText by remember { mutableStateOf(TimeUnit.MILLISECONDS.toHours(durationMillis).toString()) }
     var minutesText by remember { mutableStateOf((TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60).toString()) }
+    var rateText by remember { mutableStateOf(session.hourlyRate?.let { formatRateInput(it) }.orEmpty()) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.Edit, contentDescription = null) },
-        title = { Text(stringResource(R.string.edit_duration)) },
+        title = { Text(stringResource(R.string.edit_session)) },
         text = {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    value = hoursText,
-                    onValueChange = { value -> hoursText = value.filter { it.isDigit() } },
-                    label = { Text(stringResource(R.string.hours)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.weight(1f)
+            Column {
+                Text(
+                    stringResource(R.string.duration),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedTextField(
-                    value = minutesText,
-                    onValueChange = { value -> minutesText = value.filter { it.isDigit() } },
-                    label = { Text(stringResource(R.string.minutes)) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.weight(1f)
-                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = hoursText,
+                        onValueChange = { value -> hoursText = value.filter { it.isDigit() } },
+                        label = { Text(stringResource(R.string.hours)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = minutesText,
+                        onValueChange = { value -> minutesText = value.filter { it.isDigit() } },
+                        label = { Text(stringResource(R.string.minutes)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = companyRate)
             }
         },
         confirmButton = {
-            TextButton(onClick = {
-                val hours = hoursText.toLongOrNull() ?: 0
-                val minutes = (minutesText.toLongOrNull() ?: 0).coerceIn(0, 59)
-                onConfirm(TimeUnit.HOURS.toMillis(hours) + TimeUnit.MINUTES.toMillis(minutes))
-            }) {
+            TextButton(
+                onClick = {
+                    val hours = hoursText.toLongOrNull() ?: 0
+                    val minutes = (minutesText.toLongOrNull() ?: 0).coerceIn(0, 59)
+                    onConfirm(TimeUnit.HOURS.toMillis(hours) + TimeUnit.MINUTES.toMillis(minutes), Validators.parseAmount(rateText))
+                },
+                enabled = Validators.amountOk(rateText)
+            ) {
                 Text(stringResource(R.string.save))
             }
         },

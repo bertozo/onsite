@@ -43,10 +43,20 @@ object Validators {
 
     fun isValidEmail(value: String): Boolean = Patterns.EMAIL_ADDRESS.matcher(value.trim()).matches()
 
+    /** Money typed by the user: digits with an optional "." or "," decimal part, never negative. */
+    fun parseAmount(value: String): Double? {
+        val normalised = value.trim().replace(',', '.')
+        if (normalised.isBlank() || !Regex("^\\d+(\\.\\d{0,2})?$").matches(normalised)) return null
+        return normalised.toDoubleOrNull()?.takeIf { it >= 0 }
+    }
+
+    fun isValidAmount(value: String): Boolean = parseAmount(value) != null
+
     // "Optional" variants: blank is fine, otherwise the rule applies.
     fun abnOk(value: String) = value.isBlank() || isValidAbn(value)
     fun bsbOk(value: String) = value.isBlank() || isValidBsb(value)
     fun accountNumberOk(value: String) = value.isBlank() || isValidAccountNumber(value)
     fun phoneOk(value: String) = value.isBlank() || isValidPhone(value)
     fun emailOk(value: String) = value.isBlank() || isValidEmail(value)
+    fun amountOk(value: String) = value.isBlank() || isValidAmount(value)
 }

@@ -10,5 +10,7 @@ data class Company(
     val abn: String?,
     val phone: String?,
     val email: String?,
-    val createdAtMillis: Long
+    val createdAtMillis: Long,
+    /** Default hourly rate suggested for invoices; a session can override it. Null = not set. */
+    val hourlyRate: Double? = null
 )
