@@ -20,9 +20,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Receipt
 import androidx.compose.material.icons.filled.ViewColumn
@@ -30,11 +32,15 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,13 +64,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xbertz.onsite.report.LabeledTotal
 import com.xbertz.onsite.report.ReportColumn
 import com.xbertz.onsite.report.ReportPeriod
 import com.xbertz.onsite.report.ReportSummary
-import com.xbertz.onsite.report.SiteTotal
 import com.xbertz.onsite.report.WeekTotal
 import com.xbertz.onsite.report.buildCsv
 import com.xbertz.onsite.report.summarize
+import com.xbertz.onsite.report.totalsByCompany
+import com.xbertz.onsite.report.totalsByJobType
 import com.xbertz.onsite.report.totalsBySite
 import com.xbertz.onsite.report.weeklyTotals
 import com.xbertz.onsite.ui.theme.tabularNums
@@ -83,6 +91,7 @@ private fun durationText(millis: Long): String = stringResource(
 /** Warning colour for "unbilled" figures; fixed so it reads the same in both themes. */
 private val UnbilledAmber = Color(0xFFB8790F)
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReportsScreen(
     onBack: () -> Unit,
@@ -142,6 +151,8 @@ fun ReportsScreen(
     val summary = remember(filteredSessions, ratesByCompany) { summarize(filteredSessions, ratesByCompany, zone) }
     val weeks = remember(filteredSessions, startDate, endDate) { weeklyTotals(filteredSessions, startDate, endDate, zone) }
     val bySite = remember(filteredSessions) { totalsBySite(filteredSessions) }
+    val byCompany = remember(filteredSessions) { totalsByCompany(filteredSessions) }
+    val byJobType = remember(filteredSessions) { totalsByJobType(filteredSessions) }
 
     // Column labels resolved here (composable context) so the CSV builder stays a plain function.
     val columnLabels = ReportColumn.entries.associateWith { stringResource(it.labelRes) }
@@ -160,6 +171,9 @@ fun ReportsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
+            ReportModeSwitch(mode = filters.viewMode, onSelect = { reportViewModel.setViewMode(it) })
+            Spacer(Modifier.height(12.dp))
+
             // Period preset: one dropdown instead of a chip row, so it never needs to scroll or wrap
             // as more presets are added.
             Box {
@@ -248,82 +262,110 @@ fun ReportsScreen(
             Spacer(Modifier.height(16.dp))
             SummaryCard(summary = summary, showRateHint = summary.estimatedAmount == null && filteredSessions.isNotEmpty())
 
-            if (filteredSessions.isNotEmpty()) {
-                if (weeks.size > 1 && weeks.any { it.millis > 0 }) {
-                    Spacer(Modifier.height(12.dp))
-                    WeeklyChartCard(weeks = weeks)
-                }
-                if (bySite.size > 1) {
-                    Spacer(Modifier.height(12.dp))
-                    SiteBreakdownCard(totals = bySite)
-                }
-            }
-
-            Spacer(Modifier.height(16.dp))
-            OutlinedButton(
-                onClick = { showColumnsDialog = true },
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Filled.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "${stringResource(R.string.columns)}: " + columns.map { stringResource(it.labelRes) }.joinToString(", "),
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-
-            if (filteredSessions.isEmpty()) {
-                EmptyState(text = stringResource(R.string.reports_empty))
-            } else {
-                ReportTable(
-                    sessions = filteredSessions,
-                    sitesByLabel = sitesByLabel,
-                    columns = columns,
-                    totalDurationMillis = summary.totalMillis
-                )
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = {
-                            val preselected = filters.company?.let { name -> companies.firstOrNull { it.name == name } }
-                            invoiceViewModel.startReview(filteredSessions, startDate, endDate, preselected)
-                            onReviewInvoice()
-                        },
+            when (filters.viewMode) {
+                ReportViewMode.LIST -> {
+                    Spacer(Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = { showColumnsDialog = true },
                         shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.generate_invoice))
+                        Icon(Icons.Filled.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            "${stringResource(R.string.columns)}: " + columns.map { stringResource(it.labelRes) }.joinToString(", "),
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
-                    OutlinedButton(onClick = onOpenInvoices, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
-                        Icon(Icons.Filled.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.menu_invoices))
+                    Spacer(Modifier.height(12.dp))
+
+                    if (filteredSessions.isEmpty()) {
+                        EmptyState(text = stringResource(R.string.reports_empty))
+                    } else {
+                        ReportTable(
+                            sessions = filteredSessions,
+                            sitesByLabel = sitesByLabel,
+                            columns = columns,
+                            totalDurationMillis = summary.totalMillis
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(
+                                onClick = {
+                                    val preselected = filters.company?.let { name -> companies.firstOrNull { it.name == name } }
+                                    invoiceViewModel.startReview(filteredSessions, startDate, endDate, preselected)
+                                    onReviewInvoice()
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.weight(1f).height(48.dp)
+                            ) {
+                                Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.generate_invoice))
+                            }
+                            OutlinedButton(onClick = onOpenInvoices, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
+                                Icon(Icons.Filled.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.menu_invoices))
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = {
+                                val csv = buildCsv(filteredSessions, columns, columnLabels, rateLabel, amountLabel, sitesByLabel, ratesByCompany, zone)
+                                val uri = reportViewModel.writeCsv(csv, startDate, endDate)
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/csv"
+                                    putExtra(Intent.EXTRA_STREAM, uri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                }
+                                context.startActivity(Intent.createChooser(intent, exportTitle))
+                            },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth().height(44.dp)
+                        ) {
+                            Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.export_csv))
+                        }
                     }
                 }
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = {
-                        val csv = buildCsv(filteredSessions, columns, columnLabels, rateLabel, amountLabel, sitesByLabel, ratesByCompany, zone)
-                        val uri = reportViewModel.writeCsv(csv, startDate, endDate)
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/csv"
-                            putExtra(Intent.EXTRA_STREAM, uri)
-                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                ReportViewMode.INSIGHTS -> {
+                    if (filteredSessions.isEmpty()) {
+                        Spacer(Modifier.height(16.dp))
+                        EmptyState(text = stringResource(R.string.reports_empty))
+                    } else {
+                        if (weeks.size > 1 && weeks.any { it.millis > 0 }) {
+                            Spacer(Modifier.height(12.dp))
+                            WeeklyChartCard(weeks = weeks)
                         }
-                        context.startActivity(Intent.createChooser(intent, exportTitle))
-                    },
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.fillMaxWidth().height(44.dp)
-                ) {
-                    Icon(Icons.Filled.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.export_csv))
+                        if (bySite.size > 1) {
+                            Spacer(Modifier.height(12.dp))
+                            BreakdownCard(
+                                title = stringResource(R.string.hours_by_site),
+                                totals = bySite,
+                                emptyLabel = stringResource(R.string.site)
+                            )
+                        }
+                        if (byCompany.size > 1) {
+                            Spacer(Modifier.height(12.dp))
+                            BreakdownCard(
+                                title = stringResource(R.string.hours_by_client),
+                                totals = byCompany,
+                                emptyLabel = stringResource(R.string.company)
+                            )
+                        }
+                        if (byJobType.size > 1) {
+                            Spacer(Modifier.height(12.dp))
+                            BreakdownCard(
+                                title = stringResource(R.string.hours_by_service),
+                                totals = byJobType,
+                                emptyLabel = stringResource(R.string.job_type)
+                            )
+                        }
+                    }
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -336,6 +378,30 @@ fun ReportsScreen(
             onToggle = { column, enabled -> reportViewModel.setColumnEnabled(column, enabled) },
             onDismiss = { showColumnsDialog = false }
         )
+    }
+}
+
+/** Two-way switch at the top of Reports: the plain session list, or a set of aggregate charts. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReportModeSwitch(mode: ReportViewMode, onSelect: (ReportViewMode) -> Unit) {
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        SegmentedButton(
+            selected = mode == ReportViewMode.LIST,
+            onClick = { onSelect(ReportViewMode.LIST) },
+            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+            icon = { Icon(Icons.Filled.List, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        ) {
+            Text(stringResource(R.string.report_mode_list))
+        }
+        SegmentedButton(
+            selected = mode == ReportViewMode.INSIGHTS,
+            onClick = { onSelect(ReportViewMode.INSIGHTS) },
+            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+            icon = { Icon(Icons.Filled.BarChart, contentDescription = null, modifier = Modifier.size(18.dp)) }
+        ) {
+            Text(stringResource(R.string.report_mode_insights))
+        }
     }
 }
 
@@ -460,20 +526,19 @@ private fun WeeklyChartCard(weeks: List<WeekTotal>) {
     }
 }
 
-/** Hours per site with a proportional bar, biggest first. */
+/** Hours per label (site, client or service) with a proportional bar, biggest first. */
 @Composable
-private fun SiteBreakdownCard(totals: List<SiteTotal>) {
+private fun BreakdownCard(title: String, totals: List<LabeledTotal>, emptyLabel: String) {
     val maxMillis = totals.maxOf { it.millis }.coerceAtLeast(1L)
-    val unnamed = stringResource(R.string.site)
     ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            Text(stringResource(R.string.hours_by_site), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(10.dp))
             totals.forEachIndexed { index, total ->
                 if (index > 0) Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        total.site.ifBlank { unnamed },
+                        total.label.ifBlank { emptyLabel },
                         style = MaterialTheme.typography.bodyMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.update
 import java.io.File
 import java.time.LocalDate
 
+/** How the Reports screen presents the filtered sessions. */
+enum class ReportViewMode { LIST, INSIGHTS }
+
 /** Period, filters and column selection of the Reports screen. */
 data class ReportFilters(
     val period: ReportPeriod = ReportPeriod.THIS_WEEK,
@@ -21,7 +24,8 @@ data class ReportFilters(
     val customEnd: LocalDate = LocalDate.now(),
     /** Company name to restrict the report to; null = every company. */
     val company: String? = null,
-    val unbilledOnly: Boolean = false
+    val unbilledOnly: Boolean = false,
+    val viewMode: ReportViewMode = ReportViewMode.LIST
 ) {
     /** Inclusive date range the report covers. */
     val range: Pair<LocalDate, LocalDate>
@@ -73,6 +77,8 @@ class ReportViewModel(application: Application) : AndroidViewModel(application) 
     fun setCompany(name: String?) = _filters.update { it.copy(company = name) }
 
     fun setUnbilledOnly(enabled: Boolean) = _filters.update { it.copy(unbilledOnly = enabled) }
+
+    fun setViewMode(mode: ReportViewMode) = _filters.update { it.copy(viewMode = mode) }
 
     /** Writes [csv] into the shared cache folder and returns a content URI for the share sheet. */
     fun writeCsv(csv: String, start: LocalDate, end: LocalDate): Uri {

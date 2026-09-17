@@ -266,6 +266,10 @@
     <string name="no_rate_hint">Set an hourly rate on the company to estimate amounts.</string>
     <string name="weekly_hours">Hours per week</string>
     <string name="hours_by_site">Hours by site</string>
+    <string name="hours_by_client">Hours by client</string>
+    <string name="hours_by_service">Hours by service</string>
+    <string name="report_mode_list">List</string>
+    <string name="report_mode_insights">Insights</string>
     <string name="export_csv">Export CSV</string>
     <string name="company_recent_invoices">Recent invoices</string>
     <string name="company_no_invoices">No invoices yet</string>

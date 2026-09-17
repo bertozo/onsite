@@ -262,6 +262,10 @@
     <string name="no_rate_hint">Cadastre um valor por hora na empresa para estimar valores.</string>
     <string name="weekly_hours">Horas por semana</string>
     <string name="hours_by_site">Horas por local</string>
+    <string name="hours_by_client">Horas por cliente</string>
+    <string name="hours_by_service">Horas por serviço</string>
+    <string name="report_mode_list">Lista</string>
+    <string name="report_mode_insights">Análise</string>
     <string name="export_csv">Exportar CSV</string>
     <string name="company_recent_invoices">Invoices recentes</string>
     <string name="company_no_invoices">Nenhuma invoice ainda</string>

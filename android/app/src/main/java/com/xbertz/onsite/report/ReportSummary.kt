@@ -43,8 +43,8 @@ data class ReportSummary(
 /** One bar of the weekly chart: the Monday that starts the week and the hours tracked in it. */
 data class WeekTotal(val weekStart: LocalDate, val millis: Long)
 
-/** One row of the per-site breakdown. */
-data class SiteTotal(val site: String, val millis: Long)
+/** One row of an "hours by X" breakdown: a label (site, client or service) and the hours behind it. */
+data class LabeledTotal(val label: String, val millis: Long)
 
 private fun TrackingSession.localDate(zone: ZoneId): LocalDate =
     Instant.ofEpochMilli(startTimestampMillis).atZone(zone).toLocalDate()
@@ -93,13 +93,22 @@ fun weeklyTotals(
         .toList()
 }
 
-/** Hours per site, biggest first; sessions without a site label are grouped under an empty name. */
-fun totalsBySite(sessions: List<TrackingSession>): List<SiteTotal> =
+/** Hours grouped by [keyOf], biggest first; sessions with a blank key are grouped under an empty label. */
+private fun totalsBy(sessions: List<TrackingSession>, keyOf: (TrackingSession) -> String?): List<LabeledTotal> =
     sessions
         .filter { it.stopTimestampMillis != null }
-        .groupBy { it.siteLabel.orEmpty() }
-        .map { (site, list) -> SiteTotal(site, list.sumOf { it.durationMillis ?: 0L }) }
+        .groupBy { keyOf(it).orEmpty() }
+        .map { (label, list) -> LabeledTotal(label, list.sumOf { it.durationMillis ?: 0L }) }
         .sortedByDescending { it.millis }
+
+/** Hours per site, biggest first; sessions without a site label are grouped under an empty name. */
+fun totalsBySite(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.siteLabel }
+
+/** Hours per client, biggest first. */
+fun totalsByCompany(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.companyName }
+
+/** Hours per service, biggest first. */
+fun totalsByJobType(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.jobTypeLabel }
 
 /**
  * CSV with the same columns as the on-screen table (one row per session), plus the rate and

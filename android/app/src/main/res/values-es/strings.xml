@@ -262,6 +262,10 @@
     <string name="no_rate_hint">Registra una tarifa por hora en la empresa para estimar importes.</string>
     <string name="weekly_hours">Horas por semana</string>
     <string name="hours_by_site">Horas por sitio</string>
+    <string name="hours_by_client">Horas por cliente</string>
+    <string name="hours_by_service">Horas por servicio</string>
+    <string name="report_mode_list">Lista</string>
+    <string name="report_mode_insights">Análisis</string>
     <string name="export_csv">Exportar CSV</string>
     <string name="company_recent_invoices">Facturas recientes</string>
     <string name="company_no_invoices">Aún no hay facturas</string>
