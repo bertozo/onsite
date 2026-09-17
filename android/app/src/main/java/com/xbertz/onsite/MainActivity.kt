@@ -11,8 +11,10 @@ import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -58,7 +60,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ButtonDefaults
@@ -88,6 +93,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -114,6 +120,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -129,7 +136,9 @@ import com.xbertz.onsite.photo.PhotoStamper
 import com.xbertz.onsite.photo.TimestampPosition
 import com.xbertz.onsite.report.ReportColumn
 import com.xbertz.onsite.ui.theme.OnSiteTheme
+import com.xbertz.onsite.ui.theme.tabularNums
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
@@ -395,10 +404,32 @@ fun MainMenuScreen(
     onPlanningClick: () -> Unit,
     onPhotoClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    profileViewModel: ProfileViewModel = viewModel()
+    profileViewModel: ProfileViewModel = viewModel(),
+    trackerViewModel: LocationTrackerViewModel = viewModel()
 ) {
     val profile by profileViewModel.uiState.collectAsState()
     val profilePhoto = rememberBitmapFromFile(profile.photoPath)
+    val activeSession by trackerViewModel.activeSession.collectAsState()
+    val lastSession by trackerViewModel.lastSession.collectAsState()
+    val trackerState by trackerViewModel.uiState.collectAsState()
+    val companies by trackerViewModel.companies.collectAsState()
+    val sites by trackerViewModel.sites.collectAsState()
+    val jobTypes by trackerViewModel.jobTypes.collectAsState()
+    val context = LocalContext.current
+
+    // Resuming from the home screen needs the same permissions as the tracker; if location is
+    // refused we fall back to opening the tracker, which explains why it is needed.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { if (hasLocationPermission(context)) trackerViewModel.resumeLastSession() else onTrackerClick() }
+    val onResumeClick = {
+        val missing = missingTrackingPermissions(context)
+        if (missing.isEmpty()) trackerViewModel.resumeLastSession() else permissionLauncher.launch(missing)
+    }
+
+    trackerState.lastCompletedSession?.let { session ->
+        SessionSummaryDialog(session = session, onDismiss = { trackerViewModel.dismissSessionSummary() })
+    }
 
     val secondaryActions = listOf(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
@@ -473,16 +504,191 @@ fun MainMenuScreen(
 
         Spacer(Modifier.height(28.dp))
 
-        ElevatedCard(
-            onClick = onTrackerClick,
-            modifier = Modifier.fillMaxWidth(),
-            shape = MaterialTheme.shapes.large,
-            colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+        val running = activeSession
+        if (running != null) {
+            ActiveSessionCard(
+                session = running,
+                isProcessing = trackerState.isProcessing,
+                errorRes = trackerState.locationErrorRes,
+                onStop = { if (hasLocationPermission(context)) trackerViewModel.stopTracking() else onTrackerClick() },
+                onOpen = onTrackerClick
+            )
+        } else {
+            StartTrackingCard(
+                lastSession = lastSession,
+                isProcessing = trackerState.isProcessing,
+                errorRes = trackerState.locationErrorRes,
+                onClick = onTrackerClick,
+                onResume = onResumeClick
+            )
+        }
+
+        val setupSteps = listOf(
+            SetupStep(stringResource(R.string.setup_profile), Icons.Filled.Person, profile.name.isNotBlank(), onProfileClick),
+            SetupStep(stringResource(R.string.setup_company), Icons.Filled.Business, companies.isNotEmpty(), onCompaniesClick),
+            SetupStep(stringResource(R.string.setup_site), Icons.Filled.Place, sites.isNotEmpty(), onSitesClick),
+            SetupStep(stringResource(R.string.setup_job_type), Icons.Filled.Work, jobTypes.isNotEmpty(), onJobTypesClick)
+        )
+        if (setupSteps.any { !it.done }) {
+            Spacer(Modifier.height(16.dp))
+            SetupChecklist(steps = setupSteps)
+        }
+
+        Spacer(Modifier.height(28.dp))
+        Text(
+            stringResource(R.string.manage),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+
+        secondaryActions.chunked(2).forEach { rowItems ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowItems.forEach { action ->
+                    MenuCard(action = action, modifier = Modifier.weight(1f))
+                }
+                if (rowItems.size == 1) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+private fun hasLocationPermission(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+/** Location is required to track; notifications (API 33+) only power the chronometer notification. */
+private fun missingTrackingPermissions(context: Context): Array<String> {
+    val wanted = mutableListOf<String>()
+    if (!hasLocationPermission(context)) {
+        wanted += Manifest.permission.ACCESS_FINE_LOCATION
+        wanted += Manifest.permission.ACCESS_COARSE_LOCATION
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) {
+        wanted += Manifest.permission.POST_NOTIFICATIONS
+    }
+    return wanted.toTypedArray()
+}
+
+/** "HH:MM:SS" for a running chronometer. */
+private fun formatElapsed(millis: Long): String {
+    val totalSeconds = (millis / 1000).coerceAtLeast(0)
+    return String.format(
+        Locale.ENGLISH, "%02d:%02d:%02d",
+        totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60
+    )
+}
+
+/** Home card for the running session: what is being tracked, a live chronometer and a Stop button. */
+@Composable
+private fun ActiveSessionCard(
+    session: TrackingSession,
+    isProcessing: Boolean,
+    @StringRes errorRes: Int?,
+    onStop: () -> Unit,
+    onOpen: () -> Unit
+) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(session.id) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    val details = listOfNotNull(
+        session.companyName?.takeIf { it.isNotBlank() },
+        session.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(PlannerMarkerGreen)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.session_in_progress),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                formatElapsed(now - session.startTimestampMillis),
+                style = MaterialTheme.typography.displaySmall.tabularNums,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            if (details.isNotEmpty()) {
+                Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            errorRes?.let { resId ->
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(resId), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onStop,
+                    enabled = !isProcessing,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) {
+                    if (isProcessing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onError, strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.Stop, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.stop), fontWeight = FontWeight.Bold)
+                    }
+                }
+                OutlinedButton(onClick = onOpen, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
+                    Text(stringResource(R.string.open_tracker))
+                }
+            }
+        }
+    }
+}
+
+/** Home card when nothing is running: opens the tracker, with a one-tap resume of the last session. */
+@Composable
+private fun StartTrackingCard(
+    lastSession: TrackingSession?,
+    isProcessing: Boolean,
+    @StringRes errorRes: Int?,
+    onClick: () -> Unit,
+    onResume: () -> Unit
+) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.PlayArrow,
                     contentDescription = null,
@@ -505,27 +711,110 @@ fun MainMenuScreen(
                 }
                 Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
             }
-        }
-
-        Spacer(Modifier.height(28.dp))
-        Text(
-            stringResource(R.string.manage),
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Spacer(Modifier.height(12.dp))
-
-        secondaryActions.chunked(2).forEach { rowItems ->
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                rowItems.forEach { action ->
-                    MenuCard(action = action, modifier = Modifier.weight(1f))
-                }
-                if (rowItems.size == 1) {
-                    Spacer(Modifier.weight(1f))
+            errorRes?.let { resId ->
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(resId), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            val resumable = lastSession?.takeIf {
+                !it.siteLabel.isNullOrBlank() && !it.companyName.isNullOrBlank() && !it.jobTypeLabel.isNullOrBlank()
+            }
+            if (resumable != null) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.last_session_hint, resumable.siteLabel.orEmpty(), resumable.companyName.orEmpty()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = onResume,
+                        enabled = !isProcessing,
+                        shape = MaterialTheme.shapes.medium,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        if (isProcessing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.resume_last_session), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+private data class SetupStep(val label: String, val icon: ImageVector, val done: Boolean, val onClick: () -> Unit)
+
+/** First-run checklist: replaces the old "set up X first" banner; disappears once every step is done. */
+@Composable
+private fun SetupChecklist(steps: List<SetupStep>) {
+    val doneCount = steps.count { it.done }
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.setup_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    stringResource(R.string.setup_progress, doneCount, steps.size),
+                    style = MaterialTheme.typography.labelMedium.tabularNums,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { doneCount.toFloat() / steps.size },
+                modifier = Modifier.fillMaxWidth().clip(CircleShape)
+            )
+            Spacer(Modifier.height(6.dp))
+            steps.forEach { step ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(enabled = !step.done, onClick = step.onClick)
+                        .padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        if (step.done) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = null,
+                        tint = if (step.done) PlannerMarkerGreen else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        step.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (step.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (step.done) TextDecoration.LineThrough else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!step.done) {
+                        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
         }
     }
 }
@@ -892,7 +1181,7 @@ private fun PlanningSessionRow(session: TrackingSession) {
                         TimeUnit.MILLISECONDS.toHours(durationMillis),
                         TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
                     ),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.tabularNums,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -2174,7 +2463,7 @@ fun ReportTable(
                                     modifier = Modifier.width(widths.getValue(column)).padding(end = 6.dp),
                                     textAlign = if (column.isRightAligned()) TextAlign.End else TextAlign.Start,
                                     maxLines = 2,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = if (column.isRightAligned()) MaterialTheme.typography.bodyMedium.tabularNums else MaterialTheme.typography.bodyMedium,
                                     color = if (column == ReportColumn.DATE) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
                                 )
                             }
@@ -2202,6 +2491,7 @@ fun ReportTable(
                         text = stringResource(R.string.duration_format, totalHours, totalMinutes),
                         modifier = Modifier.width(widths.getValue(ReportColumn.HOURS)).padding(end = 6.dp),
                         textAlign = TextAlign.End,
+                        style = LocalTextStyle.current.tabularNums,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
@@ -3019,13 +3309,10 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
             context, Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         hasLocationPermission = fineGranted
-        if (!fineGranted) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+        // Ask for notifications (API 33+) in the same prompt so the chronometer notification can be shown.
+        val missing = missingTrackingPermissions(context)
+        if (missing.isNotEmpty()) {
+            permissionLauncher.launch(missing)
         }
     }
 
@@ -3502,7 +3789,7 @@ fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick:
             Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
                 Text(
                     stringResource(R.string.duration_format, hours, minutes),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.labelLarge.tabularNums,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)

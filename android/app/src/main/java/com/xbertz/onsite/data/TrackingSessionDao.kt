@@ -27,6 +27,13 @@ interface TrackingSessionDao {
     )
     suspend fun getActiveSession(): TrackingSession?
 
+    /** Same as [getActiveSession] but observable, so the home screen can show the running session. */
+    @Query(
+        "SELECT * FROM tracking_sessions WHERE stopTimestampMillis IS NULL " +
+            "ORDER BY startTimestampMillis DESC, id DESC LIMIT 1"
+    )
+    fun getActiveSessionFlow(): Flow<TrackingSession?>
+
     @Query("SELECT * FROM tracking_sessions WHERE id = :id")
     suspend fun getById(id: Long): TrackingSession?
 

@@ -18,6 +18,7 @@ import com.xbertz.onsite.data.TrackingSession
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -73,10 +74,37 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
         .map { list -> list.filter { it.stopTimestampMillis != null } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /** The running session, if any; the home screen shows it with a live chronometer. */
+    val activeSession: StateFlow<TrackingSession?> = dao.getActiveSessionFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    /** Most recent completed session, used for the one-tap "resume" on the home screen. */
+    val lastSession: StateFlow<TrackingSession?> = completedSessions
+        .map { it.firstOrNull() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
     init {
         viewModelScope.launch {
             val active = dao.getActiveSession()
             _uiState.update { it.copy(isSessionActive = active != null, activeSessionId = active?.id) }
+            // Re-post the chronometer notification in case the process was killed while tracking.
+            if (active != null) SessionNotification.show(getApplication(), active)
+        }
+    }
+
+    /**
+     * Starts a new session with the same company/site/job type as [lastSession]. Names are resolved
+     * against the current registers, so a deleted record simply prevents the resume.
+     */
+    fun resumeLastSession() {
+        val last = lastSession.value ?: return
+        if (_uiState.value.isSessionActive) return
+        viewModelScope.launch {
+            val company = companyDao.getAll().first().firstOrNull { it.name == last.companyName } ?: return@launch
+            val site = siteDao.getAll().first().firstOrNull { it.label == last.siteLabel } ?: return@launch
+            val jobType = jobTypeDao.getAll().first().firstOrNull { it.name == last.jobTypeLabel } ?: return@launch
+            _uiState.update { it.copy(selectedCompany = company, selectedSite = site, selectedJobType = jobType) }
+            startTracking()
         }
     }
 
@@ -116,19 +144,19 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
                 return@launch
             }
 
-            val id = dao.insert(
-                TrackingSession(
-                    companyName = company.name,
-                    siteLabel = site.label,
-                    jobTypeLabel = jobType.name,
-                    startTimestampMillis = System.currentTimeMillis(),
-                    startLatitude = location.latitude,
-                    startLongitude = location.longitude,
-                    stopTimestampMillis = null,
-                    stopLatitude = null,
-                    stopLongitude = null
-                )
+            val session = TrackingSession(
+                companyName = company.name,
+                siteLabel = site.label,
+                jobTypeLabel = jobType.name,
+                startTimestampMillis = System.currentTimeMillis(),
+                startLatitude = location.latitude,
+                startLongitude = location.longitude,
+                stopTimestampMillis = null,
+                stopLatitude = null,
+                stopLongitude = null
             )
+            val id = dao.insert(session)
+            SessionNotification.show(getApplication(), session.copy(id = id))
             _uiState.update { it.copy(activeSessionId = id, isProcessing = false) }
         }
     }
@@ -166,6 +194,7 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
                 stopLongitude = location.longitude
             )
             dao.update(updated)
+            SessionNotification.cancel(getApplication())
             _uiState.update {
                 it.copy(activeSessionId = null, isProcessing = false, lastCompletedSession = updated)
             }

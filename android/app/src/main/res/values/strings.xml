@@ -26,6 +26,18 @@
     <string name="menu_job_types_subtitle">Manage services</string>
     <string name="menu_profile">Profile</string>
     <string name="menu_profile_subtitle">Your details</string>
+    <string name="session_in_progress">Session in progress</string>
+    <string name="open_tracker">Open</string>
+    <string name="resume_last_session">Resume</string>
+    <string name="last_session_hint">Last: %1$s · %2$s</string>
+    <string name="setup_title">Set up your app</string>
+    <string name="setup_progress">%1$d of %2$d done</string>
+    <string name="setup_profile">Add your name to the profile</string>
+    <string name="setup_company">Register a company</string>
+    <string name="setup_site">Register a site</string>
+    <string name="setup_job_type">Register a job type</string>
+    <string name="notification_channel_session">Active session</string>
+    <string name="notification_session_title">Tracking: %1$s</string>
 
     <!-- Settings -->
     <string name="appearance">Appearance</string>

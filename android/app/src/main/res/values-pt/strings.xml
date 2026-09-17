@@ -24,6 +24,18 @@
     <string name="menu_job_types_subtitle">Gerenciar serviços</string>
     <string name="menu_profile">Perfil</string>
     <string name="menu_profile_subtitle">Seus dados</string>
+    <string name="session_in_progress">Sessão em andamento</string>
+    <string name="open_tracker">Abrir</string>
+    <string name="resume_last_session">Retomar</string>
+    <string name="last_session_hint">Última: %1$s · %2$s</string>
+    <string name="setup_title">Configuração inicial</string>
+    <string name="setup_progress">%1$d de %2$d concluídos</string>
+    <string name="setup_profile">Preencha seu nome no perfil</string>
+    <string name="setup_company">Cadastre uma empresa</string>
+    <string name="setup_site">Cadastre um local</string>
+    <string name="setup_job_type">Cadastre um tipo de serviço</string>
+    <string name="notification_channel_session">Sessão ativa</string>
+    <string name="notification_session_title">Registrando: %1$s</string>
 
     <!-- Configurações -->
     <string name="appearance">Aparência</string>

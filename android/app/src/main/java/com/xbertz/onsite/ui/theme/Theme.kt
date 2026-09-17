@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 
@@ -121,6 +122,10 @@ private val DarkColors = darkColorScheme(
     outline = md_theme_dark_outline,
     outlineVariant = md_theme_dark_outlineVariant
 )
+
+/** Monospaced digits so timers, hours and amounts line up in columns and don't jitter while ticking. */
+val TextStyle.tabularNums: TextStyle
+    get() = copy(fontFeatureSettings = "tnum")
 
 val AppShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
