@@ -225,7 +225,11 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
         )
         Screen.INVOICES -> InvoicesScreen(onBack = { screen = Screen.MENU }, onGoToReports = { screen = Screen.REPORTS })
         Screen.INVOICE_REVIEW -> InvoiceReviewScreen(onBack = { screen = Screen.REPORTS }, onGenerated = { screen = Screen.REPORTS })
-        Screen.COMPANIES -> CompaniesScreen(onBack = { screen = Screen.MENU })
+        Screen.COMPANIES -> CompaniesScreen(
+            onBack = { screen = Screen.MENU },
+            onReviewInvoice = { screen = Screen.INVOICE_REVIEW },
+            onOpenReports = { screen = Screen.REPORTS }
+        )
         Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU })
         Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU })
         Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
@@ -311,14 +315,25 @@ internal fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, 
 }
 
 @Composable
-private fun EntityListItem(
+internal fun EntityListItem(
     icon: ImageVector,
     title: String,
     subtitle: String?,
     onEdit: (() -> Unit)? = null,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onClick: (() -> Unit)? = null
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+    val cardModifier = Modifier.fillMaxWidth()
+    ElevatedCard(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        modifier = cardModifier,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -2053,160 +2068,6 @@ private fun SettingsOptionRow(
 // Reports
 // ---------------------------------------------------------------------------
 
-@Composable
-fun ReportsScreen(
-    onBack: () -> Unit,
-    onReviewInvoice: () -> Unit,
-    onOpenInvoices: () -> Unit,
-    viewModel: LocationTrackerViewModel = viewModel(),
-    invoiceViewModel: InvoiceViewModel = viewModel(),
-    reportViewModel: ReportViewModel = viewModel()
-) {
-    val sessions by viewModel.completedSessions.collectAsState()
-    val sites by viewModel.sites.collectAsState()
-    val columnSelection by reportViewModel.columns.collectAsState()
-    val columns = remember(columnSelection) { ReportColumn.ordered(columnSelection) }
-    val sitesByLabel = remember(sites) { sites.associateBy { it.label } }
-    val invoiceState by invoiceViewModel.uiState.collectAsState()
-    val context = LocalContext.current
-    var showColumnsDialog by remember { mutableStateOf(false) }
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    // Coming back from the review step with a fresh PDF: confirm it and offer to share right away.
-    val generated = invoiceState.generatedInvoice
-    val generatedMessage = generated?.let { stringResource(R.string.invoice_generated, it.number) }
-    val shareLabel = stringResource(R.string.share)
-    LaunchedEffect(generated?.id) {
-        val invoice = generated ?: return@LaunchedEffect
-        val result = snackbarHostState.showSnackbar(
-            message = generatedMessage.orEmpty(),
-            actionLabel = shareLabel,
-            duration = SnackbarDuration.Long
-        )
-        if (result == SnackbarResult.ActionPerformed) {
-            invoiceViewModel.pdfUri(invoice)?.let { uri ->
-                shareInvoicePdf(context, uri)
-                invoiceViewModel.markShared(invoice)
-            }
-        }
-        invoiceViewModel.consumeGeneratedInvoice()
-    }
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
-
-    var startDate by remember { mutableStateOf(LocalDate.now().minusDays(6)) }
-    var endDate by remember { mutableStateOf(LocalDate.now()) }
-
-    val filteredSessions = remember(sessions, startDate, endDate) {
-        val rangeStartMillis = startDate.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        val rangeEndMillis = endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
-        sessions
-            .filter { it.startTimestampMillis in rangeStartMillis until rangeEndMillis }
-            .sortedBy { it.startTimestampMillis }
-    }
-    val totalDurationMillis = filteredSessions.sumOf { it.durationMillis ?: 0L }
-
-    Scaffold(
-        topBar = { AppTopBar(title = stringResource(R.string.menu_reports), onBack = onBack) },
-        snackbarHost = { SnackbarHost(snackbarHostState) }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(16.dp)
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                OutlinedButton(
-                    onClick = {
-                        showDatePicker(context, startDate) { picked ->
-                            startDate = picked
-                            if (endDate.isBefore(picked)) endDate = picked
-                        }
-                    },
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(startDate.format(dateFormatter), style = MaterialTheme.typography.bodySmall)
-                }
-                Text("–", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                OutlinedButton(
-                    onClick = {
-                        showDatePicker(context, endDate) { picked ->
-                            endDate = picked
-                            if (startDate.isAfter(picked)) startDate = picked
-                        }
-                    },
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(endDate.format(dateFormatter), style = MaterialTheme.typography.bodySmall)
-                }
-            }
-
-            Spacer(Modifier.height(10.dp))
-            OutlinedButton(
-                onClick = { showColumnsDialog = true },
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Filled.ViewColumn, contentDescription = null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    "${stringResource(R.string.columns)}: " + columns.map { stringResource(it.labelRes) }.joinToString(", "),
-                    style = MaterialTheme.typography.bodySmall
-                )
-            }
-
-            Spacer(Modifier.height(16.dp))
-
-            if (filteredSessions.isEmpty()) {
-                EmptyState(text = stringResource(R.string.reports_empty))
-            } else {
-                ReportTable(
-                    sessions = filteredSessions,
-                    sitesByLabel = sitesByLabel,
-                    columns = columns,
-                    totalDurationMillis = totalDurationMillis,
-                    modifier = Modifier.weight(1f)
-                )
-
-                Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = {
-                            invoiceViewModel.startReview(filteredSessions, startDate, endDate)
-                            onReviewInvoice()
-                        },
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.weight(1f).height(48.dp)
-                    ) {
-                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.generate_invoice))
-                    }
-                    OutlinedButton(onClick = onOpenInvoices, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
-                        Icon(Icons.Filled.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.menu_invoices))
-                    }
-                }
-            }
-        }
-    }
-
-    if (showColumnsDialog) {
-        ReportColumnsDialog(
-            selection = columnSelection,
-            onToggle = { column, enabled -> reportViewModel.setColumnEnabled(column, enabled) },
-            onDismiss = { showColumnsDialog = false }
-        )
-    }
-}
-
 /** Lets the user turn template columns on/off; order is fixed by [ReportColumn] so every report looks the same. */
 @Composable
 fun ReportColumnsDialog(
@@ -2315,8 +2176,8 @@ fun ReportTable(
                     }
                 }
 
-                LazyColumn(modifier = Modifier.weight(1f)) {
-                    itemsIndexed(sessions) { index, session ->
+                Column {
+                    sessions.forEachIndexed { index, session ->
                         val rowColor = if (index % 2 == 0) {
                             MaterialTheme.colorScheme.surface
                         } else {
@@ -2408,10 +2269,41 @@ private fun reportCellValue(
 // ---------------------------------------------------------------------------
 
 @Composable
-fun CompaniesScreen(onBack: () -> Unit, viewModel: CompanyViewModel = viewModel()) {
+fun CompaniesScreen(
+    onBack: () -> Unit,
+    onReviewInvoice: () -> Unit,
+    onOpenReports: () -> Unit,
+    viewModel: CompanyViewModel = viewModel(),
+    trackerViewModel: LocationTrackerViewModel = viewModel(),
+    invoiceViewModel: InvoiceViewModel = viewModel(),
+    reportViewModel: ReportViewModel = viewModel()
+) {
     val uiState by viewModel.uiState.collectAsState()
     val companies by viewModel.companies.collectAsState()
     val editState by viewModel.editState.collectAsState()
+    val sessions by trackerViewModel.completedSessions.collectAsState()
+    val invoices by invoiceViewModel.invoices.collectAsState()
+    var sheetCompany by remember { mutableStateOf<Company?>(null) }
+
+    sheetCompany?.let { company ->
+        CompanySheet(
+            company = company,
+            sessions = sessions,
+            invoices = invoices,
+            onDismiss = { sheetCompany = null },
+            onGenerateInvoice = { open, start, end ->
+                sheetCompany = null
+                reportViewModel.setCompany(company.name)
+                invoiceViewModel.startReview(open, start, end, company)
+                onReviewInvoice()
+            },
+            onViewReport = {
+                sheetCompany = null
+                reportViewModel.setCompany(company.name)
+                onOpenReports()
+            }
+        )
+    }
 
     editState?.let { state ->
         EditCompanyDialog(
@@ -2538,7 +2430,8 @@ fun CompaniesScreen(onBack: () -> Unit, viewModel: CompanyViewModel = viewModel(
                                 company.email?.takeIf { it.isNotBlank() }
                             ).joinToString("  •  ").ifBlank { null },
                             onEdit = { viewModel.startEditingCompany(company) },
-                            onDelete = { viewModel.deleteCompany(company) }
+                            onDelete = { viewModel.deleteCompany(company) },
+                            onClick = { sheetCompany = company }
                         )
                     }
                 }
