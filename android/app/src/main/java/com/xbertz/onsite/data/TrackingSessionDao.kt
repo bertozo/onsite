@@ -41,6 +41,18 @@ interface TrackingSessionDao {
     @Query("UPDATE tracking_sessions SET companyName = :newName WHERE companyName = :oldName")
     suspend fun renameCompany(oldName: String, newName: String)
 
+    /** Links the given sessions to the invoice that billed them. */
+    @Query("UPDATE tracking_sessions SET invoiceId = :invoiceId WHERE id IN (:ids)")
+    suspend fun markInvoiced(ids: List<Long>, invoiceId: Long)
+
+    /** Voiding an invoice frees its sessions to be billed again. */
+    @Query("UPDATE tracking_sessions SET invoiceId = NULL WHERE invoiceId = :invoiceId")
+    suspend fun clearInvoice(invoiceId: Long)
+
+    /** Sets (or clears, with null) the rate override on a group of sessions, e.g. all of one day. */
+    @Query("UPDATE tracking_sessions SET hourlyRate = :rate WHERE id IN (:ids)")
+    suspend fun setHourlyRate(ids: List<Long>, rate: Double?)
+
     /** Same as [renameCompany] for the job type label. */
     @Query("UPDATE tracking_sessions SET jobTypeLabel = :newName WHERE jobTypeLabel = :oldName")
     suspend fun renameJobType(oldName: String, newName: String)

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <!-- Invoice PDFs are written to cacheDir/invoices and shared through the FileProvider. -->
+    <!-- Invoice PDFs live in filesDir/invoices so they can be reopened later; cache is kept for exports. -->
+    <files-path name="invoice_files" path="invoices/" />
     <cache-path name="invoices" path="invoices/" />
 </paths>

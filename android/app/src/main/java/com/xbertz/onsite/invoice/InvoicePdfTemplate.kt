@@ -44,7 +44,9 @@ object InvoicePdfTemplate {
     private const val TABLE_HEADER_HEIGHT = 26f
     private const val FOOTER_HEIGHT = 36f
     private const val HEADER_BLOCK_HEIGHT = 190f // header + parties, fixed so pagination is predictable
-    private const val TOTALS_BLOCK_HEIGHT = 190f // totals + payment details
+    private const val TOTALS_BLOCK_HEIGHT = 190f // totals + payment details (notes add to this)
+    private const val NOTES_LINE_HEIGHT = 13f
+    private const val MAX_NOTES_LINES = 6
 
     private val ACCENT = Color.rgb(0x1E, 0x5A, 0x96)
     private val ACCENT_LIGHT = Color.rgb(0xE3, 0xEC, 0xF7)
@@ -84,7 +86,7 @@ object InvoicePdfTemplate {
     private class ColumnSpec(val fixedWidth: Float?, val weight: Float, val alignRight: Boolean)
 
     private val columnSpecs = mapOf(
-        ReportColumn.DATE to ColumnSpec(62f, 0f, alignRight = false),
+        ReportColumn.DATE to ColumnSpec(72f, 0f, alignRight = false),
         ReportColumn.SITE to ColumnSpec(null, 1f, alignRight = false),
         ReportColumn.ADDRESS to ColumnSpec(null, 1.6f, alignRight = false),
         ReportColumn.COMPANY to ColumnSpec(null, 1f, alignRight = false),
@@ -102,11 +104,10 @@ object InvoicePdfTemplate {
         data.columns.forEach { column ->
             entries += Triple(res.getString(column.labelRes).uppercase(locale), columnSpecs.getValue(column)) { line -> line.valueFor(column) }
         }
-        data.hourlyRate?.let { rate ->
-            entries += Triple(res.getString(R.string.pdf_col_rate), rateSpec) { formatMoney(rate) }
-            entries += Triple(res.getString(R.string.pdf_col_amount), amountSpec) { line ->
-                formatMoney(Math.round(line.hours * rate * 100) / 100.0)
-            }
+        if (data.showAmounts) {
+            // Rate is per line: a day can override the invoice default.
+            entries += Triple(res.getString(R.string.pdf_col_rate), rateSpec) { line -> line.hourlyRate?.let(::formatMoney).orEmpty() }
+            entries += Triple(res.getString(R.string.pdf_col_amount), amountSpec) { line -> line.amount?.let(::formatMoney).orEmpty() }
         }
 
         val fixedSum = entries.sumOf { (it.second.fixedWidth ?: 0f).toDouble() }.toFloat()
@@ -140,7 +141,9 @@ object InvoicePdfTemplate {
         // The totals block follows the last row; if it doesn't fit, it gets its own page.
         val lastTableTop = if (pages.size == 1) firstTableTop else MARGIN
         val lastTableBottom = lastTableTop + TABLE_HEADER_HEIGHT + pages.last().size * ROW_HEIGHT
-        val totalsOnOwnPage = lastTableBottom + 16f + TOTALS_BLOCK_HEIGHT > tableBottomLimit
+        val notesLines = wrapNotes(data.notes)
+        val totalsHeight = TOTALS_BLOCK_HEIGHT + if (notesLines.isEmpty()) 0f else 24f + notesLines.size * NOTES_LINE_HEIGHT
+        val totalsOnOwnPage = lastTableBottom + 16f + totalsHeight > tableBottomLimit
         val totalPages = pages.size + if (totalsOnOwnPage) 1 else 0
 
         var rowOffset = 0
@@ -161,7 +164,7 @@ object InvoicePdfTemplate {
             rowOffset += rows.size
 
             if (pageIndex == pages.lastIndex && !totalsOnOwnPage) {
-                drawTotals(canvas, data, tableBottom + 16f, res)
+                drawTotals(canvas, data, tableBottom + 16f, res, notesLines)
             }
             drawFooter(canvas, data, pageIndex + 1, totalPages, res)
             document.finishPage(page)
@@ -170,7 +173,7 @@ object InvoicePdfTemplate {
         if (totalsOnOwnPage) {
             val pageInfo = PdfDocument.PageInfo.Builder(PAGE_WIDTH, PAGE_HEIGHT, totalPages).create()
             val page = document.startPage(pageInfo)
-            drawTotals(page.canvas, data, MARGIN, res)
+            drawTotals(page.canvas, data, MARGIN, res, notesLines)
             drawFooter(page.canvas, data, totalPages, totalPages, res)
             document.finishPage(page)
         }
@@ -280,7 +283,7 @@ object InvoicePdfTemplate {
         return y
     }
 
-    private fun drawTotals(canvas: Canvas, data: InvoiceData, startY: Float, res: Resources) {
+    private fun drawTotals(canvas: Canvas, data: InvoiceData, startY: Float, res: Resources, notesLines: List<String>) {
         val boxWidth = 220f
         val boxLeft = MARGIN + CONTENT_WIDTH - boxWidth
         val rightEdge = MARGIN + CONTENT_WIDTH
@@ -290,16 +293,30 @@ object InvoicePdfTemplate {
         drawRightAligned(canvas, formatHours(data.totalHours), rightEdge, y + 14f, totalLabelPaint)
         y += 22f
 
-        data.hourlyRate?.let { rate ->
-            canvas.drawText(res.getString(R.string.pdf_hourly_rate), boxLeft, y + 12f, bodyPaint)
-            drawRightAligned(canvas, formatMoney(rate), rightEdge, y + 12f, bodyPaint)
-            y += 20f
+        data.totalAmount?.let { total ->
+            // A single rate line only makes sense when every day used the same rate.
+            if (data.hasUniformRate) {
+                canvas.drawText(res.getString(R.string.pdf_hourly_rate), boxLeft, y + 12f, bodyPaint)
+                drawRightAligned(canvas, formatMoney(data.lines.first().hourlyRate ?: 0.0), rightEdge, y + 12f, bodyPaint)
+                y += 20f
+            }
 
             fillPaint.color = ACCENT_LIGHT
             canvas.drawRect(boxLeft - 10f, y, rightEdge, y + 32f, fillPaint)
             canvas.drawText(res.getString(R.string.pdf_total_due), boxLeft, y + 21f, totalLabelPaint)
-            drawRightAligned(canvas, formatMoney(data.totalAmount ?: 0.0), rightEdge - 4f, y + 21f, totalValuePaint)
+            drawRightAligned(canvas, formatMoney(total), rightEdge - 4f, y + 21f, totalValuePaint)
             y += 32f
+        }
+
+        if (notesLines.isNotEmpty()) {
+            y += 24f
+            canvas.drawText(res.getString(R.string.pdf_notes), MARGIN, y, headingPaint)
+            y += 14f
+            notesLines.forEach { line ->
+                canvas.drawText(line, MARGIN, y, bodyPaint)
+                y += NOTES_LINE_HEIGHT
+            }
+            y -= NOTES_LINE_HEIGHT
         }
 
         y += 28f
@@ -369,6 +386,28 @@ object InvoicePdfTemplate {
         var end = text.length
         while (end > 0 && paint.measureText(text.substring(0, end) + ellipsis) > maxWidth) end--
         return text.substring(0, end).trimEnd() + ellipsis
+    }
+
+    /** Word-wraps the notes to the content width, at most [MAX_NOTES_LINES] lines (the last one ellipsized). */
+    private fun wrapNotes(notes: String?): List<String> {
+        val text = notes?.trim().orEmpty()
+        if (text.isEmpty()) return emptyList()
+        val lines = mutableListOf<String>()
+        text.lines().forEach { paragraph ->
+            var current = ""
+            paragraph.split(' ').filter { it.isNotEmpty() }.forEach { word ->
+                val candidate = if (current.isEmpty()) word else "$current $word"
+                if (bodyPaint.measureText(candidate) <= CONTENT_WIDTH) {
+                    current = candidate
+                } else {
+                    if (current.isNotEmpty()) lines += current
+                    current = word
+                }
+            }
+            lines += current
+        }
+        if (lines.size <= MAX_NOTES_LINES) return lines
+        return lines.take(MAX_NOTES_LINES - 1) + ellipsize(lines.drop(MAX_NOTES_LINES - 1).joinToString(" "), bodyPaint, CONTENT_WIDTH)
     }
 
     private fun formatHours(hours: Double): String = String.format(Locale.ENGLISH, "%.2f", hours)

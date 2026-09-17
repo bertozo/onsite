@@ -85,6 +85,10 @@ import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -187,8 +191,8 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen {
-    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO
+internal enum class Screen {
+    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO, INVOICES, INVOICE_REVIEW
 }
 
 @Composable
@@ -196,7 +200,8 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
 
     if (screen != Screen.MENU) {
-        BackHandler { screen = Screen.MENU }
+        // The invoice review is reached from Reports, so back returns there; every other screen returns home.
+        BackHandler { screen = if (screen == Screen.INVOICE_REVIEW) Screen.REPORTS else Screen.MENU }
     }
 
     when (screen) {
@@ -209,10 +214,17 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
             onReportsClick = { screen = Screen.REPORTS },
             onPlanningClick = { screen = Screen.PLANNING },
             onPhotoClick = { screen = Screen.PHOTO },
+            onInvoicesClick = { screen = Screen.INVOICES },
             onSettingsClick = { screen = Screen.SETTINGS }
         )
         Screen.TRACKER -> TrackerScreen(onBack = { screen = Screen.MENU })
-        Screen.REPORTS -> ReportsScreen(onBack = { screen = Screen.MENU })
+        Screen.REPORTS -> ReportsScreen(
+            onBack = { screen = Screen.MENU },
+            onReviewInvoice = { screen = Screen.INVOICE_REVIEW },
+            onOpenInvoices = { screen = Screen.INVOICES }
+        )
+        Screen.INVOICES -> InvoicesScreen(onBack = { screen = Screen.MENU }, onGoToReports = { screen = Screen.REPORTS })
+        Screen.INVOICE_REVIEW -> InvoiceReviewScreen(onBack = { screen = Screen.REPORTS }, onGenerated = { screen = Screen.REPORTS })
         Screen.COMPANIES -> CompaniesScreen(onBack = { screen = Screen.MENU })
         Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU })
         Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU })
@@ -228,8 +240,8 @@ fun AppRoot(settingsViewModel: SettingsViewModel) {
 // ---------------------------------------------------------------------------
 
 // Planner day markers: fixed colours so they read the same in both themes (the scheme's error colour turns pink in dark mode).
-private val PlannerMarkerGreen = Color(0xFF43A047)
-private val PlannerMarkerRed = Color(0xFFE53935)
+internal val PlannerMarkerGreen = Color(0xFF43A047)
+internal val PlannerMarkerRed = Color(0xFFE53935)
 
 private data class MenuAction(
     val title: String,
@@ -240,7 +252,7 @@ private data class MenuAction(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AppTopBar(title: String, onBack: () -> Unit) {
+internal fun AppTopBar(title: String, onBack: () -> Unit) {
     TopAppBar(
         title = { Text(title, fontWeight = FontWeight.Bold) },
         navigationIcon = {
@@ -255,7 +267,7 @@ private fun AppTopBar(title: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun SectionHeader(title: String, count: Int? = null) {
+internal fun SectionHeader(title: String, count: Int? = null) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         if (count != null) {
@@ -273,7 +285,7 @@ private fun SectionHeader(title: String, count: Int? = null) {
 }
 
 @Composable
-private fun EmptyState(text: String) {
+internal fun EmptyState(text: String) {
     Box(
         modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
         contentAlignment = Alignment.Center
@@ -288,7 +300,7 @@ private fun EmptyState(text: String) {
 }
 
 @Composable
-private fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, contentColor: Color) {
+internal fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, contentColor: Color) {
     Surface(color = containerColor, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
@@ -342,7 +354,7 @@ private fun EntityListItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TrackerDropdown(
+internal fun TrackerDropdown(
     label: String,
     icon: ImageVector,
     value: String,
@@ -370,7 +382,7 @@ private fun TrackerDropdown(
     }
 }
 
-private fun showDatePicker(context: Context, initialDate: LocalDate, onDatePicked: (LocalDate) -> Unit) {
+internal fun showDatePicker(context: Context, initialDate: LocalDate, onDatePicked: (LocalDate) -> Unit) {
     DatePickerDialog(
         context,
         { _, year, month, dayOfMonth -> onDatePicked(LocalDate.of(year, month + 1, dayOfMonth)) },
@@ -404,6 +416,7 @@ fun MainMenuScreen(
     onReportsClick: () -> Unit,
     onPlanningClick: () -> Unit,
     onPhotoClick: () -> Unit,
+    onInvoicesClick: () -> Unit,
     onSettingsClick: () -> Unit,
     profileViewModel: ProfileViewModel = viewModel(),
     trackerViewModel: LocationTrackerViewModel = viewModel()
@@ -434,6 +447,7 @@ fun MainMenuScreen(
 
     val secondaryActions = listOf(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
+        MenuAction(stringResource(R.string.menu_invoices), stringResource(R.string.menu_invoices_subtitle), Icons.Filled.Receipt, onInvoicesClick),
         MenuAction(stringResource(R.string.menu_companies), stringResource(R.string.menu_companies_subtitle), Icons.Filled.Business, onCompaniesClick),
         MenuAction(stringResource(R.string.menu_sites), stringResource(R.string.menu_sites_subtitle), Icons.Filled.Place, onSitesClick),
         MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick),
@@ -2042,6 +2056,8 @@ private fun SettingsOptionRow(
 @Composable
 fun ReportsScreen(
     onBack: () -> Unit,
+    onReviewInvoice: () -> Unit,
+    onOpenInvoices: () -> Unit,
     viewModel: LocationTrackerViewModel = viewModel(),
     invoiceViewModel: InvoiceViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel()
@@ -2053,20 +2069,27 @@ fun ReportsScreen(
     val sitesByLabel = remember(sites) { sites.associateBy { it.label } }
     val invoiceState by invoiceViewModel.uiState.collectAsState()
     val context = LocalContext.current
-    var showInvoiceDialog by remember { mutableStateOf(false) }
     var showColumnsDialog by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
-    // Once a PDF is ready, hand it to the system share sheet (open, email, save...).
-    LaunchedEffect(invoiceState.generatedPdfUri) {
-        val uri = invoiceState.generatedPdfUri ?: return@LaunchedEffect
-        val intent = Intent(Intent.ACTION_SEND).apply {
-            type = "application/pdf"
-            putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    // Coming back from the review step with a fresh PDF: confirm it and offer to share right away.
+    val generated = invoiceState.generatedInvoice
+    val generatedMessage = generated?.let { stringResource(R.string.invoice_generated, it.number) }
+    val shareLabel = stringResource(R.string.share)
+    LaunchedEffect(generated?.id) {
+        val invoice = generated ?: return@LaunchedEffect
+        val result = snackbarHostState.showSnackbar(
+            message = generatedMessage.orEmpty(),
+            actionLabel = shareLabel,
+            duration = SnackbarDuration.Long
+        )
+        if (result == SnackbarResult.ActionPerformed) {
+            invoiceViewModel.pdfUri(invoice)?.let { uri ->
+                shareInvoicePdf(context, uri)
+                invoiceViewModel.markShared(invoice)
+            }
         }
-        context.startActivity(Intent.createChooser(intent, context.getString(R.string.share_invoice)))
-        invoiceViewModel.consumeGeneratedPdf()
-        showInvoiceDialog = false
+        invoiceViewModel.consumeGeneratedInvoice()
     }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
@@ -2082,7 +2105,10 @@ fun ReportsScreen(
     }
     val totalDurationMillis = filteredSessions.sumOf { it.durationMillis ?: 0L }
 
-    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_reports), onBack = onBack) }) { padding ->
+    Scaffold(
+        topBar = { AppTopBar(title = stringResource(R.string.menu_reports), onBack = onBack) },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -2149,17 +2175,24 @@ fun ReportsScreen(
                 )
 
                 Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = {
-                        invoiceViewModel.clearError()
-                        showInvoiceDialog = true
-                    },
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.generate_invoice))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            invoiceViewModel.startReview(filteredSessions, startDate, endDate)
+                            onReviewInvoice()
+                        },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f).height(48.dp)
+                    ) {
+                        Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.generate_invoice))
+                    }
+                    OutlinedButton(onClick = onOpenInvoices, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
+                        Icon(Icons.Filled.Receipt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.menu_invoices))
+                    }
                 }
             }
         }
@@ -2170,30 +2203,6 @@ fun ReportsScreen(
             selection = columnSelection,
             onToggle = { column, enabled -> reportViewModel.setColumnEnabled(column, enabled) },
             onDismiss = { showColumnsDialog = false }
-        )
-    }
-
-    if (showInvoiceDialog) {
-        val companies by invoiceViewModel.companies.collectAsState()
-        GenerateInvoiceDialog(
-            sessions = filteredSessions,
-            companies = companies,
-            columnsLabel = columns.map { stringResource(it.labelRes) }.joinToString(", "),
-            suggestedNumber = invoiceViewModel.nextInvoiceNumber(),
-            isGenerating = invoiceState.isGenerating,
-            error = invoiceState.error,
-            onDismiss = { if (!invoiceState.isGenerating) showInvoiceDialog = false },
-            onGenerate = { company, number, rate ->
-                invoiceViewModel.generateInvoice(
-                    sessions = filteredSessions,
-                    company = company,
-                    invoiceNumber = number,
-                    hourlyRate = rate,
-                    periodStart = startDate,
-                    periodEnd = endDate,
-                    columns = columnSelection
-                )
-            }
         )
     }
 }
@@ -2236,134 +2245,6 @@ fun ReportColumnsDialog(
             }
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ok)) } }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun GenerateInvoiceDialog(
-    sessions: List<TrackingSession>,
-    companies: List<Company>,
-    columnsLabel: String,
-    suggestedNumber: String,
-    isGenerating: Boolean,
-    error: UiMessage?,
-    onDismiss: () -> Unit,
-    onGenerate: (company: Company, invoiceNumber: String, hourlyRate: Double?) -> Unit
-) {
-    // Preselect the company when every session in the report belongs to the same one.
-    val companyNamesInReport = remember(sessions) { sessions.mapNotNull { it.companyName }.distinct() }
-    var selectedCompany by remember(companies, companyNamesInReport) {
-        mutableStateOf(companies.firstOrNull { it.name == companyNamesInReport.singleOrNull() })
-    }
-    var invoiceNumber by remember { mutableStateOf(suggestedNumber) }
-    var rateText by remember { mutableStateOf("") }
-    var companyDropdownExpanded by remember { mutableStateOf(false) }
-
-    val parsedRate = rateText.trim().replace(',', '.').toDoubleOrNull()
-    val rateInvalid = rateText.isNotBlank() && (parsedRate == null || parsedRate < 0)
-    val daysForCompany = remember(sessions, selectedCompany) {
-        selectedCompany?.let { company -> buildInvoiceLines(sessions.filter { it.companyName == company.name }).size } ?: 0
-    }
-    val canGenerate = selectedCompany != null && invoiceNumber.isNotBlank() && !rateInvalid &&
-        daysForCompany > 0 && !isGenerating
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.generate_invoice)) },
-        text = {
-            Column {
-                if (companies.isEmpty()) {
-                    Text(stringResource(R.string.invoice_register_company_first), color = MaterialTheme.colorScheme.error)
-                } else {
-                    TrackerDropdown(
-                        label = stringResource(R.string.bill_to),
-                        icon = Icons.Filled.Business,
-                        value = selectedCompany?.name ?: stringResource(R.string.select_company),
-                        expanded = companyDropdownExpanded,
-                        enabled = !isGenerating,
-                        onExpandedChange = { companyDropdownExpanded = it },
-                        onDismiss = { companyDropdownExpanded = false }
-                    ) {
-                        companies.forEach { company ->
-                            DropdownMenuItem(
-                                text = { Text(company.name) },
-                                onClick = {
-                                    selectedCompany = company
-                                    companyDropdownExpanded = false
-                                }
-                            )
-                        }
-                    }
-                }
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = invoiceNumber,
-                    onValueChange = { invoiceNumber = it },
-                    label = { Text(stringResource(R.string.invoice_number)) },
-                    leadingIcon = { Icon(Icons.Filled.Tag, contentDescription = null) },
-                    enabled = !isGenerating,
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = rateText,
-                    onValueChange = { rateText = it },
-                    label = { Text(stringResource(R.string.hourly_rate_optional)) },
-                    leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
-                    supportingText = { Text(if (rateInvalid) stringResource(R.string.enter_valid_amount) else stringResource(R.string.leave_blank_hours_only)) },
-                    isError = rateInvalid,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    enabled = !isGenerating,
-                    singleLine = true,
-                    shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text(
-                    stringResource(R.string.invoice_columns_info, columnsLabel),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                if (selectedCompany != null) {
-                    Text(
-                        text = if (daysForCompany == 0) {
-                            stringResource(R.string.invoice_no_days_for_company, selectedCompany?.name.orEmpty())
-                        } else {
-                            stringResource(R.string.invoice_days_to_invoice, daysForCompany)
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (daysForCompany == 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                if (error != null) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        stringResource(error.resId, *error.args.toTypedArray()),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { selectedCompany?.let { onGenerate(it, invoiceNumber.trim(), parsedRate) } },
-                enabled = canGenerate,
-                shape = MaterialTheme.shapes.medium
-            ) {
-                if (isGenerating) {
-                    CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                } else {
-                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
-                }
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.generate_pdf))
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !isGenerating) { Text(stringResource(R.string.cancel)) } }
     )
 }
 
@@ -2490,8 +2371,9 @@ fun ReportTable(
                     )
                     Text(
                         text = stringResource(R.string.duration_format, totalHours, totalMinutes),
-                        modifier = Modifier.width(widths.getValue(ReportColumn.HOURS)).padding(end = 6.dp),
+                        modifier = Modifier.padding(end = 6.dp),
                         textAlign = TextAlign.End,
+                        maxLines = 1,
                         style = LocalTextStyle.current.tabularNums,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -3949,7 +3831,7 @@ fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick:
 
 /** Hourly-rate override input shared by the add/edit session dialogs; blank means "use the company default". */
 @Composable
-private fun SessionRateField(value: String, onValueChange: (String) -> Unit, companyRate: Double?) {
+internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, companyRate: Double?) {
     val valid = Validators.amountOk(value)
     OutlinedTextField(
         value = value,
