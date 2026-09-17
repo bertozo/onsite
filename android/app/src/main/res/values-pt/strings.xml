@@ -214,8 +214,8 @@
     <string name="planning_sessions">Sessões</string>
     <string name="planning_no_sessions">Nenhuma sessão registrada neste dia.</string>
     <string name="planning_nothing_today">Nada planejado ou registrado neste dia.</string>
-    <string name="planning_repeat_weekly">Repetir toda semana até</string>
-    <string name="planning_repeat_count">%1$d ocorrências</string>
+    <string name="planning_repeat_until">Repetir até</string>
+    <string name="planning_repeat_count">%1$d dias</string>
     <string name="calendar_hours_legend">Horas trabalhadas</string>
     <string name="timeline_company_legend">Sessões por empresa</string>
     <string name="calendar_day_total">Total: %1$s</string>

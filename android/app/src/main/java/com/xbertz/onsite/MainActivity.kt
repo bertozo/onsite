@@ -1475,8 +1475,8 @@ private fun EditPlannedJobDialog(
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
 
-    var repeatWeekly by remember { mutableStateOf(false) }
-    var repeatUntil by remember { mutableStateOf(initialDate.plusWeeks(4)) }
+    var repeatEnabled by remember { mutableStateOf(false) }
+    var repeatUntil by remember { mutableStateOf(initialDate.plusDays(4)) }
     var companyName by remember { mutableStateOf(existing?.companyName) }
     var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
     var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
@@ -1608,12 +1608,13 @@ private fun EditPlannedJobDialog(
                 if (existing == null) {
                     Spacer(Modifier.height(10.dp))
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Switch(checked = repeatWeekly, onCheckedChange = { repeatWeekly = it })
+                        Switch(checked = repeatEnabled, onCheckedChange = { repeatEnabled = it })
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.planning_repeat_weekly), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.planning_repeat_until), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
                     }
-                    if (repeatWeekly) {
-                        val occurrences = (java.time.temporal.ChronoUnit.WEEKS.between(date, maxOf(date, repeatUntil)) + 1).toInt()
+                    if (repeatEnabled) {
+                        // One job per calendar day from the start date to the chosen end date, inclusive.
+                        val occurrences = (java.time.temporal.ChronoUnit.DAYS.between(date, maxOf(date, repeatUntil)) + 1).toInt()
                         OutlinedButton(
                             onClick = { showDatePicker(context, repeatUntil) { picked -> if (!picked.isBefore(date)) repeatUntil = picked } },
                             shape = MaterialTheme.shapes.medium,
@@ -1649,7 +1650,7 @@ private fun EditPlannedJobDialog(
                             jobTypeLabel = jobTypeLabel,
                             notes = notes.trim().ifBlank { null }
                         ),
-                        if (existing == null && repeatWeekly) repeatUntil else null
+                        if (existing == null && repeatEnabled) repeatUntil else null
                     )
                 },
                 enabled = canSave

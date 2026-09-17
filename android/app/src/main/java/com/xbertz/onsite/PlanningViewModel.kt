@@ -69,7 +69,7 @@ class PlanningViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Inserts when [job.id] is 0, updates otherwise; the dialog builds the row either way.
-     * A new job with [repeatUntil] is copied to the same weekday every week up to that date.
+     * A new job with [repeatUntil] is copied to every following day up to and including that date.
      */
     fun saveJob(job: PlannedJob, repeatUntil: LocalDate? = null) {
         viewModelScope.launch {
@@ -79,10 +79,10 @@ class PlanningViewModel(application: Application) : AndroidViewModel(application
             }
             dao.insert(job)
             if (repeatUntil != null) {
-                var next = job.date.plusWeeks(1)
+                var next = job.date.plusDays(1)
                 while (!next.isAfter(repeatUntil)) {
                     dao.insert(job.copy(id = 0L, dateEpochDay = next.toEpochDay()))
-                    next = next.plusWeeks(1)
+                    next = next.plusDays(1)
                 }
             }
         }
