@@ -1,0 +1,788 @@
+<title>OnSite API Reference</title>
+<meta name="description" content="Interactive reference for every route on the OnSite backend, generated from openapi.yaml.">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Public+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface-2: #edeae2;
+    --border: #ddd8cc;
+    --ink: #1d1c19;
+    --ink-dim: #6b675c;
+    --ink-faint: #948f81;
+    --accent: #2f5d5a;
+    --accent-ink: #ffffff;
+    --accent-soft: #e4ede9;
+    --get: #1d5fc9;
+    --get-soft: #e5edfb;
+    --post: #146c43;
+    --post-soft: #e1f2e8;
+    --put: #92590a;
+    --put-soft: #f7ecd9;
+    --delete: #ab2b22;
+    --delete-soft: #fbe6e4;
+    --code-bg: #1b1e1a;
+    --code-ink: #e7e4da;
+    --code-key: #9fd4a3;
+    --code-str: #e0c47c;
+    --code-punct: #8a9a8a;
+    --shadow: 0 1px 2px rgba(30, 26, 14, 0.06), 0 6px 20px rgba(30, 26, 14, 0.05);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12140f;
+      --surface: #191c16;
+      --surface-2: #20241d;
+      --border: #333527;
+      --ink: #ecebe3;
+      --ink-dim: #a8a496;
+      --ink-faint: #7a7669;
+      --accent: #6fb5ac;
+      --accent-ink: #0d1512;
+      --accent-soft: #1c2b28;
+      --get: #7aa8f2;
+      --get-soft: #1b2436;
+      --post: #6bcf9a;
+      --post-soft: #17281f;
+      --put: #e3ac5a;
+      --put-soft: #2c2416;
+      --delete: #f0897e;
+      --delete-soft: #2e1a18;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12140f;
+    --surface: #191c16;
+    --surface-2: #20241d;
+    --border: #333527;
+    --ink: #ecebe3;
+    --ink-dim: #a8a496;
+    --ink-faint: #7a7669;
+    --accent: #6fb5ac;
+    --accent-ink: #0d1512;
+    --accent-soft: #1c2b28;
+    --get: #7aa8f2;
+    --get-soft: #1b2436;
+    --post: #6bcf9a;
+    --post-soft: #17281f;
+    --put: #e3ac5a;
+    --put-soft: #2c2416;
+    --delete: #f0897e;
+    --delete-soft: #2e1a18;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    padding-inline: 0;
+  }
+  code, .mono { font-family: "JetBrains Mono", ui-monospace, Menlo, monospace; }
+  h1, h2, h3, h4 { text-wrap: balance; margin: 0; }
+  a { color: inherit; }
+
+  .topbar {
+    position: sticky;
+    top: env(safe-area-inset-top, 0px);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .topbar .badge {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 3px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+  }
+  .topbar-title { font-weight: 800; font-size: 16px; }
+  .topbar-title span { color: var(--ink-dim); font-weight: 500; }
+  .topbar-spacer { flex: 1; }
+  .topbar-base {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    background: var(--surface-2);
+    padding: 6px 10px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .copy-btn {
+    all: unset;
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .copy-btn:hover { background: var(--accent-soft); }
+  .copy-btn:focus-visible, button:focus-visible, input:focus-visible, a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .theme-toggle {
+    all: unset;
+    cursor: pointer;
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    color: var(--ink-dim);
+    flex-shrink: 0;
+  }
+  .theme-toggle:hover { color: var(--ink); border-color: var(--ink-faint); }
+
+  .shell {
+    display: flex;
+    align-items: flex-start;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 20px 80px;
+    gap: 32px;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: calc(53px + env(safe-area-inset-top, 0px) + 20px);
+    width: 220px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: calc(100vh - 53px - env(safe-area-inset-top, 0px) - 40px);
+    overflow-y: auto;
+  }
+  .sidebar input[type="search"] {
+    font: inherit;
+    font-size: 13px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 10px;
+    margin-bottom: 10px;
+    width: 100%;
+  }
+  .sidebar input[type="search"]::placeholder { color: var(--ink-faint); }
+  .side-group-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 14px 0 4px;
+  }
+  .side-group-title:first-child { margin-top: 0; }
+  .side-link {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--ink-dim);
+    text-decoration: none;
+  }
+  .side-link:hover { background: var(--surface-2); color: var(--ink); }
+  .side-link .m { font-size: 10px; font-weight: 700; font-family: "JetBrains Mono", monospace; width: 34px; flex-shrink: 0; }
+  .side-link .m.get { color: var(--get); }
+  .side-link .m.post { color: var(--post); }
+  .side-link .m.put { color: var(--put); }
+  .side-link .m.delete { color: var(--delete); }
+  .side-link .p { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: "JetBrains Mono", monospace; font-size: 12px; }
+
+  main { flex: 1; min-width: 0; }
+
+  .intro {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin-bottom: 28px;
+    box-shadow: var(--shadow);
+  }
+  .intro h1 { font-size: 22px; margin-bottom: 6px; }
+  .intro p { color: var(--ink-dim); margin: 10px 0 0; max-width: 62ch; }
+  .intro-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .fact {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: var(--ink-dim);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: 100px;
+  }
+  .fact b { color: var(--ink); font-weight: 600; }
+  .fact code { font-size: 11.5px; }
+
+  .group { margin-bottom: 40px; scroll-margin-top: 70px; }
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+  }
+  .group-head h2 { font-size: 18px; }
+  .group-note { color: var(--ink-faint); font-size: 12.5px; margin: 6px 0 16px; }
+
+  .endpoint {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-top: 14px;
+    overflow: hidden;
+    scroll-margin-top: 70px;
+    box-shadow: var(--shadow);
+  }
+  .endpoint-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 13px 16px;
+    flex-wrap: wrap;
+  }
+  .method {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 4px 9px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+  .method.get { color: var(--get); background: var(--get-soft); }
+  .method.post { color: var(--post); background: var(--post-soft); }
+  .method.put { color: var(--put); background: var(--put-soft); }
+  .method.delete { color: var(--delete); background: var(--delete-soft); }
+  .path { font-family: "JetBrains Mono", monospace; font-size: 13.5px; word-break: break-all; }
+  .summary { color: var(--ink-dim); font-size: 13px; flex-basis: 100%; }
+  .tags-row { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; }
+  .pill {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    padding: 3px 8px;
+    border-radius: 100px;
+    white-space: nowrap;
+  }
+  .pill.owner { color: var(--put); background: var(--put-soft); }
+  .pill.noauth { color: var(--ink-dim); background: var(--surface-2); border: 1px solid var(--border); }
+
+  .endpoint-body {
+    border-top: 1px solid var(--border);
+    padding: 16px;
+    display: grid;
+    gap: 16px;
+  }
+  .endpoint-body p.desc { color: var(--ink-dim); font-size: 13.5px; margin: 0; }
+  .endpoint-body p.desc code { background: var(--surface-2); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+  .kv-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  .kv-table caption {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+  }
+  .kv-table td { padding: 5px 10px 5px 0; vertical-align: top; border-top: 1px solid var(--border); }
+  .kv-table tr:first-child td { border-top: none; }
+  .kv-table td:first-child { font-family: "JetBrains Mono", monospace; color: var(--ink); white-space: nowrap; }
+  .kv-table td:last-child { color: var(--ink-dim); }
+
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 720px) { .panes { grid-template-columns: 1fr; } }
+  .pane-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .pane-label .status { font-family: "JetBrains Mono", monospace; color: var(--post); font-weight: 700; }
+  pre.code {
+    margin: 0;
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 9px;
+    padding: 12px 14px;
+    font-size: 12.5px;
+    overflow-x: auto;
+    line-height: 1.6;
+  }
+  pre.code .k { color: var(--code-key); }
+  pre.code .s { color: var(--code-str); }
+  pre.code .p { color: var(--code-punct); }
+
+  footer {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+    color: var(--ink-faint);
+    font-size: 12.5px;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+
+  @media (max-width: 860px) {
+    .shell { flex-direction: column; gap: 20px; }
+    .sidebar { position: static; width: 100%; max-height: none; }
+    .sidebar-groups { display: none; }
+    .sidebar.open .sidebar-groups { display: flex; flex-direction: column; }
+    .sidebar-toggle {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 13px; font-weight: 600; color: var(--ink);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; padding: 8px 12px; cursor: pointer;
+    }
+  }
+  .sidebar-toggle { display: none; }
+</style>
+
+<div class="topbar">
+  <div class="topbar-title">OnSite API <span>reference</span></div>
+  <span class="badge">v1.0.0</span>
+  <div class="topbar-spacer"></div>
+  <div class="topbar-base">
+    <code id="base-url-text">http://127.0.0.1:8080</code>
+    <button class="copy-btn" onclick="copyText('http://127.0.0.1:8080', this)" aria-label="Copy base URL">copy</button>
+  </div>
+  <button class="theme-toggle" id="themeToggle" aria-label="Toggle color theme" title="Toggle color theme">
+    <svg id="themeIcon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+  </button>
+</div>
+
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <button class="sidebar-toggle" id="sidebarToggle">Jump to endpoint &#9662;</button>
+    <div class="sidebar-groups">
+      <input type="search" id="filterInput" placeholder="Filter endpoints&hellip;" aria-label="Filter endpoints">
+      <div id="navGroups"></div>
+    </div>
+  </aside>
+
+  <main>
+    <div class="intro">
+      <h1>OnSite backend API</h1>
+      <p>Kotlin/Ktor monolith behind the OnSite Android app: accounts, team invites, the subcontractor&ndash;client connection bridge, and CRUD for everything the app tracks (companies, sites, job types, sessions, planned jobs, invoices). Rendered from <code>openapi.yaml</code> &mdash; the source of truth if this page and the code ever disagree.</p>
+      <div class="intro-facts">
+        <span class="fact">&#128274; <b>Auth:</b> <code>Authorization: Bearer &lt;jwt&gt;</code> on every route except dev-login</span>
+        <span class="fact">&#127760; <b>Multi-tenant:</b> optional <code>X-Account-Id</code> header to act as another account you belong to</span>
+        <span class="fact">&#128230; <b>38</b> operations across <b>10</b> groups</span>
+      </div>
+    </div>
+    <div id="groups"></div>
+  </main>
+</div>
+
+<footer>
+  Generated for <code>onsite-backend</code>. Import <code>postman_collection.json</code> into Postman to call these live, or open <code>openapi.yaml</code> in any OpenAPI tool.
+</footer>
+
+<script>
+const API = [
+  {
+    tag: "Auth (dev only)",
+    note: "Only reachable when the server is started with DEV_AUTH_ENABLED=true — never enable that outside a local dev machine.",
+    endpoints: [
+      {
+        method: "POST", path: "/v1/dev/auth/login", auth: "none",
+        summary: "Mint a dev session for any email, no password",
+        description: "Signs an HS256 token shaped exactly like a real Supabase-issued one, so every other route is oblivious to which one signed it.",
+        request: { email: "dev@example.com" },
+        responseStatus: 200,
+        response: { token: "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI…" }
+      }
+    ]
+  },
+  {
+    tag: "Identity",
+    endpoints: [
+      {
+        method: "POST", path: "/v1/me/bootstrap",
+        summary: "Provision the caller's identity (idempotent)",
+        description: "Call right after Supabase sign-in/sign-up. Creates the <code>users</code> row and, only the first time, a personal account with an OWNER membership.",
+        responseStatus: 200,
+        response: { userId: "34c71b3e-…", email: "you@example.com", displayName: null,
+          memberships: [{ accountId: "7f09c7b5-…", accountName: "you@example.com", accountKind: "PERSONAL", role: "OWNER" }] }
+      },
+      {
+        method: "GET", path: "/v1/me",
+        summary: "Get the caller's identity",
+        description: "404 if you haven't called Bootstrap yet.",
+        responseStatus: 200,
+        response: { userId: "34c71b3e-…", email: "you@example.com", displayName: null,
+          memberships: [{ accountId: "7f09c7b5-…", accountName: "you@example.com", accountKind: "PERSONAL", role: "OWNER" }] }
+      },
+      {
+        method: "GET", path: "/v1/me/account-members", owner: true,
+        summary: "List every member of the active account",
+        description: "Used to populate an “assign this job to” picker.",
+        headers: [["X-Account-Id", "optional — defaults to your personal account"]],
+        responseStatus: 200,
+        response: [
+          { userId: "34c71b3e-…", email: "owner@example.com", displayName: null, role: "OWNER" },
+          { userId: "91bcd602-…", email: "worker@example.com", displayName: null, role: "WORKER" }
+        ]
+      }
+    ]
+  },
+  {
+    tag: "Team invites",
+    endpoints: [
+      {
+        method: "POST", path: "/v1/accounts/{accountId}/invites", owner: true,
+        summary: "Invite a worker into an account",
+        params: [["accountId", "an account you own"]],
+        request: { email: "worker@example.com" },
+        responseStatus: 201,
+        response: { id: "b278a26d-…", accountId: "7f09c7b5-…", accountName: "owner@example.com", email: "worker@example.com", role: "WORKER", status: "PENDING" }
+      },
+      {
+        method: "GET", path: "/v1/me/invites",
+        summary: "List pending invites sent to the caller's email",
+        responseStatus: 200,
+        response: [{ id: "b278a26d-…", accountId: "7f09c7b5-…", accountName: "owner@example.com", email: "worker@example.com", role: "WORKER", status: "PENDING" }]
+      },
+      {
+        method: "POST", path: "/v1/me/invites/{inviteId}/accept",
+        summary: "Accept a team invite",
+        description: "Creates a WORKER membership in the inviting account for the caller.",
+        params: [["inviteId", "from the invite"]],
+        responseStatus: 200,
+        response: { id: "b278a26d-…", accountId: "7f09c7b5-…", accountName: "owner@example.com", email: "worker@example.com", role: "WORKER", status: "ACCEPTED" }
+      }
+    ]
+  },
+  {
+    tag: "Connections",
+    note: "The subcontractor ↔ client bridge: links one of the worker's own Companies to a client's real account without merging identities.",
+    endpoints: [
+      {
+        method: "POST", path: "/v1/accounts/{accountId}/connection-invites", owner: true,
+        summary: "Invite a contractor to connect",
+        description: "Sent from the client/employer's account.",
+        params: [["accountId", "an account you own"]],
+        request: { email: "contractor@example.com" },
+        responseStatus: 201,
+        response: { id: "b88bd5a0-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", email: "contractor@example.com", status: "PENDING" }
+      },
+      {
+        method: "GET", path: "/v1/me/connection-invites",
+        summary: "List pending connection invites sent to the caller's email",
+        responseStatus: 200,
+        response: [{ id: "b88bd5a0-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", email: "contractor@example.com", status: "PENDING" }]
+      },
+      {
+        method: "POST", path: "/v1/me/connection-invites/{inviteId}/accept",
+        summary: "Accept a connection invite",
+        description: "<code>companyId</code> must be one of the contractor's own Companies, representing this client.",
+        params: [["inviteId", "from the invite"]],
+        request: { companyId: "e7d4b16b-…" },
+        responseStatus: 200,
+        response: { id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerCompanyId: "e7d4b16b-…", workerCompanyName: "Client Co", status: "ACTIVE" }
+      },
+      {
+        method: "GET", path: "/v1/connections", owner: true,
+        summary: "List connections as the employer/client",
+        headers: [["X-Account-Id", "optional — defaults to your personal account"]],
+        responseStatus: 200,
+        response: [{ id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerCompanyId: "e7d4b16b-…", workerCompanyName: "Client Co", status: "ACTIVE" }]
+      },
+      {
+        method: "GET", path: "/v1/me/connections",
+        summary: "List connections as the worker/contractor",
+        responseStatus: 200,
+        response: [{ id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerCompanyId: "e7d4b16b-…", workerCompanyName: "Client Co", status: "ACTIVE" }]
+      },
+      {
+        method: "DELETE", path: "/v1/connections/{id}",
+        summary: "Revoke a connection",
+        description: "Either side of the connection may revoke it.",
+        params: [["id", "the connection id"]],
+        headers: [["X-Account-Id", "optional — defaults to your personal account"]],
+        responseStatus: 204
+      },
+      {
+        method: "POST", path: "/v1/connections/{id}/planned-jobs", owner: true,
+        summary: "Schedule a job on the connected worker's calendar",
+        params: [["id", "the connection id"]],
+        headers: [["X-Account-Id", "optional — defaults to your personal account"]],
+        request: { id: "{{$guid}}", dateEpochDay: 20000, startMinute: 480, endMinute: 960, siteLabel: "123 Main St", jobTypeLabel: "Cleaning", notes: "Front and back entrances" },
+        responseStatus: 201,
+        response: { id: "47ba749d-…", dateEpochDay: 20000, startMinute: 480, endMinute: 960, siteLabel: "123 Main St", jobTypeLabel: "Cleaning", notes: "Front and back entrances" }
+      },
+      {
+        method: "GET", path: "/v1/connections/{id}/sessions", owner: true,
+        summary: "View a connection's logged hours",
+        params: [["id", "the connection id"]],
+        headers: [["X-Account-Id", "optional — defaults to your personal account"]],
+        responseStatus: 200,
+        response: [{ id: "a390cc32-…", siteLabel: "123 Main St", jobTypeLabel: null, startTimestampMillis: 1700000000000, stopTimestampMillis: 1700007200000 }]
+      }
+    ]
+  },
+  {
+    tag: "Companies",
+    endpoints: [
+      { method: "GET", path: "/v1/companies", summary: "List companies", responseStatus: 200,
+        response: [{ id: "e7d4b16b-…", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 65.0, updatedAt: "2026-09-18T10:38:43Z" }] },
+      { method: "POST", path: "/v1/companies", owner: true, summary: "Create a company", responseStatus: 201,
+        request: { id: "{{$guid}}", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 65.0 },
+        response: { id: "e7d4b16b-…", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 65.0, updatedAt: "2026-09-18T10:38:43Z" } },
+      { method: "PUT", path: "/v1/companies/{id}", owner: true, summary: "Update a company", params: [["id", "the company id"]], responseStatus: 200,
+        request: { id: "e7d4b16b-…", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 70.0 },
+        response: { id: "e7d4b16b-…", name: "Acme Corp", hourlyRate: 70.0, updatedAt: "2026-09-18T10:41:02Z" } },
+      { method: "DELETE", path: "/v1/companies/{id}", owner: true, summary: "Delete a company (soft delete)", params: [["id", "the company id"]], responseStatus: 204 }
+    ]
+  },
+  {
+    tag: "Sites",
+    endpoints: [
+      { method: "GET", path: "/v1/sites", summary: "List sites", responseStatus: 200,
+        response: [{ id: "b1e2…", label: "Head Office", address: "123 Main St, Sydney NSW", latitude: -33.8688, longitude: 151.2093, createdAtMillis: 1700000000000, updatedAt: "2026-09-18T10:38Z" }] },
+      { method: "POST", path: "/v1/sites", owner: true, summary: "Create a site", responseStatus: 201,
+        request: { id: "{{$guid}}", label: "Head Office", address: "123 Main St, Sydney NSW", latitude: -33.8688, longitude: 151.2093, createdAtMillis: 1700000000000 },
+        response: { id: "b1e2…", label: "Head Office", latitude: -33.8688, longitude: 151.2093, updatedAt: "2026-09-18T10:38Z" } },
+      { method: "PUT", path: "/v1/sites/{id}", owner: true, summary: "Update a site", params: [["id", "the site id"]], responseStatus: 200,
+        request: { id: "b1e2…", label: "Head Office", address: "123 Main St, Sydney NSW", latitude: -33.8688, longitude: 151.2093, createdAtMillis: 1700000000000 },
+        response: { id: "b1e2…", label: "Head Office", updatedAt: "2026-09-18T10:41Z" } },
+      { method: "DELETE", path: "/v1/sites/{id}", owner: true, summary: "Delete a site (soft delete)", params: [["id", "the site id"]], responseStatus: 204 }
+    ]
+  },
+  {
+    tag: "Job types",
+    endpoints: [
+      { method: "GET", path: "/v1/job-types", summary: "List job types", responseStatus: 200,
+        response: [{ id: "c3f4…", name: "Cleaning", createdAtMillis: 1700000000000, updatedAt: "2026-09-18T10:38Z" }] },
+      { method: "POST", path: "/v1/job-types", owner: true, summary: "Create a job type", responseStatus: 201,
+        request: { id: "{{$guid}}", name: "Cleaning", createdAtMillis: 1700000000000 },
+        response: { id: "c3f4…", name: "Cleaning", updatedAt: "2026-09-18T10:38Z" } },
+      { method: "PUT", path: "/v1/job-types/{id}", owner: true, summary: "Update a job type", params: [["id", "the job type id"]], responseStatus: 200,
+        request: { id: "c3f4…", name: "Deep cleaning", createdAtMillis: 1700000000000 },
+        response: { id: "c3f4…", name: "Deep cleaning", updatedAt: "2026-09-18T10:41Z" } },
+      { method: "DELETE", path: "/v1/job-types/{id}", owner: true, summary: "Delete a job type (soft delete)", params: [["id", "the job type id"]], responseStatus: 204 }
+    ]
+  },
+  {
+    tag: "Invoices",
+    note: "No delete route — the app sets status to VOID instead of removing the row.",
+    endpoints: [
+      { method: "GET", path: "/v1/invoices", summary: "List invoices", description: "Newest issue date first.", responseStatus: 200,
+        response: [{ id: "d5a6…", number: "INV-0001", companyName: "Acme Corp", totalHours: 24.5, totalAmount: 1592.5, status: "DRAFT", updatedAt: "2026-09-18T10:38Z" }] },
+      { method: "POST", path: "/v1/invoices", owner: true, summary: "Create an invoice", responseStatus: 201,
+        request: { id: "{{$guid}}", number: "INV-0001", companyName: "Acme Corp", periodStartEpochDay: 19990, periodEndEpochDay: 19996, issueDateEpochDay: 19997, totalHours: 24.5, totalAmount: 1592.5, hourlyRate: 65.0, status: "DRAFT", createdAtMillis: 1700000000000 },
+        response: { id: "d5a6…", number: "INV-0001", status: "DRAFT", updatedAt: "2026-09-18T10:38Z" } },
+      { method: "PUT", path: "/v1/invoices/{id}", owner: true, summary: "Update an invoice", params: [["id", "the invoice id"]], responseStatus: 200,
+        request: { id: "d5a6…", number: "INV-0001", companyName: "Acme Corp", periodStartEpochDay: 19990, periodEndEpochDay: 19996, issueDateEpochDay: 19997, totalHours: 24.5, status: "SENT", sentAtMillis: 1700000000000, createdAtMillis: 1700000000000 },
+        response: { id: "d5a6…", status: "SENT", updatedAt: "2026-09-18T10:41Z" } }
+    ]
+  },
+  {
+    tag: "Tracking sessions",
+    endpoints: [
+      { method: "GET", path: "/v1/sessions", summary: "List tracking sessions", description: "A WORKER only sees their own; an OWNER sees everyone's.", responseStatus: 200,
+        response: [{ id: "a390cc32-…", companyName: "Acme Corp", siteLabel: "Head Office", startTimestampMillis: 1700000000000, stopTimestampMillis: 1700007200000, createdByUserId: "34c71b3e-…" }] },
+      { method: "POST", path: "/v1/sessions", summary: "Create a tracking session", description: "Any member may create their own session; omit stop fields for one still running.", responseStatus: 201,
+        request: { id: "{{$guid}}", companyName: "Acme Corp", siteLabel: "Head Office", jobTypeLabel: "Cleaning", startTimestampMillis: 1700000000000, startLatitude: -33.8688, startLongitude: 151.2093, stopTimestampMillis: 1700007200000, stopLatitude: -33.8688, stopLongitude: 151.2093, hourlyRate: 65.0 },
+        response: { id: "a390cc32-…", companyName: "Acme Corp", updatedAt: "2026-09-18T10:39Z" } },
+      { method: "PUT", path: "/v1/sessions/{id}", summary: "Update a tracking session", description: "A WORKER can only update their own.", params: [["id", "the session id"]], responseStatus: 200,
+        request: { id: "a390cc32-…", companyName: "Acme Corp", startTimestampMillis: 1700000000000, startLatitude: -33.8688, startLongitude: 151.2093, stopTimestampMillis: 1700007200000 },
+        response: { id: "a390cc32-…", updatedAt: "2026-09-18T10:41Z" } },
+      { method: "DELETE", path: "/v1/sessions/{id}", summary: "Delete a tracking session (soft delete)", description: "A WORKER can only delete their own.", params: [["id", "the session id"]], responseStatus: 204 }
+    ]
+  },
+  {
+    tag: "Planned jobs",
+    endpoints: [
+      { method: "GET", path: "/v1/planned-jobs", summary: "List planned jobs", description: "A WORKER only sees jobs they created or are assigned to; an OWNER sees every job.", responseStatus: 200,
+        response: [{ id: "596a147f-…", dateEpochDay: 20000, startMinute: 420, companyName: null, createdByUserId: "34c71b3e-…", assignedUserId: "91bcd602-…", updatedAt: "2026-09-18T10:38Z" }] },
+      { method: "POST", path: "/v1/planned-jobs", summary: "Create a planned job", description: "<code>assignedUserId</code> is OWNER-only — forced to the caller for a WORKER.", responseStatus: 201,
+        request: { id: "{{$guid}}", dateEpochDay: 20000, startMinute: 480, endMinute: 960, companyName: "Acme Corp", siteLabel: "Head Office", jobTypeLabel: "Cleaning", notes: "Bring the extension ladder", assignedUserId: null },
+        response: { id: "596a147f-…", dateEpochDay: 20000, startMinute: 480, updatedAt: "2026-09-18T10:38Z" } },
+      { method: "PUT", path: "/v1/planned-jobs/{id}", summary: "Update a planned job", description: "Same assignment rule as create.", params: [["id", "the planned job id"]], responseStatus: 200,
+        request: { id: "596a147f-…", dateEpochDay: 20000, startMinute: 480, endMinute: 960, companyName: "Acme Corp", assignedUserId: "91bcd602-…" },
+        response: { id: "596a147f-…", assignedUserId: "91bcd602-…", updatedAt: "2026-09-18T10:41Z" } },
+      { method: "DELETE", path: "/v1/planned-jobs/{id}", summary: "Delete a planned job (soft delete)", description: "A WORKER can only delete a job they created or are assigned to.", params: [["id", "the planned job id"]], responseStatus: 204 }
+    ]
+  }
+];
+
+function slug(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, ""); }
+
+function syntaxHighlight(obj) {
+  if (obj === undefined) return "";
+  const json = JSON.stringify(obj, null, 2);
+  return json
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/(&quot;|")([^"\n]+?)\1(:)/g, '<span class="k">$1$2$1</span><span class="p">$3</span>')
+    .replace(/: (&quot;|")([^"\n]*?)\1/g, ': <span class="s">$1$2$1</span>')
+    .replace(/"/g, "&quot;").replace(/&quot;/g, '"');
+}
+
+function renderKvTable(caption, rows) {
+  if (!rows || !rows.length) return "";
+  const trs = rows.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+  return `<table class="kv-table"><caption>${caption}</caption>${trs}</table>`;
+}
+
+function renderEndpoint(ep) {
+  const id = slug(ep.method + "-" + ep.path);
+  const tagsHtml = [
+    ep.owner ? '<span class="pill owner">OWNER only</span>' : "",
+    ep.auth === "none" ? '<span class="pill noauth">no auth</span>' : ""
+  ].join("");
+
+  const paramsRows = (ep.params || []).map(([k, v]) => [k, v]);
+  const headerRows = [["Authorization", ep.auth === "none" ? "not required" : "Bearer &lt;jwt&gt;"], ...(ep.headers || [])];
+
+  const panes = [];
+  if (ep.request !== undefined) {
+    panes.push(`<div><div class="pane-label">Request body</div><pre class="code">${syntaxHighlight(ep.request)}</pre></div>`);
+  }
+  if (ep.responseStatus !== undefined) {
+    panes.push(`<div><div class="pane-label">Response &nbsp;<span class="status">${ep.responseStatus}</span></div>${ep.response !== undefined ? `<pre class="code">${syntaxHighlight(ep.response)}</pre>` : `<pre class="code"><span class="p">(empty body)</span></pre>`}</div>`);
+  }
+
+  return `
+  <article class="endpoint" id="${id}">
+    <div class="endpoint-head">
+      <span class="method ${ep.method.toLowerCase()}">${ep.method}</span>
+      <span class="path">${ep.path}</span>
+      <div class="tags-row">${tagsHtml}</div>
+      <div class="summary">${ep.summary}</div>
+    </div>
+    <div class="endpoint-body">
+      ${ep.description ? `<p class="desc">${ep.description}</p>` : ""}
+      ${renderKvTable("Path parameters", paramsRows)}
+      ${renderKvTable("Headers", headerRows)}
+      ${panes.length ? `<div class="panes">${panes.join("")}</div>` : ""}
+    </div>
+  </article>`;
+}
+
+function renderAll() {
+  const groupsEl = document.getElementById("groups");
+  const navEl = document.getElementById("navGroups");
+  groupsEl.innerHTML = API.map(g => `
+    <section class="group" id="${slug(g.tag)}">
+      <div class="group-head"><h2>${g.tag}</h2></div>
+      ${g.note ? `<p class="group-note">${g.note}</p>` : ""}
+      ${g.endpoints.map(renderEndpoint).join("")}
+    </section>
+  `).join("");
+
+  navEl.innerHTML = API.map(g => `
+    <div class="nav-group" data-group="${slug(g.tag)}">
+      <div class="side-group-title">${g.tag}</div>
+      ${g.endpoints.map(ep => `
+        <a class="side-link" data-text="${(ep.method + " " + ep.path + " " + ep.summary).toLowerCase()}" href="#${slug(ep.method + "-" + ep.path)}">
+          <span class="m ${ep.method.toLowerCase()}">${ep.method}</span>
+          <span class="p">${ep.path}</span>
+        </a>
+      `).join("")}
+    </div>
+  `).join("");
+}
+
+function copyText(text, btn) {
+  const done = () => { const old = btn.textContent; btn.textContent = "copied"; setTimeout(() => btn.textContent = old, 1200); };
+  try {
+    navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+  } catch (e) { fallbackCopy(text, done); }
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch (e) {}
+  document.body.removeChild(ta);
+}
+
+function initTheme() {
+  const root = document.documentElement;
+  const icon = document.getElementById("themeIcon");
+  let saved = null;
+  try { saved = localStorage.getItem("onsite-api-theme"); } catch (e) {}
+  if (saved) root.setAttribute("data-theme", saved);
+  const isDark = () => {
+    const explicit = root.getAttribute("data-theme");
+    if (explicit) return explicit === "dark";
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  };
+  const paint = () => {
+    icon.innerHTML = isDark()
+      ? '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>'
+      : '<circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>';
+  };
+  paint();
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const next = isDark() ? "light" : "dark";
+    root.setAttribute("data-theme", next);
+    try { localStorage.setItem("onsite-api-theme", next); } catch (e) {}
+    paint();
+  });
+}
+
+function initFilter() {
+  const input = document.getElementById("filterInput");
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    document.querySelectorAll(".nav-group").forEach(group => {
+      let any = false;
+      group.querySelectorAll(".side-link").forEach(link => {
+        const match = !q || link.dataset.text.includes(q);
+        link.style.display = match ? "" : "none";
+        if (match) any = true;
+      });
+      group.style.display = any ? "" : "none";
+    });
+  });
+}
+
+function initSidebarToggle() {
+  const btn = document.getElementById("sidebarToggle");
+  const sidebar = document.getElementById("sidebar");
+  btn.addEventListener("click", () => sidebar.classList.toggle("open"));
+}
+
+renderAll();
+initTheme();
+initFilter();
+initSidebarToggle();
+</script>

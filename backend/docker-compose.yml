@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: onsite-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: onsite
+      POSTGRES_USER: onsite
+      POSTGRES_PASSWORD: onsite_dev_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - onsite-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  onsite-postgres-data:

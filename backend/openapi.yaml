@@ -1,0 +1,916 @@
+openapi: 3.0.3
+info:
+  title: OnSite Backend
+  version: "1.0.0"
+  description: |
+    API for the OnSite backend (Kotlin/Ktor monolith). Serves the OnSite Android app
+    (and, eventually, Web/iOS): multi-tenant accounts, team invites, the subcontractor
+    <-> client "connection" bridge, and CRUD for the domain entities the app tracks
+    locally in Room (companies, sites, job types, sessions, planned jobs, invoices).
+
+    Auth: every route except `/v1/dev/auth/login` requires a bearer JWT. In production
+    that token comes from Supabase Auth (verified against the project's JWKS endpoint);
+    the dev-login route mints an equivalent HS256 token for local testing and only exists
+    when the server is started with `DEV_AUTH_ENABLED=true`.
+
+    Multi-tenancy: most routes act on the caller's *personal* account by default. Pass
+    `X-Account-Id` to act as a different account you have a membership in (e.g. a team you
+    were invited into). The header is never trusted blindly - the server checks a
+    membership row exists for (caller, that account) on every request.
+servers:
+  - url: http://127.0.0.1:8080
+    description: Local dev server (docker-compose Postgres + ./gradlew run)
+
+tags:
+  - name: Auth (dev only)
+  - name: Identity
+  - name: Team invites
+  - name: Connections
+  - name: Companies
+  - name: Sites
+  - name: Job types
+  - name: Invoices
+  - name: Tracking sessions
+  - name: Planned jobs
+
+security:
+  - bearerAuth: []
+
+paths:
+  /v1/dev/auth/login:
+    post:
+      tags: [Auth (dev only)]
+      summary: Mint a dev session for any email, no password
+      description: |
+        Only reachable when `DEV_AUTH_ENABLED=true`. Signs an HS256 token in the same
+        claim shape a real Supabase-issued token has, so every other route is oblivious
+        to which one signed it. Never enable this outside a local dev machine.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200":
+          description: A bearer token to use on every other request.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token: { type: string }
+
+  /v1/me/bootstrap:
+    post:
+      tags: [Identity]
+      summary: Provision the caller's identity (idempotent)
+      description: |
+        Call right after Supabase sign-in/sign-up. Creates the `users` row and, only the
+        very first time, a personal account with an OWNER membership. Later calls just
+        refresh the denormalized email and return current state.
+      responses:
+        "200":
+          description: Current identity state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MeResponse" }
+
+  /v1/me:
+    get:
+      tags: [Identity]
+      summary: Get the caller's identity
+      responses:
+        "200":
+          description: Current identity state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MeResponse" }
+        "404":
+          description: No `users` row yet - call `/v1/me/bootstrap` first.
+
+  /v1/me/account-members:
+    get:
+      tags: [Identity]
+      summary: List every member of the active account
+      description: OWNER only. Used to populate an "assign this job to" picker.
+      parameters:
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "200":
+          description: Every member of the active account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MemberDto" }
+        "403":
+          description: Caller is not the OWNER of the active account.
+
+  /v1/accounts/{accountId}/invites:
+    post:
+      tags: [Team invites]
+      summary: Invite a worker into an account
+      description: OWNER only. `accountId` must be an account the caller owns.
+      parameters:
+        - $ref: "#/components/parameters/AccountIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "201":
+          description: The created invite.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteDto" }
+
+  /v1/me/invites:
+    get:
+      tags: [Team invites]
+      summary: List pending invites sent to the caller's email
+      responses:
+        "200":
+          description: Pending invites.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/InviteDto" }
+
+  /v1/me/invites/{inviteId}/accept:
+    post:
+      tags: [Team invites]
+      summary: Accept a team invite
+      description: Creates a WORKER membership in the inviting account for the caller.
+      parameters:
+        - name: inviteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The now-accepted invite.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InviteDto" }
+
+  /v1/accounts/{accountId}/connection-invites:
+    post:
+      tags: [Connections]
+      summary: Invite a contractor to connect
+      description: OWNER only, sent from the client/employer's account.
+      parameters:
+        - $ref: "#/components/parameters/AccountIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "201":
+          description: The created connection invite.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectionInviteDto" }
+
+  /v1/me/connection-invites:
+    get:
+      tags: [Connections]
+      summary: List pending connection invites sent to the caller's email
+      responses:
+        "200":
+          description: Pending connection invites.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConnectionInviteDto" }
+
+  /v1/me/connection-invites/{inviteId}/accept:
+    post:
+      tags: [Connections]
+      summary: Accept a connection invite
+      description: |
+        Called by the contractor/worker. `companyId` must be one of *their own*
+        Companies, representing this client - the bridge links that Company to the
+        employer's real account without merging identities.
+      parameters:
+        - name: inviteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [companyId]
+              properties:
+                companyId: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The now-active connection.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectionDto" }
+
+  /v1/connections:
+    get:
+      tags: [Connections]
+      summary: List connections as the employer/client
+      description: OWNER only. Contractors connected *to* the active account.
+      parameters:
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "200":
+          description: Active connections.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConnectionDto" }
+
+  /v1/me/connections:
+    get:
+      tags: [Connections]
+      summary: List connections as the worker/contractor
+      description: Clients the caller (as a contractor) is connected to.
+      responses:
+        "200":
+          description: Active connections.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConnectionDto" }
+
+  /v1/connections/{connectionId}:
+    delete:
+      tags: [Connections]
+      summary: Revoke a connection
+      description: Either side of the connection may revoke it.
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "204": { description: Revoked. }
+        "404": { description: Not found. }
+
+  /v1/connections/{connectionId}/planned-jobs:
+    post:
+      tags: [Connections]
+      summary: Schedule a job on the connected worker's calendar
+      description: OWNER only, called by the employer.
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConnectionPlannedJobRequest" }
+      responses:
+        "201":
+          description: The created job, as scheduled on the worker's calendar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ConnectionPlannedJobDto" }
+
+  /v1/connections/{connectionId}/sessions:
+    get:
+      tags: [Connections]
+      summary: View a connection's logged hours
+      description: OWNER only. Every tracked session the worker logged against this connection's company.
+      parameters:
+        - name: connectionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "200":
+          description: Sessions logged against this connection.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ConnectionSessionDto" }
+
+  /v1/companies:
+    get:
+      tags: [Companies]
+      summary: List companies
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      responses:
+        "200":
+          description: Companies in the active account.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/CompanyDto" } }
+    post:
+      tags: [Companies]
+      summary: Create a company
+      description: OWNER only.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyRequest" }
+      responses:
+        "201":
+          description: The created company.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyDto" }
+
+  /v1/companies/{id}:
+    put:
+      tags: [Companies]
+      summary: Update a company
+      description: OWNER only.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyRequest" }
+      responses:
+        "200":
+          description: The updated company.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CompanyDto" }
+        "404": { description: Not found. }
+    delete:
+      tags: [Companies]
+      summary: Delete a company (soft delete)
+      description: OWNER only.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "204": { description: Deleted. }
+        "404": { description: Not found. }
+
+  /v1/sites:
+    get:
+      tags: [Sites]
+      summary: List sites
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      responses:
+        "200":
+          description: Sites in the active account.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/SiteDto" } }
+    post:
+      tags: [Sites]
+      summary: Create a site
+      description: OWNER only.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SiteRequest" }
+      responses:
+        "201":
+          description: The created site.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SiteDto" }
+
+  /v1/sites/{id}:
+    put:
+      tags: [Sites]
+      summary: Update a site
+      description: OWNER only.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SiteRequest" }
+      responses:
+        "200":
+          description: The updated site.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SiteDto" }
+        "404": { description: Not found. }
+    delete:
+      tags: [Sites]
+      summary: Delete a site (soft delete)
+      description: OWNER only.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "204": { description: Deleted. }
+        "404": { description: Not found. }
+
+  /v1/job-types:
+    get:
+      tags: [Job types]
+      summary: List job types
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      responses:
+        "200":
+          description: Job types in the active account.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/JobTypeDto" } }
+    post:
+      tags: [Job types]
+      summary: Create a job type
+      description: OWNER only.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobTypeRequest" }
+      responses:
+        "201":
+          description: The created job type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobTypeDto" }
+
+  /v1/job-types/{id}:
+    put:
+      tags: [Job types]
+      summary: Update a job type
+      description: OWNER only.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/JobTypeRequest" }
+      responses:
+        "200":
+          description: The updated job type.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/JobTypeDto" }
+        "404": { description: Not found. }
+    delete:
+      tags: [Job types]
+      summary: Delete a job type (soft delete)
+      description: OWNER only.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "204": { description: Deleted. }
+        "404": { description: Not found. }
+
+  /v1/invoices:
+    get:
+      tags: [Invoices]
+      summary: List invoices
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      responses:
+        "200":
+          description: Invoices in the active account, newest issue date first.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/InvoiceDto" } }
+    post:
+      tags: [Invoices]
+      summary: Create an invoice
+      description: OWNER only.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvoiceRequest" }
+      responses:
+        "201":
+          description: The created invoice.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvoiceDto" }
+
+  /v1/invoices/{id}:
+    put:
+      tags: [Invoices]
+      summary: Update an invoice
+      description: |
+        OWNER only. There is no delete route for invoices - the app sets `status` to
+        VOID instead of removing the row.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/InvoiceRequest" }
+      responses:
+        "200":
+          description: The updated invoice.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InvoiceDto" }
+        "404": { description: Not found. }
+
+  /v1/sessions:
+    get:
+      tags: [Tracking sessions]
+      summary: List tracking sessions
+      description: A WORKER only ever sees their own sessions; an OWNER sees everyone's.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      responses:
+        "200":
+          description: Sessions, newest start time first.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/TrackingSessionDto" } }
+    post:
+      tags: [Tracking sessions]
+      summary: Create a tracking session
+      description: Any member of the account may create their own session.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackingSessionRequest" }
+      responses:
+        "201":
+          description: The created session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrackingSessionDto" }
+
+  /v1/sessions/{id}:
+    put:
+      tags: [Tracking sessions]
+      summary: Update a tracking session
+      description: A WORKER can only update their own sessions.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TrackingSessionRequest" }
+      responses:
+        "200":
+          description: The updated session.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrackingSessionDto" }
+        "404": { description: Not found. }
+    delete:
+      tags: [Tracking sessions]
+      summary: Delete a tracking session (soft delete)
+      description: A WORKER can only delete their own sessions.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "204": { description: Deleted. }
+        "404": { description: Not found. }
+
+  /v1/planned-jobs:
+    get:
+      tags: [Planned jobs]
+      summary: List planned jobs
+      description: A WORKER only sees jobs they created or are assigned to; an OWNER sees every job.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      responses:
+        "200":
+          description: Planned jobs, soonest date first.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/PlannedJobDto" } }
+    post:
+      tags: [Planned jobs]
+      summary: Create a planned job
+      description: |
+        `assignedUserId` is only honoured for an OWNER - a WORKER's own planned job is
+        always self-assigned server-side regardless of what's sent.
+      parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlannedJobRequest" }
+      responses:
+        "201":
+          description: The created planned job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlannedJobDto" }
+
+  /v1/planned-jobs/{id}:
+    put:
+      tags: [Planned jobs]
+      summary: Update a planned job
+      description: Same assignment rule as create.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlannedJobRequest" }
+      responses:
+        "200":
+          description: The updated planned job.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PlannedJobDto" }
+        "404": { description: Not found. }
+    delete:
+      tags: [Planned jobs]
+      summary: Delete a planned job (soft delete)
+      description: A WORKER can only delete a job they created or are assigned to.
+      parameters:
+        - $ref: "#/components/parameters/IdPath"
+        - $ref: "#/components/parameters/AccountIdHeader"
+      responses:
+        "204": { description: Deleted. }
+        "404": { description: Not found. }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A Supabase-issued access token (ES256, verified against the project's JWKS
+        endpoint) or, in dev, a token from `/v1/dev/auth/login` (HS256). Both are
+        accepted side by side.
+
+  parameters:
+    AccountIdHeader:
+      name: X-Account-Id
+      in: header
+      required: false
+      description: Act as this account instead of the caller's default (first) membership. The caller must have a membership in it.
+      schema: { type: string, format: uuid }
+    AccountIdPath:
+      name: accountId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    AccountMembershipDto:
+      type: object
+      properties:
+        accountId: { type: string, format: uuid }
+        accountName: { type: string }
+        accountKind: { type: string, enum: [PERSONAL, BUSINESS] }
+        role: { type: string, enum: [OWNER, WORKER] }
+
+    MeResponse:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string, nullable: true }
+        memberships:
+          type: array
+          items: { $ref: "#/components/schemas/AccountMembershipDto" }
+
+    MemberDto:
+      type: object
+      properties:
+        userId: { type: string, format: uuid }
+        email: { type: string, format: email }
+        displayName: { type: string, nullable: true }
+        role: { type: string, enum: [OWNER, WORKER] }
+
+    InviteDto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        accountId: { type: string, format: uuid }
+        accountName: { type: string }
+        email: { type: string, format: email }
+        role: { type: string, enum: [OWNER, WORKER] }
+        status: { type: string, enum: [PENDING, ACCEPTED, REVOKED] }
+
+    ConnectionInviteDto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        employerAccountId: { type: string, format: uuid }
+        employerAccountName: { type: string }
+        email: { type: string, format: email }
+        status: { type: string, enum: [PENDING, ACCEPTED, REVOKED] }
+
+    ConnectionDto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        employerAccountId: { type: string, format: uuid }
+        employerAccountName: { type: string }
+        workerAccountId: { type: string, format: uuid }
+        workerCompanyId: { type: string, format: uuid }
+        workerCompanyName: { type: string }
+        status: { type: string, enum: [ACTIVE, REVOKED] }
+
+    ConnectionPlannedJobRequest:
+      type: object
+      required: [id, dateEpochDay, startMinute]
+      properties:
+        id: { type: string, format: uuid }
+        dateEpochDay: { type: integer, format: int64, description: "Days since 1970-01-01 (LocalDate.toEpochDay())." }
+        startMinute: { type: integer, description: "Minutes since midnight." }
+        endMinute: { type: integer, nullable: true }
+        siteLabel: { type: string, nullable: true }
+        jobTypeLabel: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    ConnectionPlannedJobDto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        dateEpochDay: { type: integer, format: int64 }
+        startMinute: { type: integer }
+        endMinute: { type: integer, nullable: true }
+        siteLabel: { type: string, nullable: true }
+        jobTypeLabel: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+
+    ConnectionSessionDto:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        siteLabel: { type: string, nullable: true }
+        jobTypeLabel: { type: string, nullable: true }
+        startTimestampMillis: { type: integer, format: int64 }
+        stopTimestampMillis: { type: integer, format: int64, nullable: true }
+
+    CompanyRequest:
+      type: object
+      required: [id, name, createdAtMillis]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        abn: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        createdAtMillis: { type: integer, format: int64 }
+        hourlyRate: { type: number, format: double, nullable: true }
+
+    CompanyDto:
+      allOf:
+        - $ref: "#/components/schemas/CompanyRequest"
+        - type: object
+          properties:
+            updatedAt: { type: string, format: date-time }
+
+    SiteRequest:
+      type: object
+      required: [id, label, latitude, longitude, createdAtMillis]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        address: { type: string, nullable: true }
+        latitude: { type: number, format: double }
+        longitude: { type: number, format: double }
+        createdAtMillis: { type: integer, format: int64 }
+
+    SiteDto:
+      allOf:
+        - $ref: "#/components/schemas/SiteRequest"
+        - type: object
+          properties:
+            updatedAt: { type: string, format: date-time }
+
+    JobTypeRequest:
+      type: object
+      required: [id, name, createdAtMillis]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        createdAtMillis: { type: integer, format: int64 }
+
+    JobTypeDto:
+      allOf:
+        - $ref: "#/components/schemas/JobTypeRequest"
+        - type: object
+          properties:
+            updatedAt: { type: string, format: date-time }
+
+    InvoiceRequest:
+      type: object
+      required: [id, number, companyName, periodStartEpochDay, periodEndEpochDay, issueDateEpochDay, totalHours, createdAtMillis]
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: string }
+        companyName: { type: string }
+        periodStartEpochDay: { type: integer, format: int64 }
+        periodEndEpochDay: { type: integer, format: int64 }
+        issueDateEpochDay: { type: integer, format: int64 }
+        totalHours: { type: number, format: double }
+        totalAmount: { type: number, format: double, nullable: true }
+        hourlyRate: { type: number, format: double, nullable: true }
+        status: { type: string, enum: [DRAFT, SENT, PAID, VOID], default: DRAFT }
+        sentAtMillis: { type: integer, format: int64, nullable: true }
+        paidAtMillis: { type: integer, format: int64, nullable: true }
+        pdfPath: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        createdAtMillis: { type: integer, format: int64 }
+
+    InvoiceDto:
+      allOf:
+        - $ref: "#/components/schemas/InvoiceRequest"
+        - type: object
+          properties:
+            updatedAt: { type: string, format: date-time }
+
+    TrackingSessionRequest:
+      type: object
+      required: [id, startTimestampMillis, startLatitude, startLongitude]
+      properties:
+        id: { type: string, format: uuid }
+        companyName: { type: string, nullable: true }
+        siteLabel: { type: string, nullable: true }
+        jobTypeLabel: { type: string, nullable: true }
+        startTimestampMillis: { type: integer, format: int64 }
+        startLatitude: { type: number, format: double }
+        startLongitude: { type: number, format: double }
+        stopTimestampMillis: { type: integer, format: int64, nullable: true }
+        stopLatitude: { type: number, format: double, nullable: true }
+        stopLongitude: { type: number, format: double, nullable: true }
+        hourlyRate: { type: number, format: double, nullable: true }
+        invoiceId: { type: string, format: uuid, nullable: true }
+
+    TrackingSessionDto:
+      allOf:
+        - $ref: "#/components/schemas/TrackingSessionRequest"
+        - type: object
+          properties:
+            createdByUserId: { type: string, format: uuid, nullable: true }
+            updatedAt: { type: string, format: date-time }
+
+    PlannedJobRequest:
+      type: object
+      required: [id, dateEpochDay, startMinute]
+      properties:
+        id: { type: string, format: uuid }
+        dateEpochDay: { type: integer, format: int64 }
+        startMinute: { type: integer }
+        endMinute: { type: integer, nullable: true }
+        companyName: { type: string, nullable: true }
+        siteLabel: { type: string, nullable: true }
+        jobTypeLabel: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        assignedUserId:
+          type: string
+          format: uuid
+          nullable: true
+          description: OWNER-only; ignored (forced to the caller) for a WORKER.
+
+    PlannedJobDto:
+      allOf:
+        - $ref: "#/components/schemas/PlannedJobRequest"
+        - type: object
+          properties:
+            createdByUserId: { type: string, format: uuid, nullable: true }
+            updatedAt: { type: string, format: date-time }
