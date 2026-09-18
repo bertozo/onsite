@@ -18,7 +18,9 @@ data class PlannedJob(
     val companyName: String?,
     val siteLabel: String?,
     val jobTypeLabel: String?,
-    val notes: String?
+    val notes: String?,
+    /** Backend user UUID of the teammate this is scheduled for; null on a personal account or an unassigned item. */
+    val assignedUserId: String? = null
 ) {
     val date: LocalDate get() = LocalDate.ofEpochDay(dateEpochDay)
     val startTime: LocalTime get() = LocalTime.ofSecondOfDay(startMinute * 60L)

@@ -13,6 +13,10 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import com.xbertz.onsite.backend.ConnectionDto
+import com.xbertz.onsite.backend.ConnectionPlannedJobRequest
+import com.xbertz.onsite.backend.ConnectionSessionDto
+import com.xbertz.onsite.backend.MemberDto
 import androidx.activity.ComponentActivity
 import androidx.annotation.StringRes
 import androidx.activity.compose.BackHandler
@@ -56,6 +60,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -114,6 +119,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -121,12 +130,14 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -198,18 +209,30 @@ class MainActivity : ComponentActivity() {
 }
 
 internal enum class Screen {
-    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO, INVOICES, INVOICE_REVIEW
+    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO, INVOICES, INVOICE_REVIEW,
+    CONNECTION_DETAIL
 }
 
 @Composable
 fun AppRoot(settingsViewModel: SettingsViewModel) {
     val authViewModel: AuthViewModel = viewModel()
     val authState by authViewModel.state.collectAsState()
+    val passwordResetState by authViewModel.passwordReset.collectAsState()
 
     when (val state = authState) {
         AuthUiState.CheckingSession -> FullScreenProgress()
-        is AuthUiState.LoggedOut -> LoginScreen(loading = false, error = state.error, onLogin = authViewModel::login)
-        AuthUiState.LoggingIn -> LoginScreen(loading = true, error = null, onLogin = authViewModel::login)
+        is AuthUiState.LoggedOut, AuthUiState.LoggingIn -> AuthScreen(
+            loading = state == AuthUiState.LoggingIn,
+            error = (state as? AuthUiState.LoggedOut)?.error,
+            info = (state as? AuthUiState.LoggedOut)?.info,
+            passwordReset = passwordResetState,
+            onSignIn = authViewModel::signIn,
+            onSignUp = authViewModel::signUp,
+            onOpenPasswordReset = authViewModel::openPasswordReset,
+            onDismissPasswordReset = authViewModel::dismissPasswordReset,
+            onSendPasswordResetCode = authViewModel::sendPasswordResetCode,
+            onConfirmPasswordReset = authViewModel::confirmPasswordReset,
+        )
         AuthUiState.SyncingData -> FullScreenProgress(
             title = stringResource(R.string.syncing_title),
             subtitle = stringResource(R.string.syncing_subtitle)
@@ -229,6 +252,7 @@ private fun SignedInAppRoot(
     authState: AuthUiState.LoggedIn
 ) {
     var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
+    var selectedEmployerConnection by remember { mutableStateOf<ConnectionDto?>(null) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -240,8 +264,14 @@ private fun SignedInAppRoot(
     }
 
     if (screen != Screen.MENU) {
-        // The invoice review is reached from Reports, so back returns there; every other screen returns home.
-        BackHandler { screen = if (screen == Screen.INVOICE_REVIEW) Screen.REPORTS else Screen.MENU }
+        // The invoice review is reached from Reports and connection detail from Settings; every other screen returns home.
+        BackHandler {
+            screen = when (screen) {
+                Screen.INVOICE_REVIEW -> Screen.REPORTS
+                Screen.CONNECTION_DETAIL -> Screen.SETTINGS
+                else -> Screen.MENU
+            }
+        }
     }
 
     when (screen) {
@@ -279,9 +309,24 @@ private fun SignedInAppRoot(
             viewModel = settingsViewModel,
             authViewModel = authViewModel,
             authState = authState,
-            onLogout = authViewModel::logout
+            onLogout = authViewModel::logout,
+            onOpenConnection = { connection ->
+                selectedEmployerConnection = connection
+                screen = Screen.CONNECTION_DETAIL
+            }
         )
-        Screen.PLANNING -> PlanningScreen(onBack = { screen = Screen.MENU })
+        Screen.CONNECTION_DETAIL -> selectedEmployerConnection?.let { connection ->
+            ConnectionDetailScreen(
+                connection = connection,
+                authViewModel = authViewModel,
+                onBack = { screen = Screen.SETTINGS }
+            )
+        }
+        Screen.PLANNING -> {
+            val members by authViewModel.members.collectAsState()
+            LaunchedEffect(authState.isOwner) { if (authState.isOwner) authViewModel.loadMembers() }
+            PlanningScreen(onBack = { screen = Screen.MENU }, isOwner = authState.isOwner, members = members)
+        }
         Screen.PHOTO -> PhotoScreen(onBack = { screen = Screen.MENU })
     }
 }
@@ -360,6 +405,12 @@ internal fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, 
         }
     }
 }
+
+/** Moves to the next field on the keyboard's "Next" action, shared by every multi-field form. */
+internal fun nextFieldActions(focusManager: FocusManager) = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Next) })
+
+/** Dismisses the keyboard on "Done" without submitting - used on a form's last field. */
+internal fun doneFieldActions(focusManager: FocusManager) = KeyboardActions(onDone = { focusManager.clearFocus() })
 
 /** Collapsible "add new" form: closed by default so the list below gets the screen, opens on tap. */
 @Composable
@@ -1173,6 +1224,8 @@ private fun CalendarDayCell(
 @Composable
 fun PlanningScreen(
     onBack: () -> Unit,
+    isOwner: Boolean = true,
+    members: List<MemberDto> = emptyList(),
     viewModel: PlanningViewModel = viewModel(),
     trackerViewModel: LocationTrackerViewModel = viewModel()
 ) {
@@ -1195,6 +1248,8 @@ fun PlanningScreen(
             companies = companies,
             sites = sites,
             jobTypes = jobTypes,
+            isOwner = isOwner,
+            members = members,
             onDismiss = { showAddDialog = false },
             onConfirm = { job, repeatUntil ->
                 viewModel.saveJob(job, repeatUntil)
@@ -1226,6 +1281,8 @@ fun PlanningScreen(
             companies = companies,
             sites = sites,
             jobTypes = jobTypes,
+            isOwner = isOwner,
+            members = members,
             onDismiss = { editingJob = null },
             onConfirm = { updated, _ ->
                 viewModel.saveJob(updated)
@@ -1314,6 +1371,9 @@ fun PlanningScreen(
                     if (index > 0) Spacer(Modifier.height(10.dp))
                     PlannedJobRow(
                         job = job,
+                        assigneeLabel = if (isOwner && members.size > 1) {
+                            members.firstOrNull { it.userId == job.assignedUserId }?.let { it.displayName?.takeIf(String::isNotBlank) ?: it.email }
+                        } else null,
                         onEditClick = { editingJob = job },
                         onDeleteClick = { deletingJob = job }
                     )
@@ -1495,7 +1555,7 @@ private fun PlanningSessionRow(session: TrackingSession) {
 
 
 @Composable
-private fun PlannedJobRow(job: PlannedJob, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
+private fun PlannedJobRow(job: PlannedJob, assigneeLabel: String? = null, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
     val timeText = job.endTime?.let { "${job.startTime.format(timeFormatter)} – ${it.format(timeFormatter)}" }
         ?: job.startTime.format(timeFormatter)
@@ -1530,6 +1590,18 @@ private fun PlannedJobRow(job: PlannedJob, onEditClick: () -> Unit, onDeleteClic
                 if (!job.notes.isNullOrBlank() && title != job.notes) {
                     Text(job.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
                 }
+                if (assigneeLabel != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text(
+                            stringResource(R.string.planning_assigned_to_value, assigneeLabel),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                        )
+                    }
+                }
             }
             IconButton(onClick = onEditClick) {
                 Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
@@ -1550,6 +1622,8 @@ private fun EditPlannedJobDialog(
     companies: List<Company>,
     sites: List<Site>,
     jobTypes: List<JobType>,
+    isOwner: Boolean = true,
+    members: List<MemberDto> = emptyList(),
     onDismiss: () -> Unit,
     onConfirm: (job: PlannedJob, repeatUntil: LocalDate?) -> Unit
 ) {
@@ -1562,6 +1636,7 @@ private fun EditPlannedJobDialog(
     var companyName by remember { mutableStateOf(existing?.companyName) }
     var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
     var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
+    var assignedUserId by remember { mutableStateOf(existing?.assignedUserId) }
     var date by remember { mutableStateOf(initialDate) }
     var startTime by remember { mutableStateOf(existing?.startTime ?: LocalTime.of(7, 0)) }
     var endTime by remember { mutableStateOf(existing?.endTime) }
@@ -1569,6 +1644,7 @@ private fun EditPlannedJobDialog(
     var companyExpanded by remember { mutableStateOf(false) }
     var siteExpanded by remember { mutableStateOf(false) }
     var jobTypeExpanded by remember { mutableStateOf(false) }
+    var assigneeExpanded by remember { mutableStateOf(false) }
 
     val canSave = companyName != null || siteLabel != null || jobTypeLabel != null || notes.isNotBlank()
     val none = stringResource(R.string.planning_none)
@@ -1677,6 +1753,30 @@ private fun EditPlannedJobDialog(
                     }
                 }
 
+                if (isOwner && members.size > 1) {
+                    Spacer(Modifier.height(10.dp))
+                    val assigneeLabel = members.firstOrNull { it.userId == assignedUserId }
+                        ?.let { it.displayName?.takeIf(String::isNotBlank) ?: it.email }
+                        ?: none
+                    TrackerDropdown(
+                        label = stringResource(R.string.planning_assigned_to),
+                        icon = Icons.Filled.Person,
+                        value = assigneeLabel,
+                        expanded = assigneeExpanded,
+                        enabled = true,
+                        onExpandedChange = { assigneeExpanded = it },
+                        onDismiss = { assigneeExpanded = false }
+                    ) {
+                        DropdownMenuItem(text = { Text(none) }, onClick = { assignedUserId = null; assigneeExpanded = false })
+                        members.forEach { member ->
+                            DropdownMenuItem(
+                                text = { Text(member.displayName?.takeIf(String::isNotBlank) ?: member.email) },
+                                onClick = { assignedUserId = member.userId; assigneeExpanded = false }
+                            )
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
                     value = notes,
@@ -1730,7 +1830,8 @@ private fun EditPlannedJobDialog(
                             companyName = companyName,
                             siteLabel = siteLabel,
                             jobTypeLabel = jobTypeLabel,
-                            notes = notes.trim().ifBlank { null }
+                            notes = notes.trim().ifBlank { null },
+                            assignedUserId = assignedUserId
                         ),
                         if (existing == null && repeatEnabled) repeatUntil else null
                     )
@@ -1784,6 +1885,7 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
     val context = LocalContext.current
     val logoBitmap = rememberBitmapFromFile(uiState.logoPath)
     val lastPhoto = rememberBitmapFromUri(uiState.lastPhotoUri)
+    val focusManager = LocalFocusManager.current
 
     var cameraOpen by rememberSaveable { mutableStateOf(false) }
     var cameraDenied by remember { mutableStateOf(false) }
@@ -1875,6 +1977,8 @@ fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
                         onValueChange = viewModel::setLabel,
                         label = { Text(stringResource(R.string.photo_label)) },
                         supportingText = { Text(stringResource(R.string.photo_label_hint)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = doneFieldActions(focusManager),
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
@@ -2229,6 +2333,7 @@ fun SettingsScreen(
     authViewModel: AuthViewModel,
     authState: AuthUiState.LoggedIn,
     onLogout: () -> Unit,
+    onOpenConnection: (ConnectionDto) -> Unit = {},
     companyViewModel: CompanyViewModel = viewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsState()
@@ -2236,6 +2341,7 @@ fun SettingsScreen(
     val pendingInvites by authViewModel.pendingInvites.collectAsState()
     val pendingConnectionInvites by authViewModel.pendingConnectionInvites.collectAsState()
     val connections by authViewModel.connections.collectAsState()
+    val employerConnections by authViewModel.employerConnections.collectAsState()
     val myCompanies by companyViewModel.companies.collectAsState()
     val context = LocalContext.current
 
@@ -2243,6 +2349,7 @@ fun SettingsScreen(
         authViewModel.loadPendingInvites()
         authViewModel.loadPendingConnectionInvites()
         authViewModel.loadConnections()
+        if (authState.isOwner) authViewModel.loadEmployerConnections()
     }
 
     // The locale is applied in MainActivity.attachBaseContext, so the Activity must be rebuilt.
@@ -2432,12 +2539,27 @@ fun SettingsScreen(
                         Spacer(Modifier.height(12.dp))
                         var inviteEmail by rememberSaveable { mutableStateOf("") }
                         var inviteResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                        val inviteEmailValid = Validators.isValidEmail(inviteEmail)
+                        val focusManager = LocalFocusManager.current
                         OutlinedTextField(
                             value = inviteEmail,
                             onValueChange = { inviteEmail = it; inviteResult = null },
                             label = { Text(stringResource(R.string.team_invite_email_label)) },
+                            isError = inviteEmail.isNotBlank() && !inviteEmailValid,
+                            supportingText = if (inviteEmail.isNotBlank() && !inviteEmailValid) {
+                                { Text(stringResource(R.string.invalid_email)) }
+                            } else null,
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (inviteEmailValid) {
+                                    authViewModel.inviteWorker(inviteEmail) { success ->
+                                        inviteResult = success
+                                        if (success) inviteEmail = ""
+                                    }
+                                }
+                                focusManager.clearFocus()
+                            }),
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(12.dp))
@@ -2448,7 +2570,7 @@ fun SettingsScreen(
                                     if (success) inviteEmail = ""
                                 }
                             },
-                            enabled = inviteEmail.contains("@"),
+                            enabled = inviteEmailValid,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.team_invite_button))
@@ -2530,12 +2652,27 @@ fun SettingsScreen(
                         Spacer(Modifier.height(12.dp))
                         var connectionEmail by rememberSaveable { mutableStateOf("") }
                         var connectionResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                        val connectionEmailValid = Validators.isValidEmail(connectionEmail)
+                        val focusManager = LocalFocusManager.current
                         OutlinedTextField(
                             value = connectionEmail,
                             onValueChange = { connectionEmail = it; connectionResult = null },
                             label = { Text(stringResource(R.string.connection_invite_email_label)) },
+                            isError = connectionEmail.isNotBlank() && !connectionEmailValid,
+                            supportingText = if (connectionEmail.isNotBlank() && !connectionEmailValid) {
+                                { Text(stringResource(R.string.invalid_email)) }
+                            } else null,
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (connectionEmailValid) {
+                                    authViewModel.inviteContractor(connectionEmail) { success ->
+                                        connectionResult = success
+                                        if (success) connectionEmail = ""
+                                    }
+                                }
+                                focusManager.clearFocus()
+                            }),
                             modifier = Modifier.fillMaxWidth()
                         )
                         Spacer(Modifier.height(12.dp))
@@ -2546,7 +2683,7 @@ fun SettingsScreen(
                                     if (success) connectionEmail = ""
                                 }
                             },
-                            enabled = connectionEmail.contains("@"),
+                            enabled = connectionEmailValid,
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(stringResource(R.string.connection_invite_button))
@@ -2558,6 +2695,32 @@ fun SettingsScreen(
                                 color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
                                 style = MaterialTheme.typography.bodySmall
                             )
+                        }
+                    }
+                }
+            }
+
+            if (authState.isOwner && employerConnections.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.connection_connected_contractors_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        employerConnections.forEach { connection ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenConnection(connection) }
+                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(connection.workerCompanyName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     }
                 }
@@ -2614,6 +2777,250 @@ private fun ConnectionInviteRow(
             color = MaterialTheme.colorScheme.error,
             style = MaterialTheme.typography.bodySmall
         )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection detail (employer side): schedule a job on the worker's calendar, view their hours
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ConnectionDetailScreen(
+    connection: ConnectionDto,
+    authViewModel: AuthViewModel,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+
+    var sessions by remember { mutableStateOf<List<ConnectionSessionDto>>(emptyList()) }
+    var loadingSessions by remember { mutableStateOf(true) }
+    LaunchedEffect(connection.id) {
+        loadingSessions = true
+        authViewModel.loadConnectionSessions(connection.id) { result ->
+            sessions = result
+            loadingSessions = false
+        }
+    }
+
+    var date by remember { mutableStateOf(LocalDate.now()) }
+    var startTime by remember { mutableStateOf(LocalTime.of(7, 0)) }
+    var endTime by remember { mutableStateOf<LocalTime?>(null) }
+    var siteLabel by remember { mutableStateOf("") }
+    var jobTypeLabel by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var scheduling by remember { mutableStateOf(false) }
+    var scheduleResult by remember { mutableStateOf<Boolean?>(null) }
+
+    val totalMillis = sessions.sumOf { (it.stopTimestampMillis ?: it.startTimestampMillis) - it.startTimestampMillis }
+
+    Scaffold(topBar = { AppTopBar(title = connection.workerCompanyName, onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        stringResource(R.string.connection_detail_schedule_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { showDatePicker(context, date) { date = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("${stringResource(R.string.date)}: ${date.format(dateFormatter)}")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { showTimePicker(context, startTime) { startTime = it } },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(startTime.format(timeFormatter))
+                        }
+                        OutlinedButton(
+                            onClick = { showTimePicker(context, endTime ?: startTime.plusHours(1)) { endTime = it } },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(endTime?.format(timeFormatter) ?: "–")
+                        }
+                        if (endTime != null) {
+                            IconButton(onClick = { endTime = null }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.planning_clear_end_time), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = siteLabel,
+                        onValueChange = { siteLabel = it },
+                        label = { Text(stringResource(R.string.site)) },
+                        leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = jobTypeLabel,
+                        onValueChange = { jobTypeLabel = it },
+                        label = { Text(stringResource(R.string.job_description)) },
+                        leadingIcon = { Icon(Icons.Filled.Work, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text(stringResource(R.string.planning_notes)) },
+                        minLines = 2,
+                        maxLines = 4,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            scheduling = true
+                            scheduleResult = null
+                            val req = ConnectionPlannedJobRequest(
+                                id = java.util.UUID.randomUUID().toString(),
+                                dateEpochDay = date.toEpochDay(),
+                                startMinute = startTime.toSecondOfDay() / 60,
+                                endMinute = endTime?.let { it.toSecondOfDay() / 60 },
+                                siteLabel = siteLabel.trim().ifBlank { null },
+                                jobTypeLabel = jobTypeLabel.trim().ifBlank { null },
+                                notes = notes.trim().ifBlank { null }
+                            )
+                            authViewModel.scheduleConnectionJob(connection.id, req) { success ->
+                                scheduling = false
+                                scheduleResult = success
+                                if (success) {
+                                    siteLabel = ""
+                                    jobTypeLabel = ""
+                                    notes = ""
+                                    endTime = null
+                                }
+                            }
+                        },
+                        enabled = !scheduling,
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        if (scheduling) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        } else {
+                            Icon(Icons.Filled.EventNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.connection_detail_schedule_button))
+                        }
+                    }
+                    scheduleResult?.let { success ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(if (success) R.string.connection_detail_schedule_sent else R.string.connection_detail_schedule_failed),
+                            color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader(title = stringResource(R.string.connection_detail_hours_section), count = sessions.size)
+                Spacer(Modifier.weight(1f))
+                if (sessions.isNotEmpty()) {
+                    val totalText = stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(totalMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+                    )
+                    Text(totalText, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (loadingSessions) {
+                Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (sessions.isEmpty()) {
+                EmptyState(text = stringResource(R.string.connection_detail_no_sessions))
+            } else {
+                sessions.sortedByDescending { it.startTimestampMillis }.forEachIndexed { index, session ->
+                    if (index > 0) Spacer(Modifier.height(8.dp))
+                    ConnectionSessionRow(session, dateFormatter, timeFormatter)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionSessionRow(session: ConnectionSessionDto, dateFormatter: DateTimeFormatter, timeFormatter: DateTimeFormatter) {
+    val zone = remember { ZoneId.systemDefault() }
+    val start = remember(session) { Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone) }
+    val stop = remember(session) { session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone) } }
+    val durationMillis = (session.stopTimestampMillis ?: session.startTimestampMillis) - session.startTimestampMillis
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(start.toLocalDate().format(dateFormatter), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                val details = listOfNotNull(
+                    session.siteLabel?.takeIf { it.isNotBlank() },
+                    session.jobTypeLabel?.takeIf { it.isNotBlank() }
+                ).joinToString(" · ")
+                if (details.isNotBlank()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "${start.toLocalTime().format(timeFormatter)} – ${stop?.toLocalTime()?.format(timeFormatter) ?: "…"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                    ),
+                    style = MaterialTheme.typography.labelLarge.tabularNums,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
     }
 }
 
@@ -2884,6 +3291,10 @@ fun CompaniesScreen(
     val sessions by trackerViewModel.completedSessions.collectAsState()
     val invoices by invoiceViewModel.invoices.collectAsState()
     var sheetCompany by remember { mutableStateOf<Company?>(null) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val nameFocusRequester = remember { FocusRequester() }
 
     sheetCompany?.let { company ->
         CompanySheet(
@@ -2922,6 +3333,9 @@ fun CompaniesScreen(
 
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_companies), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            LaunchedEffect(formExpanded) {
+                if (formExpanded) nameFocusRequester.requestFocus()
+            }
             NewEntityCard(
                 visible = canManage,
                 title = stringResource(R.string.new_company),
@@ -2933,9 +3347,11 @@ fun CompaniesScreen(
                         onValueChange = { viewModel.onNameChanged(it) },
                         label = { Text(stringResource(R.string.company_name)) },
                         leadingIcon = { Icon(Icons.Filled.Business, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
                     )
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
@@ -2946,6 +3362,8 @@ fun CompaniesScreen(
                         supportingText = if (!Validators.abnOk(uiState.abn)) {
                             { Text(stringResource(R.string.invalid_abn)) }
                         } else null,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -2960,7 +3378,8 @@ fun CompaniesScreen(
                             { Text(stringResource(R.string.invalid_phone)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -2975,7 +3394,8 @@ fun CompaniesScreen(
                             { Text(stringResource(R.string.invalid_email)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -2990,7 +3410,8 @@ fun CompaniesScreen(
                             { Text(stringResource(R.string.enter_valid_amount)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                        keyboardActions = doneField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3057,6 +3478,12 @@ fun EditCompanyDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val nameFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { nameFocusRequester.requestFocus() }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.Business, contentDescription = null) },
@@ -3067,9 +3494,11 @@ fun EditCompanyDialog(
                     value = state.name,
                     onValueChange = onNameChanged,
                     label = { Text(stringResource(R.string.company_name)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
                 )
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
@@ -3080,6 +3509,8 @@ fun EditCompanyDialog(
                     supportingText = if (!Validators.abnOk(state.abn)) {
                         { Text(stringResource(R.string.invalid_abn)) }
                     } else null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -3093,7 +3524,8 @@ fun EditCompanyDialog(
                     supportingText = if (!Validators.phoneOk(state.phone)) {
                         { Text(stringResource(R.string.invalid_phone)) }
                     } else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -3107,7 +3539,8 @@ fun EditCompanyDialog(
                     supportingText = if (!Validators.emailOk(state.email)) {
                         { Text(stringResource(R.string.invalid_email)) }
                     } else null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -3122,7 +3555,8 @@ fun EditCompanyDialog(
                         { Text(stringResource(R.string.enter_valid_amount)) }
                     } else null,
                     leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = doneField,
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
                     modifier = Modifier.fillMaxWidth()
@@ -3156,6 +3590,8 @@ fun JobTypesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: Job
     val uiState by viewModel.uiState.collectAsState()
     val jobTypes by viewModel.jobTypes.collectAsState()
     val editState by viewModel.editState.collectAsState()
+    val focusManager = LocalFocusManager.current
+    val nameFocusRequester = remember { FocusRequester() }
 
     editState?.let { state ->
         EditJobTypeDialog(
@@ -3170,6 +3606,9 @@ fun JobTypesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: Job
 
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_job_types), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            LaunchedEffect(formExpanded) {
+                if (formExpanded) nameFocusRequester.requestFocus()
+            }
             NewEntityCard(
                 visible = canManage,
                 title = stringResource(R.string.new_job_type),
@@ -3181,9 +3620,17 @@ fun JobTypesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: Job
                         onValueChange = { viewModel.onNameChanged(it) },
                         label = { Text(stringResource(R.string.job_type_hint)) },
                         leadingIcon = { Icon(Icons.Filled.Work, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (uiState.name.isNotBlank()) {
+                                viewModel.saveJobType()
+                                formExpanded = false
+                            }
+                            focusManager.clearFocus()
+                        }),
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
                     )
                     Spacer(Modifier.height(16.dp))
                     Button(
@@ -3235,6 +3682,10 @@ fun EditJobTypeDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val nameFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { nameFocusRequester.requestFocus() }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.Work, contentDescription = null) },
@@ -3244,9 +3695,14 @@ fun EditJobTypeDialog(
                 value = state.name,
                 onValueChange = onNameChanged,
                 label = { Text(stringResource(R.string.job_type_hint)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (state.name.isNotBlank()) onConfirm()
+                    focusManager.clearFocus()
+                }),
                 singleLine = true,
                 shape = MaterialTheme.shapes.small,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
             )
         },
         confirmButton = {
@@ -3275,6 +3731,10 @@ fun SitesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: SiteVi
     val editState by viewModel.editState.collectAsState()
     val editSuggestions by viewModel.editSuggestions.collectAsState()
     var addressDropdownExpanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val labelFocusRequester = remember { FocusRequester() }
 
     editState?.let { state ->
         EditSiteDialog(
@@ -3292,6 +3752,9 @@ fun SitesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: SiteVi
 
     Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_sites), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            LaunchedEffect(formExpanded) {
+                if (formExpanded) labelFocusRequester.requestFocus()
+            }
             NewEntityCard(
                 visible = canManage,
                 title = stringResource(R.string.new_site),
@@ -3303,9 +3766,11 @@ fun SitesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: SiteVi
                         onValueChange = { viewModel.onLabelChanged(it) },
                         label = { Text(stringResource(R.string.site_label)) },
                         leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().focusRequester(labelFocusRequester)
                     )
                     Spacer(Modifier.height(10.dp))
 
@@ -3322,6 +3787,8 @@ fun SitesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: SiteVi
                             label = { Text(stringResource(R.string.address)) },
                             placeholder = { Text(stringResource(R.string.address_placeholder)) },
                             leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = doneField,
                             singleLine = true,
                             shape = MaterialTheme.shapes.small,
                             modifier = Modifier
@@ -3408,6 +3875,11 @@ fun EditSiteDialog(
     onConfirm: () -> Unit
 ) {
     var dropdownExpanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val labelFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { labelFocusRequester.requestFocus() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -3419,9 +3891,11 @@ fun EditSiteDialog(
                     value = state.label,
                     onValueChange = onLabelChanged,
                     label = { Text(stringResource(R.string.site_label)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
                     singleLine = true,
                     shape = MaterialTheme.shapes.small,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().focusRequester(labelFocusRequester)
                 )
                 Spacer(Modifier.height(10.dp))
 
@@ -3436,6 +3910,8 @@ fun EditSiteDialog(
                             dropdownExpanded = true
                         },
                         label = { Text(stringResource(R.string.address)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = doneField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier
@@ -3504,6 +3980,9 @@ fun rememberBitmapFromFile(path: String?): ImageBitmap? {
 fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val photoBitmap = rememberBitmapFromFile(uiState.photoPath)
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickVisualMedia()
@@ -3570,6 +4049,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                         onValueChange = { viewModel.onNameChanged(it) },
                         label = { Text(stringResource(R.string.full_name)) },
                         leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3584,7 +4065,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                             { Text(stringResource(R.string.invalid_phone)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3599,7 +4081,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                             { Text(stringResource(R.string.invalid_email)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3610,6 +4093,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                         onValueChange = { viewModel.onRoleChanged(it) },
                         label = { Text(stringResource(R.string.role_position)) },
                         leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3624,7 +4109,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                             { Text(stringResource(R.string.invalid_abn)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.Numbers, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3647,7 +4133,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                             { Text(stringResource(R.string.invalid_bsb)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.AccountBalance, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -3662,7 +4149,8 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
                             { Text(stringResource(R.string.invalid_account_number)) }
                         } else null,
                         leadingIcon = { Icon(Icons.Filled.CreditCard, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = doneField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.fillMaxWidth()
@@ -4086,6 +4574,8 @@ fun AddSessionDialog(
     val context = LocalContext.current
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
 
     var company by remember { mutableStateOf(initialCompany ?: companies.singleOrNull()) }
     var rateText by remember { mutableStateOf("") }
@@ -4232,7 +4722,8 @@ fun AddSessionDialog(
                         value = hoursText,
                         onValueChange = { value -> hoursText = value.filter { it.isDigit() }.take(3) },
                         label = { Text(stringResource(R.string.hours)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.weight(1f)
@@ -4241,7 +4732,8 @@ fun AddSessionDialog(
                         value = minutesText,
                         onValueChange = { value -> minutesText = value.filter { it.isDigit() }.take(2) },
                         label = { Text(stringResource(R.string.minutes)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         isError = (minutesText.toIntOrNull() ?: 0) > 59,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
@@ -4345,6 +4837,7 @@ fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick:
 @Composable
 internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, companyRate: Double?) {
     val valid = Validators.amountOk(value)
+    val focusManager = LocalFocusManager.current
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
@@ -4360,7 +4853,8 @@ internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, co
                 }
             )
         },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+        keyboardActions = doneFieldActions(focusManager),
         singleLine = true,
         shape = MaterialTheme.shapes.small,
         modifier = Modifier.fillMaxWidth()
@@ -4379,6 +4873,10 @@ fun EditSessionDialog(
     var hoursText by remember { mutableStateOf(TimeUnit.MILLISECONDS.toHours(durationMillis).toString()) }
     var minutesText by remember { mutableStateOf((TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60).toString()) }
     var rateText by remember { mutableStateOf(session.hourlyRate?.let { formatRateInput(it) }.orEmpty()) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val hoursFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { hoursFocusRequester.requestFocus() }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -4397,16 +4895,18 @@ fun EditSessionDialog(
                         value = hoursText,
                         onValueChange = { value -> hoursText = value.filter { it.isDigit() } },
                         label = { Text(stringResource(R.string.hours)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).focusRequester(hoursFocusRequester)
                     )
                     OutlinedTextField(
                         value = minutesText,
                         onValueChange = { value -> minutesText = value.filter { it.isDigit() } },
                         label = { Text(stringResource(R.string.minutes)) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
                         modifier = Modifier.weight(1f)

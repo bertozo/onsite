@@ -67,8 +67,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
@@ -159,6 +161,8 @@ fun InvoiceReviewScreen(
     val locale = LocalContext.current.resources.configuration.locales[0]
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
     val lineDateFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEE, d MMM", locale) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
 
     val cancel = {
         invoiceViewModel.cancelReview()
@@ -270,6 +274,8 @@ fun InvoiceReviewScreen(
                         onValueChange = { number = it },
                         label = { Text(stringResource(R.string.invoice_number)) },
                         leadingIcon = { Icon(Icons.Filled.Tag, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         enabled = !uiState.isGenerating,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,
@@ -288,7 +294,8 @@ fun InvoiceReviewScreen(
                                 else stringResource(R.string.leave_blank_hours_only)
                             )
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
                         enabled = !uiState.isGenerating,
                         singleLine = true,
                         shape = MaterialTheme.shapes.small,

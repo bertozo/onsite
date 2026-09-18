@@ -404,6 +404,7 @@ private suspend fun pushPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
             siteLabel = row.siteLabel,
             jobTypeLabel = row.jobTypeLabel,
             notes = row.notes,
+            assignedUserId = row.assignedUserId,
         )
         if (mapping == null) BackendApi.createPlannedJob(token, req) else BackendApi.updatePlannedJob(token, remoteId, req)
         sync.upsertMapping(SyncMapping(TYPE_PLANNED_JOB, row.id, remoteId, System.currentTimeMillis()))
@@ -428,6 +429,7 @@ private suspend fun pullPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
             siteLabel = remote.siteLabel,
             jobTypeLabel = remote.jobTypeLabel,
             notes = remote.notes,
+            assignedUserId = remote.assignedUserId,
         )
         val localId = if (mapping == null) dao.insert(job) else { dao.update(job); mapping.localId }
         sync.upsertMapping(SyncMapping(TYPE_PLANNED_JOB, localId, remote.id, System.currentTimeMillis()))

@@ -24,12 +24,6 @@ import kotlinx.serialization.json.Json
 private const val BASE_URL = "http://127.0.0.1:8080"
 
 @Serializable
-data class DevLoginRequest(val email: String)
-
-@Serializable
-data class DevLoginResponse(val token: String)
-
-@Serializable
 data class AccountMembershipDto(
     val accountId: String,
     val accountName: String,
@@ -82,6 +76,34 @@ data class ConnectionDto(
     val workerCompanyId: String,
     val workerCompanyName: String,
     val status: String,
+)
+
+@Serializable
+data class MemberDto(
+    val userId: String,
+    val email: String,
+    val displayName: String?,
+    val role: String,
+)
+
+@Serializable
+data class ConnectionPlannedJobRequest(
+    val id: String,
+    val dateEpochDay: Long,
+    val startMinute: Int,
+    val endMinute: Int? = null,
+    val siteLabel: String? = null,
+    val jobTypeLabel: String? = null,
+    val notes: String? = null,
+)
+
+@Serializable
+data class ConnectionSessionDto(
+    val id: String,
+    val siteLabel: String?,
+    val jobTypeLabel: String?,
+    val startTimestampMillis: Long,
+    val stopTimestampMillis: Long?,
 )
 
 @Serializable
@@ -157,6 +179,7 @@ data class PlannedJobRequest(
     val siteLabel: String? = null,
     val jobTypeLabel: String? = null,
     val notes: String? = null,
+    val assignedUserId: String? = null,
 )
 
 object BackendApi {
@@ -170,14 +193,6 @@ object BackendApi {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
-    }
-
-    suspend fun devLogin(email: String): String {
-        val response: DevLoginResponse = client.post("$BASE_URL/v1/dev/auth/login") {
-            contentType(ContentType.Application.Json)
-            setBody(DevLoginRequest(email))
-        }.body()
-        return response.token
     }
 
     suspend fun bootstrap(token: String): MeResponse =
@@ -213,9 +228,26 @@ object BackendApi {
     suspend fun listMyConnections(token: String): List<ConnectionDto> =
         client.get("$BASE_URL/v1/me/connections") { bearerAuth(token) }.body()
 
+    /** OWNER-only: the contractors connected *to* the active account (the employer side, unlike [listMyConnections]). */
+    suspend fun listEmployerConnections(token: String): List<ConnectionDto> =
+        client.get("$BASE_URL/v1/connections") { bearerAuth(token) }.body()
+
     suspend fun revokeConnection(token: String, connectionId: String) {
         client.delete("$BASE_URL/v1/connections/$connectionId") { bearerAuth(token) }
     }
+
+    /** OWNER-only: every member of the active account, for the "assign to" picker. */
+    suspend fun listAccountMembers(token: String): List<MemberDto> =
+        client.get("$BASE_URL/v1/me/account-members") { bearerAuth(token) }.body()
+
+    /** Employer schedules a job straight onto the connected worker's own calendar. */
+    suspend fun createConnectionPlannedJob(token: String, connectionId: String, req: ConnectionPlannedJobRequest) {
+        client.post("$BASE_URL/v1/connections/$connectionId/planned-jobs") { bearerAuth(token); jsonBody(req) }
+    }
+
+    /** Employer reads the hours the connected worker has logged against this connection's company. */
+    suspend fun listConnectionSessions(token: String, connectionId: String): List<ConnectionSessionDto> =
+        client.get("$BASE_URL/v1/connections/$connectionId/sessions") { bearerAuth(token) }.body()
 
     suspend fun createCompany(token: String, req: CompanyRequest) {
         client.post("$BASE_URL/v1/companies") { bearerAuth(token); jsonBody(req) }
