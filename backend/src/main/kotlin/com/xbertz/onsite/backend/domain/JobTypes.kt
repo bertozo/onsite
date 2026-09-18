@@ -93,7 +93,7 @@ class JobTypesRepository {
 }
 
 fun Route.jobTypeRoutes(repository: JobTypesRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         route("/v1/job-types") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()

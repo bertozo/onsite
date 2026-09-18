@@ -149,7 +149,7 @@ class TrackingSessionsRepository {
 }
 
 fun Route.trackingSessionRoutes(repository: TrackingSessionsRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         route("/v1/sessions") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()

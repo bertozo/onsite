@@ -108,7 +108,7 @@ class SitesRepository {
 }
 
 fun Route.siteRoutes(repository: SitesRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         route("/v1/sites") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()

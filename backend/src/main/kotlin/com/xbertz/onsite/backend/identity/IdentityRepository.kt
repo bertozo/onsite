@@ -71,6 +71,21 @@ class IdentityRepository {
         loadMeForUser(user)
     }
 
+    /** Every member of an account, for the OWNER's "assign to" pickers - never exposed to a WORKER. */
+    fun membersOf(accountId: UUID): List<MemberDto> = transaction {
+        (Memberships innerJoin Users)
+            .select(Users.id, Users.email, Users.displayName, Memberships.role)
+            .where { Memberships.accountId eq accountId }
+            .map {
+                MemberDto(
+                    userId = it[Users.id].toString(),
+                    email = it[Users.email],
+                    displayName = it[Users.displayName],
+                    role = it[Memberships.role],
+                )
+            }
+    }
+
     private fun loadMe(userId: UUID): MeResponse {
         val user = Users.selectAll().where { Users.id eq userId }.single()
         return loadMeForUser(user)

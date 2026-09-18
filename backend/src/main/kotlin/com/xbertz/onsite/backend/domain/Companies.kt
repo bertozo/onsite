@@ -114,7 +114,7 @@ class CompaniesRepository {
 }
 
 fun Route.companyRoutes(repository: CompaniesRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         route("/v1/companies") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()

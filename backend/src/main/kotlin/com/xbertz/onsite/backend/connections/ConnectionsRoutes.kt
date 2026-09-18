@@ -21,7 +21,7 @@ import kotlinx.coroutines.withContext
 import java.util.UUID
 
 fun Route.connectionRoutes(repository: ConnectionsRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         post("/v1/accounts/{accountId}/connection-invites") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
             val accountId = UUID.fromString(call.parameters["accountId"])

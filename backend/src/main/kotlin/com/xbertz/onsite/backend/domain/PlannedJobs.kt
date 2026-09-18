@@ -109,7 +109,8 @@ class PlannedJobsRepository {
         PlannedJobs.selectAll().where { PlannedJobs.id eq id }.single().toDto()
     }
 
-    fun update(accountId: UUID, id: UUID, ownOnlyUserId: UUID?, req: PlannedJobRequest): PlannedJobDto? = transaction {
+    /** [assignedUserId] is the caller-resolved value from the route (self for a WORKER, whatever the OWNER asked for otherwise) - always written, same as [create]. */
+    fun update(accountId: UUID, id: UUID, ownOnlyUserId: UUID?, assignedUserId: UUID?, req: PlannedJobRequest): PlannedJobDto? = transaction {
         var condition = (PlannedJobs.id eq id) and (PlannedJobs.accountId eq accountId)
         if (ownOnlyUserId != null) {
             condition = condition and ((PlannedJobs.createdByUserId eq ownOnlyUserId) or (PlannedJobs.assignedUserId eq ownOnlyUserId))
@@ -122,6 +123,7 @@ class PlannedJobsRepository {
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[notes] = req.notes
+            it[PlannedJobs.assignedUserId] = assignedUserId
             it[updatedAt] = Instant.now()
         }
         if (updated == 0) null else PlannedJobs.selectAll().where { PlannedJobs.id eq id }.single().toDto()
@@ -140,7 +142,7 @@ class PlannedJobsRepository {
 }
 
 fun Route.plannedJobRoutes(repository: PlannedJobsRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         route("/v1/planned-jobs") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
@@ -165,7 +167,9 @@ fun Route.plannedJobRoutes(repository: PlannedJobsRepository) {
                 val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<PlannedJobRequest>()
-                val result = withContext(Dispatchers.IO) { repository.update(active.accountId, id, ownOnly, req) }
+                // Same rule as creating one: a WORKER can only ever (re)schedule for themselves.
+                val assignedUserId = if (active.isOwner) req.assignedUserId?.let(UUID::fromString) else user.userId
+                val result = withContext(Dispatchers.IO) { repository.update(active.accountId, id, ownOnly, assignedUserId, req) }
                 if (result == null) call.respond(HttpStatusCode.NotFound) else call.respond(result)
             }
             delete("/{id}") {

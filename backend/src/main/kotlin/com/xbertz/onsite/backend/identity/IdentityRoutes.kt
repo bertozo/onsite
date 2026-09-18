@@ -15,7 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 fun Route.identityRoutes(repository: IdentityRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         // Call right after Supabase sign-in/sign-up: provisions the personal account on
         // first login, no-op on every login after that.
         post("/v1/me/bootstrap") {
@@ -36,6 +36,14 @@ fun Route.identityRoutes(repository: IdentityRepository) {
             } else {
                 call.respond(response)
             }
+        }
+
+        // The OWNER's picker for "assign this job to": every member of the active account.
+        get("/v1/me/account-members") {
+            val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
+            val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+            active.requireOwner()
+            call.respond(withContext(Dispatchers.IO) { repository.membersOf(active.accountId) })
         }
     }
 }

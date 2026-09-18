@@ -153,7 +153,7 @@ class InvoicesRepository {
 }
 
 fun Route.invoiceRoutes(repository: InvoicesRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         route("/v1/invoices") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()

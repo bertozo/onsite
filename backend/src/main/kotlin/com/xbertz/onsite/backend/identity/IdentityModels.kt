@@ -17,3 +17,11 @@ data class MeResponse(
     val displayName: String?,
     val memberships: List<AccountMembershipDto>,
 )
+
+@Serializable
+data class MemberDto(
+    val userId: String,
+    val email: String,
+    val displayName: String?,
+    val role: String,
+)

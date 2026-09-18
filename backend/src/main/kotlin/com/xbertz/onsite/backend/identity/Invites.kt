@@ -110,7 +110,7 @@ class InviteRepository {
 }
 
 fun Route.inviteRoutes(repository: InviteRepository) {
-    authenticate(AUTH_JWT) {
+    authenticate(*AUTH_JWT) {
         post("/v1/accounts/{accountId}/invites") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
             val accountId = UUID.fromString(call.parameters["accountId"])

@@ -74,10 +74,18 @@ this machine's `localhost:8080`. The app is already configured to call
 
 ## Switching to a real Supabase project
 
+Modern Supabase projects sign access tokens with an asymmetric ES256 key, not a shared
+secret - the backend verifies them against the project's public JWKS endpoint instead of a
+configured secret, so there's no key to copy into `.env`.
+
 1. Create the project in the Supabase dashboard (this is an account-creation step only you
    can do).
-2. Settings → API → JWT Settings has the JWT secret; put it in `.env` as
-   `SUPABASE_JWT_SECRET`, replacing the dev value.
-3. Point the Android/iOS/Web clients at that project's URL and anon key for sign-up/sign-in;
-   they call Supabase directly for auth and only send this backend the resulting JWT.
-4. `SUPABASE_JWT_ISSUER` stays `supabase` unless Supabase changes that default.
+2. Settings → API has the Project URL; put it in `.env` as `SUPABASE_PROJECT_URL`. The
+   backend fetches `<that URL>/auth/v1/.well-known/jwks.json` once at startup and verifies
+   tokens against the public key(s) published there (`auth/SupabaseJwks.kt`).
+3. Point the Android/iOS/Web clients at that project's URL and publishable (`sb_publishable_...`)
+   key for sign-up/sign-in; they call Supabase directly for auth and only send this backend
+   the resulting JWT.
+4. `SUPABASE_JWT_SECRET`/`SUPABASE_JWT_ISSUER` are unrelated to the real project - they only
+   sign/verify the dev-only login's tokens (`auth/DevAuthRoutes.kt`), which stays available
+   side-by-side for local testing as long as `DEV_AUTH_ENABLED=true`.

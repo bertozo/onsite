@@ -10,6 +10,7 @@ data class AppConfig(
     val dbPassword: String,
     val supabaseJwtSecret: String,
     val supabaseJwtIssuer: String,
+    val supabaseProjectUrl: String,
     val port: Int,
     val devAuthEnabled: Boolean,
 ) {
@@ -24,6 +25,7 @@ data class AppConfig(
                 dbPassword = required("DB_PASSWORD"),
                 supabaseJwtSecret = required("SUPABASE_JWT_SECRET"),
                 supabaseJwtIssuer = System.getenv("SUPABASE_JWT_ISSUER") ?: "supabase",
+                supabaseProjectUrl = required("SUPABASE_PROJECT_URL").trimEnd('/'),
                 port = System.getenv("PORT")?.toIntOrNull() ?: 8080,
                 devAuthEnabled = System.getenv("DEV_AUTH_ENABLED")?.toBoolean() ?: false,
             )
