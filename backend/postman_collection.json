@@ -1,0 +1,609 @@
+{
+  "info": {
+    "name": "OnSite Backend",
+    "description": "Manual test collection for the OnSite backend (onsite-backend). Every request except \"Dev login\" requires a bearer token - run \"Dev login\" first (or sign in via the real Supabase flow and paste the access_token into the `token` collection variable) and every other request picks it up automatically.\n\nMost routes act on the caller's own personal account by default. To act as a different account you belong to (e.g. after accepting a team invite), set the `accountId` collection variable and enable the `X-Account-Id` header on the request - it's included but disabled by default.\n\nSee onsite-backend/README.md for how to run the server locally, and openapi.yaml (in this same folder) for the full schema of every request/response.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:8080", "type": "string" },
+    { "key": "token", "value": "", "type": "string" },
+    { "key": "accountId", "value": "", "type": "string" },
+    { "key": "companyId", "value": "", "type": "string" },
+    { "key": "siteId", "value": "", "type": "string" },
+    { "key": "jobTypeId", "value": "", "type": "string" },
+    { "key": "invoiceId", "value": "", "type": "string" },
+    { "key": "sessionId", "value": "", "type": "string" },
+    { "key": "plannedJobId", "value": "", "type": "string" },
+    { "key": "inviteId", "value": "", "type": "string" },
+    { "key": "connectionInviteId", "value": "", "type": "string" },
+    { "key": "connectionId", "value": "", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Auth (dev only)",
+      "description": "Only reachable when the server has DEV_AUTH_ENABLED=true (see onsite-backend/.env). Mints a session for any email with no password - never enable this outside a local dev machine.",
+      "item": [
+        {
+          "name": "Dev login",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"dev@example.com\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/dev/auth/login", "host": ["{{baseUrl}}"], "path": ["v1", "dev", "auth", "login"] },
+            "description": "Mints an HS256 token shaped like a real Supabase one. Auto-saves the token to the `token` collection variable so every other request is ready to go."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const body = pm.response.json();",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Identity",
+      "item": [
+        {
+          "name": "Bootstrap my account",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/me/bootstrap", "host": ["{{baseUrl}}"], "path": ["v1", "me", "bootstrap"] },
+            "description": "Call right after sign-in/sign-up. Creates the `users` row and, only the first time, a personal account with an OWNER membership. Idempotent on every later call."
+          }
+        },
+        {
+          "name": "Get my identity",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/me", "host": ["{{baseUrl}}"], "path": ["v1", "me"] },
+            "description": "Returns your user id, email, and every account you're a member of. 404 if you haven't called Bootstrap yet."
+          }
+        },
+        {
+          "name": "List account members",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "url": { "raw": "{{baseUrl}}/v1/me/account-members", "host": ["{{baseUrl}}"], "path": ["v1", "me", "account-members"] },
+            "description": "OWNER only. Every member (OWNER + WORKERs) of the active account - used to populate an \"assign this job to\" picker."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Team invites",
+      "item": [
+        {
+          "name": "Invite a worker",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"worker@example.com\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountId}}/invites",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountId}}", "invites"]
+            },
+            "description": "OWNER only. `accountId` in the path must be an account you own - usually your own personal account id from \"Get my identity\"."
+          }
+        },
+        {
+          "name": "List my pending invites",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/me/invites", "host": ["{{baseUrl}}"], "path": ["v1", "me", "invites"] },
+            "description": "Pending team invites sent to your email, from any account."
+          }
+        },
+        {
+          "name": "Accept an invite",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v1/me/invites/{{inviteId}}/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "me", "invites", "{{inviteId}}", "accept"]
+            },
+            "description": "Creates a WORKER membership in the inviting account for the currently-authenticated user (must match the invited email)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Connections (subcontractor ↔ client)",
+      "item": [
+        {
+          "name": "Invite a contractor",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"contractor@example.com\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/accounts/{{accountId}}/connection-invites",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "accounts", "{{accountId}}", "connection-invites"]
+            },
+            "description": "OWNER only, sent from the client/employer's account. `accountId` must be an account you own."
+          }
+        },
+        {
+          "name": "List my pending connection invites",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/me/connection-invites", "host": ["{{baseUrl}}"], "path": ["v1", "me", "connection-invites"] },
+            "description": "Called by the contractor/worker being invited."
+          }
+        },
+        {
+          "name": "Accept a connection invite",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"companyId\": \"{{companyId}}\"\n}" },
+            "url": {
+              "raw": "{{baseUrl}}/v1/me/connection-invites/{{connectionInviteId}}/accept",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "me", "connection-invites", "{{connectionInviteId}}", "accept"]
+            },
+            "description": "Called by the contractor/worker. `companyId` is one of *their own* Companies (see the Companies folder) that represents this client - it must already exist in their account."
+          }
+        },
+        {
+          "name": "List connections (as employer/client)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "url": { "raw": "{{baseUrl}}/v1/connections", "host": ["{{baseUrl}}"], "path": ["v1", "connections"] },
+            "description": "OWNER only. Contractors connected *to* the active account."
+          }
+        },
+        {
+          "name": "List my connections (as worker)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/v1/me/connections", "host": ["{{baseUrl}}"], "path": ["v1", "me", "connections"] },
+            "description": "Clients you (the contractor) are connected to."
+          }
+        },
+        {
+          "name": "Revoke a connection",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/connections/{{connectionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "connections", "{{connectionId}}"]
+            },
+            "description": "Either side of the connection may revoke it."
+          }
+        },
+        {
+          "name": "Schedule a job for a connection",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"siteLabel\": \"123 Main St\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Front and back entrances\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/connections/{{connectionId}}/planned-jobs",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "connections", "{{connectionId}}", "planned-jobs"]
+            },
+            "description": "OWNER only, called by the employer. Lands directly on the connected worker's own calendar. `dateEpochDay` is days since 1970-01-01 (LocalDate.toEpochDay()); `startMinute`/`endMinute` are minutes since midnight."
+          }
+        },
+        {
+          "name": "View a connection's logged hours",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/v1/connections/{{connectionId}}/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "connections", "{{connectionId}}", "sessions"]
+            },
+            "description": "OWNER only. Every tracked session the worker logged against this connection's company."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Companies",
+      "item": [
+        {
+          "name": "List companies",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": { "raw": "{{baseUrl}}/v1/companies", "host": ["{{baseUrl}}"], "path": ["v1", "companies"] }
+          }
+        },
+        {
+          "name": "Create company",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"name\": \"Acme Corp\",\n  \"abn\": \"51824753556\",\n  \"phone\": \"0412345678\",\n  \"email\": \"billing@acme.example\",\n  \"createdAtMillis\": {{$timestamp}}000,\n  \"hourlyRate\": 65.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/companies", "host": ["{{baseUrl}}"], "path": ["v1", "companies"] },
+            "description": "OWNER only."
+          }
+        },
+        {
+          "name": "Update company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{companyId}}\",\n  \"name\": \"Acme Corp\",\n  \"abn\": \"51824753556\",\n  \"phone\": \"0412345678\",\n  \"email\": \"billing@acme.example\",\n  \"createdAtMillis\": {{$timestamp}}000,\n  \"hourlyRate\": 70.0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/companies/{{companyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "companies", "{{companyId}}"]
+            },
+            "description": "OWNER only. `createdAtMillis` is not actually changed by an update, but the field is required in the body."
+          }
+        },
+        {
+          "name": "Delete company",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/companies/{{companyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "companies", "{{companyId}}"]
+            },
+            "description": "OWNER only. Soft delete."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sites",
+      "item": [
+        {
+          "name": "List sites",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": { "raw": "{{baseUrl}}/v1/sites", "host": ["{{baseUrl}}"], "path": ["v1", "sites"] }
+          }
+        },
+        {
+          "name": "Create site",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"label\": \"Head Office\",\n  \"address\": \"123 Main St, Sydney NSW\",\n  \"latitude\": -33.8688,\n  \"longitude\": 151.2093,\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/sites", "host": ["{{baseUrl}}"], "path": ["v1", "sites"] },
+            "description": "OWNER only."
+          }
+        },
+        {
+          "name": "Update site",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{siteId}}\",\n  \"label\": \"Head Office\",\n  \"address\": \"123 Main St, Sydney NSW\",\n  \"latitude\": -33.8688,\n  \"longitude\": 151.2093,\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/sites/{{siteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sites", "{{siteId}}"]
+            },
+            "description": "OWNER only."
+          }
+        },
+        {
+          "name": "Delete site",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sites/{{siteId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sites", "{{siteId}}"]
+            },
+            "description": "OWNER only. Soft delete."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Job types",
+      "item": [
+        {
+          "name": "List job types",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": { "raw": "{{baseUrl}}/v1/job-types", "host": ["{{baseUrl}}"], "path": ["v1", "job-types"] }
+          }
+        },
+        {
+          "name": "Create job type",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"name\": \"Cleaning\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/job-types", "host": ["{{baseUrl}}"], "path": ["v1", "job-types"] },
+            "description": "OWNER only."
+          }
+        },
+        {
+          "name": "Update job type",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{jobTypeId}}\",\n  \"name\": \"Cleaning\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/job-types/{{jobTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "job-types", "{{jobTypeId}}"]
+            },
+            "description": "OWNER only."
+          }
+        },
+        {
+          "name": "Delete job type",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/job-types/{{jobTypeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "job-types", "{{jobTypeId}}"]
+            },
+            "description": "OWNER only. Soft delete."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "List invoices",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": { "raw": "{{baseUrl}}/v1/invoices", "host": ["{{baseUrl}}"], "path": ["v1", "invoices"] }
+          }
+        },
+        {
+          "name": "Create invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"number\": \"INV-0001\",\n  \"companyName\": \"Acme Corp\",\n  \"periodStartEpochDay\": 19990,\n  \"periodEndEpochDay\": 19996,\n  \"issueDateEpochDay\": 19997,\n  \"totalHours\": 24.5,\n  \"totalAmount\": 1592.5,\n  \"hourlyRate\": 65.0,\n  \"status\": \"DRAFT\",\n  \"notes\": \"Week ending Friday\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/invoices", "host": ["{{baseUrl}}"], "path": ["v1", "invoices"] },
+            "description": "OWNER only. `status` is one of DRAFT, SENT, PAID, VOID."
+          }
+        },
+        {
+          "name": "Update invoice",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{invoiceId}}\",\n  \"number\": \"INV-0001\",\n  \"companyName\": \"Acme Corp\",\n  \"periodStartEpochDay\": 19990,\n  \"periodEndEpochDay\": 19996,\n  \"issueDateEpochDay\": 19997,\n  \"totalHours\": 24.5,\n  \"totalAmount\": 1592.5,\n  \"hourlyRate\": 65.0,\n  \"status\": \"SENT\",\n  \"sentAtMillis\": {{$timestamp}}000,\n  \"notes\": \"Week ending Friday\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/invoices/{{invoiceId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "invoices", "{{invoiceId}}"]
+            },
+            "description": "OWNER only. There is no delete route for invoices - status is set to VOID instead of removing the row (see CLAUDE.md \"Invoices have no deleteById\")."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tracking sessions",
+      "item": [
+        {
+          "name": "List sessions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": { "raw": "{{baseUrl}}/v1/sessions", "host": ["{{baseUrl}}"], "path": ["v1", "sessions"] },
+            "description": "A WORKER only ever sees their own sessions; an OWNER sees everyone's."
+          }
+        },
+        {
+          "name": "Create session",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"startTimestampMillis\": {{$timestamp}}000,\n  \"startLatitude\": -33.8688,\n  \"startLongitude\": 151.2093,\n  \"stopTimestampMillis\": {{$timestamp}}000,\n  \"stopLatitude\": -33.8688,\n  \"stopLongitude\": 151.2093,\n  \"hourlyRate\": 65.0\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/sessions", "host": ["{{baseUrl}}"], "path": ["v1", "sessions"] },
+            "description": "Any member of the account may create their own session. `stopTimestampMillis` (and stop lat/lng) are omitted for a still-running session."
+          }
+        },
+        {
+          "name": "Update session",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{sessionId}}\",\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"startTimestampMillis\": {{$timestamp}}000,\n  \"startLatitude\": -33.8688,\n  \"startLongitude\": 151.2093,\n  \"stopTimestampMillis\": {{$timestamp}}000,\n  \"stopLatitude\": -33.8688,\n  \"stopLongitude\": 151.2093,\n  \"hourlyRate\": 65.0,\n  \"invoiceId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sessions", "{{sessionId}}"]
+            },
+            "description": "A WORKER can only update their own sessions."
+          }
+        },
+        {
+          "name": "Delete session",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/sessions/{{sessionId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "sessions", "{{sessionId}}"]
+            },
+            "description": "A WORKER can only delete their own sessions. Soft delete."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Planned jobs",
+      "item": [
+        {
+          "name": "List planned jobs",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": { "raw": "{{baseUrl}}/v1/planned-jobs", "host": ["{{baseUrl}}"], "path": ["v1", "planned-jobs"] },
+            "description": "A WORKER only sees jobs they created or are assigned to; an OWNER sees every job in the account."
+          }
+        },
+        {
+          "name": "Create planned job",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Bring the extension ladder\",\n  \"assignedUserId\": null\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/v1/planned-jobs", "host": ["{{baseUrl}}"], "path": ["v1", "planned-jobs"] },
+            "description": "`assignedUserId` (a userId from \"List account members\") is only honoured for an OWNER - a WORKER's own planned job is always self-assigned server-side regardless of what's sent here."
+          }
+        },
+        {
+          "name": "Update planned job",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{plannedJobId}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Bring the extension ladder\",\n  \"assignedUserId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/v1/planned-jobs/{{plannedJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "planned-jobs", "{{plannedJobId}}"]
+            },
+            "description": "Same assignment rule as create."
+          }
+        },
+        {
+          "name": "Delete planned job",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
+            "url": {
+              "raw": "{{baseUrl}}/v1/planned-jobs/{{plannedJobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["v1", "planned-jobs", "{{plannedJobId}}"]
+            },
+            "description": "A WORKER can only delete a job they created or are assigned to. Soft delete."
+          }
+        }
+      ]
+    }
+  ]
+}
