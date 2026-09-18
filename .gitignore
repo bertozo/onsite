@@ -1,0 +1,21 @@
+# Android / Kotlin / Gradle (android/, backend/)
+*.iml
+.idea/
+.gradle/
+.kotlin/
+build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.aab
+*.log
+.DS_Store
+
+# Backend
+.env
+
+# The Gradle wrapper jars are intentionally not committed; Android Studio /
+# `gradle wrapper` regenerates them on sync (see android/CLAUDE.md)
+gradle/wrapper/gradle-wrapper.jar
