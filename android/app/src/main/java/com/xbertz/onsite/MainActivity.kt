@@ -1,0 +1,5026 @@
+package com.xbertz.onsite
+
+import android.Manifest
+import android.app.Activity
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.Intent
+import android.content.res.Configuration
+import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import com.xbertz.onsite.backend.ConnectionDto
+import com.xbertz.onsite.backend.ConnectionPlannedJobRequest
+import com.xbertz.onsite.backend.ConnectionSessionDto
+import com.xbertz.onsite.backend.MemberDto
+import androidx.activity.ComponentActivity
+import androidx.annotation.StringRes
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
+import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Circle
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusManager
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.JobType
+import com.xbertz.onsite.data.PlannedJob
+import com.xbertz.onsite.data.Site
+import com.xbertz.onsite.data.TrackingSession
+import com.xbertz.onsite.invoice.buildInvoiceLines
+import com.xbertz.onsite.photo.PhotoStamper
+import com.xbertz.onsite.photo.TimestampPosition
+import com.xbertz.onsite.report.ReportColumn
+import com.xbertz.onsite.ui.theme.OnSiteTheme
+import com.xbertz.onsite.ui.theme.tabularNums
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.Duration
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle as JavaTextStyle
+import java.time.temporal.TemporalAdjusters
+import java.io.File
+import java.time.LocalDateTime
+import java.util.Date
+import java.util.Locale
+import java.util.concurrent.TimeUnit
+
+class MainActivity : ComponentActivity() {
+    // Apply the language chosen in Settings before any resource is resolved.
+    override fun attachBaseContext(newBase: Context) {
+        super.attachBaseContext(LocaleManager.wrap(newBase))
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            val settingsViewModel: SettingsViewModel = viewModel()
+            val themeMode by settingsViewModel.themeMode.collectAsState()
+            val darkTheme = when (themeMode) {
+                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+            }
+
+            OnSiteTheme(darkTheme = darkTheme) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    AppRoot(settingsViewModel = settingsViewModel)
+                }
+            }
+        }
+    }
+}
+
+internal enum class Screen {
+    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO, INVOICES, INVOICE_REVIEW,
+    CONNECTION_DETAIL
+}
+
+@Composable
+fun AppRoot(settingsViewModel: SettingsViewModel) {
+    val authViewModel: AuthViewModel = viewModel()
+    val authState by authViewModel.state.collectAsState()
+    val passwordResetState by authViewModel.passwordReset.collectAsState()
+
+    when (val state = authState) {
+        AuthUiState.CheckingSession -> FullScreenProgress()
+        is AuthUiState.LoggedOut, AuthUiState.LoggingIn -> AuthScreen(
+            loading = state == AuthUiState.LoggingIn,
+            error = (state as? AuthUiState.LoggedOut)?.error,
+            info = (state as? AuthUiState.LoggedOut)?.info,
+            passwordReset = passwordResetState,
+            onSignIn = authViewModel::signIn,
+            onSignUp = authViewModel::signUp,
+            onOpenPasswordReset = authViewModel::openPasswordReset,
+            onDismissPasswordReset = authViewModel::dismissPasswordReset,
+            onSendPasswordResetCode = authViewModel::sendPasswordResetCode,
+            onConfirmPasswordReset = authViewModel::confirmPasswordReset,
+        )
+        AuthUiState.SyncingData -> FullScreenProgress(
+            title = stringResource(R.string.syncing_title),
+            subtitle = stringResource(R.string.syncing_subtitle)
+        )
+        is AuthUiState.LoggedIn -> SignedInAppRoot(
+            settingsViewModel = settingsViewModel,
+            authViewModel = authViewModel,
+            authState = state
+        )
+    }
+}
+
+@Composable
+private fun SignedInAppRoot(
+    settingsViewModel: SettingsViewModel,
+    authViewModel: AuthViewModel,
+    authState: AuthUiState.LoggedIn
+) {
+    var screen by rememberSaveable { mutableStateOf(Screen.MENU) }
+    var selectedEmployerConnection by remember { mutableStateOf<ConnectionDto?>(null) }
+
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) authViewModel.syncNow()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    if (screen != Screen.MENU) {
+        // The invoice review is reached from Reports and connection detail from Settings; every other screen returns home.
+        BackHandler {
+            screen = when (screen) {
+                Screen.INVOICE_REVIEW -> Screen.REPORTS
+                Screen.CONNECTION_DETAIL -> Screen.SETTINGS
+                else -> Screen.MENU
+            }
+        }
+    }
+
+    when (screen) {
+        Screen.MENU -> MainMenuScreen(
+            onProfileClick = { screen = Screen.PROFILE },
+            onCompaniesClick = { screen = Screen.COMPANIES },
+            onSitesClick = { screen = Screen.SITES },
+            onJobTypesClick = { screen = Screen.JOB_TYPES },
+            onTrackerClick = { screen = Screen.TRACKER },
+            onReportsClick = { screen = Screen.REPORTS },
+            onPlanningClick = { screen = Screen.PLANNING },
+            onPhotoClick = { screen = Screen.PHOTO },
+            onInvoicesClick = { screen = Screen.INVOICES },
+            onSettingsClick = { screen = Screen.SETTINGS }
+        )
+        Screen.TRACKER -> TrackerScreen(onBack = { screen = Screen.MENU })
+        Screen.REPORTS -> ReportsScreen(
+            onBack = { screen = Screen.MENU },
+            onReviewInvoice = { screen = Screen.INVOICE_REVIEW },
+            onOpenInvoices = { screen = Screen.INVOICES }
+        )
+        Screen.INVOICES -> InvoicesScreen(onBack = { screen = Screen.MENU }, onGoToReports = { screen = Screen.REPORTS })
+        Screen.INVOICE_REVIEW -> InvoiceReviewScreen(onBack = { screen = Screen.REPORTS }, onGenerated = { screen = Screen.REPORTS })
+        Screen.COMPANIES -> CompaniesScreen(
+            onBack = { screen = Screen.MENU },
+            onReviewInvoice = { screen = Screen.INVOICE_REVIEW },
+            onOpenReports = { screen = Screen.REPORTS },
+            canManage = authState.isOwner
+        )
+        Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU }, canManage = authState.isOwner)
+        Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU }, canManage = authState.isOwner)
+        Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
+        Screen.SETTINGS -> SettingsScreen(
+            onBack = { screen = Screen.MENU },
+            viewModel = settingsViewModel,
+            authViewModel = authViewModel,
+            authState = authState,
+            onLogout = authViewModel::logout,
+            onOpenConnection = { connection ->
+                selectedEmployerConnection = connection
+                screen = Screen.CONNECTION_DETAIL
+            }
+        )
+        Screen.CONNECTION_DETAIL -> selectedEmployerConnection?.let { connection ->
+            ConnectionDetailScreen(
+                connection = connection,
+                authViewModel = authViewModel,
+                onBack = { screen = Screen.SETTINGS }
+            )
+        }
+        Screen.PLANNING -> {
+            val members by authViewModel.members.collectAsState()
+            LaunchedEffect(authState.isOwner) { if (authState.isOwner) authViewModel.loadMembers() }
+            PlanningScreen(onBack = { screen = Screen.MENU }, isOwner = authState.isOwner, members = members)
+        }
+        Screen.PHOTO -> PhotoScreen(onBack = { screen = Screen.MENU })
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Shared building blocks
+// ---------------------------------------------------------------------------
+
+// Planner day markers: fixed colours so they read the same in both themes (the scheme's error colour turns pink in dark mode).
+internal val PlannerMarkerGreen = Color(0xFF43A047)
+internal val PlannerMarkerRed = Color(0xFFE53935)
+
+private data class MenuAction(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun AppTopBar(title: String, onBack: () -> Unit) {
+    TopAppBar(
+        title = { Text(title, fontWeight = FontWeight.Bold) },
+        navigationIcon = {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back))
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(
+            containerColor = MaterialTheme.colorScheme.background
+        )
+    )
+}
+
+@Composable
+internal fun SectionHeader(title: String, count: Int? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        if (count != null) {
+            Spacer(Modifier.width(8.dp))
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    text = count.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EmptyState(text: String) {
+    Box(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+internal fun InfoBanner(icon: ImageVector, text: String, containerColor: Color, contentColor: Color) {
+    Surface(color = containerColor, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(20.dp))
+            Spacer(Modifier.width(10.dp))
+            Text(text, style = MaterialTheme.typography.bodySmall, color = contentColor)
+        }
+    }
+}
+
+/** Moves to the next field on the keyboard's "Next" action, shared by every multi-field form. */
+internal fun nextFieldActions(focusManager: FocusManager) = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Next) })
+
+/** Dismisses the keyboard on "Done" without submitting - used on a form's last field. */
+internal fun doneFieldActions(focusManager: FocusManager) = KeyboardActions(onDone = { focusManager.clearFocus() })
+
+/** Collapsible "add new" form: closed by default so the list below gets the screen, opens on tap. */
+@Composable
+internal fun NewEntityCard(
+    title: String,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    visible: Boolean = true,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    if (!visible) return
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.animateContentSize()) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onToggle)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Icon(
+                    if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (expanded) {
+                Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 20.dp), content = content)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun EntityListItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String?,
+    onEdit: (() -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    onClick: (() -> Unit)? = null
+) {
+    val cardModifier = Modifier.fillMaxWidth()
+    ElevatedCard(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        modifier = cardModifier,
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.elevatedCardColors(
+            disabledContainerColor = MaterialTheme.colorScheme.surface,
+            disabledContentColor = MaterialTheme.colorScheme.onSurface
+        )
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(40.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (!subtitle.isNullOrBlank()) {
+                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            if (onEdit != null) {
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
+                }
+            }
+            if (onDelete != null) {
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun TrackerDropdown(
+    label: String,
+    icon: ImageVector,
+    value: String,
+    expanded: Boolean,
+    enabled: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onDismiss: () -> Unit,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = onExpandedChange) {
+        OutlinedTextField(
+            readOnly = true,
+            value = value,
+            onValueChange = {},
+            label = { Text(label) },
+            leadingIcon = { Icon(icon, contentDescription = null) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            enabled = enabled,
+            shape = MaterialTheme.shapes.small,
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = onDismiss, content = content)
+    }
+}
+
+internal fun showDatePicker(context: Context, initialDate: LocalDate, onDatePicked: (LocalDate) -> Unit) {
+    DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth -> onDatePicked(LocalDate.of(year, month + 1, dayOfMonth)) },
+        initialDate.year,
+        initialDate.monthValue - 1,
+        initialDate.dayOfMonth
+    ).show()
+}
+
+private fun showTimePicker(context: Context, initialTime: LocalTime, onTimePicked: (LocalTime) -> Unit) {
+    TimePickerDialog(
+        context,
+        { _, hour, minute -> onTimePicked(LocalTime.of(hour, minute)) },
+        initialTime.hour,
+        initialTime.minute,
+        true
+    ).show()
+}
+
+// ---------------------------------------------------------------------------
+// Main menu
+// ---------------------------------------------------------------------------
+
+@Composable
+fun MainMenuScreen(
+    onProfileClick: () -> Unit,
+    onCompaniesClick: () -> Unit,
+    onSitesClick: () -> Unit,
+    onJobTypesClick: () -> Unit,
+    onTrackerClick: () -> Unit,
+    onReportsClick: () -> Unit,
+    onPlanningClick: () -> Unit,
+    onPhotoClick: () -> Unit,
+    onInvoicesClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+    profileViewModel: ProfileViewModel = viewModel(),
+    trackerViewModel: LocationTrackerViewModel = viewModel()
+) {
+    val profile by profileViewModel.uiState.collectAsState()
+    val profilePhoto = rememberBitmapFromFile(profile.photoPath)
+    val activeSession by trackerViewModel.activeSession.collectAsState()
+    val lastSession by trackerViewModel.lastSession.collectAsState()
+    val trackerState by trackerViewModel.uiState.collectAsState()
+    val companies by trackerViewModel.companies.collectAsState()
+    val sites by trackerViewModel.sites.collectAsState()
+    val jobTypes by trackerViewModel.jobTypes.collectAsState()
+    val context = LocalContext.current
+
+    // Resuming from the home screen needs the same permissions as the tracker; if location is
+    // refused we fall back to opening the tracker, which explains why it is needed.
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { if (hasLocationPermission(context)) trackerViewModel.resumeLastSession() else onTrackerClick() }
+    val onResumeClick = {
+        val missing = missingTrackingPermissions(context)
+        if (missing.isEmpty()) trackerViewModel.resumeLastSession() else permissionLauncher.launch(missing)
+    }
+
+    trackerState.lastCompletedSession?.let { session ->
+        SessionSummaryDialog(session = session, onDismiss = { trackerViewModel.dismissSessionSummary() })
+    }
+
+    val secondaryActions = listOf(
+        MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
+        MenuAction(stringResource(R.string.menu_invoices), stringResource(R.string.menu_invoices_subtitle), Icons.Filled.Receipt, onInvoicesClick),
+        MenuAction(stringResource(R.string.menu_companies), stringResource(R.string.menu_companies_subtitle), Icons.Filled.Business, onCompaniesClick),
+        MenuAction(stringResource(R.string.menu_sites), stringResource(R.string.menu_sites_subtitle), Icons.Filled.Place, onSitesClick),
+        MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick),
+        MenuAction(stringResource(R.string.menu_photo), stringResource(R.string.menu_photo_subtitle), Icons.Filled.PhotoCamera, onPhotoClick)
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 20.dp, vertical = 32.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(52.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.LocationOn,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.app_tagline),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            // Profile lives up here as a small avatar (photo when set), next to the settings gear.
+            IconButton(onClick = onProfileClick) {
+                if (profilePhoto != null) {
+                    Image(
+                        bitmap = profilePhoto,
+                        contentDescription = stringResource(R.string.menu_profile),
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.size(30.dp).clip(CircleShape)
+                    )
+                } else {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(30.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Filled.Person,
+                                contentDescription = stringResource(R.string.menu_profile),
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+            IconButton(onClick = onPlanningClick) {
+                Icon(
+                    Icons.Filled.CalendarMonth,
+                    contentDescription = stringResource(R.string.menu_planning),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = stringResource(R.string.settings),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        Spacer(Modifier.height(28.dp))
+
+        val running = activeSession
+        if (running != null) {
+            ActiveSessionCard(
+                session = running,
+                isProcessing = trackerState.isProcessing,
+                errorRes = trackerState.locationErrorRes,
+                onStop = { if (hasLocationPermission(context)) trackerViewModel.stopTracking() else onTrackerClick() },
+                onOpen = onTrackerClick
+            )
+        } else {
+            StartTrackingCard(
+                lastSession = lastSession,
+                isProcessing = trackerState.isProcessing,
+                errorRes = trackerState.locationErrorRes,
+                onClick = onTrackerClick,
+                onResume = onResumeClick
+            )
+        }
+
+        val setupSteps = listOf(
+            SetupStep(stringResource(R.string.setup_profile), Icons.Filled.Person, profile.name.isNotBlank(), onProfileClick),
+            SetupStep(stringResource(R.string.setup_company), Icons.Filled.Business, companies.isNotEmpty(), onCompaniesClick),
+            SetupStep(stringResource(R.string.setup_site), Icons.Filled.Place, sites.isNotEmpty(), onSitesClick),
+            SetupStep(stringResource(R.string.setup_job_type), Icons.Filled.Work, jobTypes.isNotEmpty(), onJobTypesClick)
+        )
+        if (setupSteps.any { !it.done }) {
+            Spacer(Modifier.height(16.dp))
+            SetupChecklist(steps = setupSteps)
+        }
+
+        Spacer(Modifier.height(28.dp))
+        Text(
+            stringResource(R.string.manage),
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(12.dp))
+
+        secondaryActions.chunked(2).forEach { rowItems ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                rowItems.forEach { action ->
+                    MenuCard(action = action, modifier = Modifier.weight(1f))
+                }
+                if (rowItems.size == 1) {
+                    Spacer(Modifier.weight(1f))
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+        }
+    }
+}
+
+private fun hasLocationPermission(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+/** Location is required to track; notifications (API 33+) only power the chronometer notification. */
+private fun missingTrackingPermissions(context: Context): Array<String> {
+    val wanted = mutableListOf<String>()
+    if (!hasLocationPermission(context)) {
+        wanted += Manifest.permission.ACCESS_FINE_LOCATION
+        wanted += Manifest.permission.ACCESS_COARSE_LOCATION
+    }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+    ) {
+        wanted += Manifest.permission.POST_NOTIFICATIONS
+    }
+    return wanted.toTypedArray()
+}
+
+/** "HH:MM:SS" for a running chronometer. */
+private fun formatElapsed(millis: Long): String {
+    val totalSeconds = (millis / 1000).coerceAtLeast(0)
+    return String.format(
+        Locale.ENGLISH, "%02d:%02d:%02d",
+        totalSeconds / 3600, (totalSeconds % 3600) / 60, totalSeconds % 60
+    )
+}
+
+/** Home card for the running session: what is being tracked, a live chronometer and a Stop button. */
+@Composable
+private fun ActiveSessionCard(
+    session: TrackingSession,
+    isProcessing: Boolean,
+    @StringRes errorRes: Int?,
+    onStop: () -> Unit,
+    onOpen: () -> Unit
+) {
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(session.id) {
+        while (true) {
+            now = System.currentTimeMillis()
+            delay(1000)
+        }
+    }
+    val details = listOfNotNull(
+        session.companyName?.takeIf { it.isNotBlank() },
+        session.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    ElevatedCard(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(PlannerMarkerGreen)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    stringResource(R.string.session_in_progress),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                formatElapsed(now - session.startTimestampMillis),
+                style = MaterialTheme.typography.displaySmall.tabularNums,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer
+            )
+            if (details.isNotEmpty()) {
+                Text(details, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            errorRes?.let { resId ->
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(resId), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = onStop,
+                    enabled = !isProcessing,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.weight(1f).height(48.dp)
+                ) {
+                    if (isProcessing) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onError, strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Filled.Stop, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.stop), fontWeight = FontWeight.Bold)
+                    }
+                }
+                OutlinedButton(onClick = onOpen, shape = MaterialTheme.shapes.medium, modifier = Modifier.height(48.dp)) {
+                    Text(stringResource(R.string.open_tracker))
+                }
+            }
+        }
+    }
+}
+
+/** Home card when nothing is running: opens the tracker, with a one-tap resume of the last session. */
+@Composable
+private fun StartTrackingCard(
+    lastSession: TrackingSession?,
+    isProcessing: Boolean,
+    @StringRes errorRes: Int?,
+    onClick: () -> Unit,
+    onResume: () -> Unit
+) {
+    ElevatedCard(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Filled.PlayArrow,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.start_tracking),
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        stringResource(R.string.start_tracking_subtitle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            errorRes?.let { resId ->
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(resId), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            val resumable = lastSession?.takeIf {
+                !it.siteLabel.isNullOrBlank() && !it.companyName.isNullOrBlank() && !it.jobTypeLabel.isNullOrBlank()
+            }
+            if (resumable != null) {
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.15f))
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Filled.History,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.last_session_hint, resumable.siteLabel.orEmpty(), resumable.companyName.orEmpty()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = onResume,
+                        enabled = !isProcessing,
+                        shape = MaterialTheme.shapes.medium,
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        if (isProcessing) {
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Filled.Replay, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.resume_last_session), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class SetupStep(val label: String, val icon: ImageVector, val done: Boolean, val onClick: () -> Unit)
+
+/** First-run checklist: replaces the old "set up X first" banner; disappears once every step is done. */
+@Composable
+private fun SetupChecklist(steps: List<SetupStep>) {
+    val doneCount = steps.count { it.done }
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    stringResource(R.string.setup_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    stringResource(R.string.setup_progress, doneCount, steps.size),
+                    style = MaterialTheme.typography.labelMedium.tabularNums,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            LinearProgressIndicator(
+                progress = { doneCount.toFloat() / steps.size },
+                modifier = Modifier.fillMaxWidth().clip(CircleShape)
+            )
+            Spacer(Modifier.height(6.dp))
+            steps.forEach { step ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(enabled = !step.done, onClick = step.onClick)
+                        .padding(vertical = 8.dp)
+                ) {
+                    Icon(
+                        if (step.done) Icons.Filled.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = null,
+                        tint = if (step.done) PlannerMarkerGreen else MaterialTheme.colorScheme.outline,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        step.label,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (step.done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (step.done) TextDecoration.LineThrough else null,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!step.done) {
+                        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MenuCard(action: MenuAction, modifier: Modifier = Modifier) {
+    OutlinedCard(onClick = action.onClick, modifier = modifier.height(124.dp), shape = MaterialTheme.shapes.medium) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.size(36.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        action.icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Column {
+                Text(action.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text(
+                    action.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Calendar panel (week strip that expands to the month)
+// ---------------------------------------------------------------------------
+
+/** Month title + navigation, weekday labels and either the Mon–Sun strip or the full month grid. */
+@Composable
+private fun CalendarPanel(
+    state: CalendarUiState,
+    onSelectDate: (LocalDate) -> Unit,
+    onToggleExpanded: () -> Unit,
+    onShift: (forward: Boolean) -> Unit,
+    onToday: () -> Unit
+) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val today = remember { LocalDate.now() }
+    val title = remember(state.titleMonth, locale) {
+        val month = state.titleMonth.month.getDisplayName(JavaTextStyle.FULL_STANDALONE, locale)
+            .replaceFirstChar { if (it.isLowerCase()) it.titlecase(locale) else it.toString() }
+        if (state.titleMonth.year == today.year) month else "$month ${state.titleMonth.year}"
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp).animateContentSize()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // The whole title is the expand/collapse toggle, like a dropdown.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable(onClick = onToggleExpanded)
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        if (state.expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                        contentDescription = stringResource(if (state.expanded) R.string.calendar_collapse else R.string.calendar_expand)
+                    )
+                }
+                IconButton(onClick = { onShift(false) }) {
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = stringResource(R.string.calendar_previous))
+                }
+                IconButton(onClick = { onShift(true) }) {
+                    Icon(Icons.Filled.ChevronRight, contentDescription = stringResource(R.string.calendar_next))
+                }
+                IconButton(onClick = onToday) {
+                    Icon(Icons.Filled.Today, contentDescription = stringResource(R.string.calendar_today))
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+
+            Row(modifier = Modifier.fillMaxWidth()) {
+                DayOfWeek.entries.forEach { day ->
+                    Text(
+                        day.getDisplayName(JavaTextStyle.SHORT, locale).trimEnd('.').replaceFirstChar { it.titlecase(locale) },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+
+            val weeks: List<LocalDate> = if (state.expanded) {
+                // Every Monday from the one on/before the 1st up to the one covering the last day of the month.
+                val first = state.visibleMonth.atDay(1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+                val last = state.visibleMonth.atEndOfMonth()
+                generateSequence(first) { it.plusWeeks(1) }.takeWhile { it <= last }.toList()
+            } else {
+                listOf(state.weekStart)
+            }
+
+            weeks.forEach { monday ->
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    (0L until 7L).forEach { offset ->
+                        val date = monday.plusDays(offset)
+                        CalendarDayCell(
+                            date = date,
+                            selected = date == state.selectedDate,
+                            isToday = date == today,
+                            dimmed = state.expanded && YearMonth.from(date) != state.visibleMonth,
+                            hasSessions = date in state.markedDays,
+                            hoursMillis = state.dayHours[date] ?: 0L,
+                            onClick = { onSelectDate(date) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            if (state.dayHours.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                HeatmapLegend()
+            }
+        }
+    }
+}
+
+/** Marker intensity for a past day: none, then four steps up to a full day. */
+private fun heatLevel(hoursMillis: Long): Int {
+    val hours = hoursMillis / 3_600_000.0
+    return when {
+        hoursMillis <= 0L -> 0
+        hours <= 2.0 -> 1
+        hours <= 4.0 -> 2
+        hours <= 8.0 -> 3
+        else -> 4
+    }
+}
+
+private val HeatAlphas = listOf(0f, 0.3f, 0.55f, 0.8f, 1f)
+
+@Composable
+private fun HeatmapLegend() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+    ) {
+        Text(
+            stringResource(R.string.calendar_hours_legend),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.width(6.dp))
+        (1..4).forEach { level ->
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 2.dp)
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = HeatAlphas[level]))
+            )
+        }
+        Spacer(Modifier.width(4.dp))
+        Text("8h+", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    date: LocalDate,
+    selected: Boolean,
+    isToday: Boolean,
+    dimmed: Boolean,
+    hasSessions: Boolean,
+    hoursMillis: Long,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val today = remember { LocalDate.now() }
+    val textColor = when {
+        selected -> MaterialTheme.colorScheme.onPrimary
+        dimmed -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        isToday -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier.padding(vertical = 2.dp)
+    ) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(if (selected) MaterialTheme.colorScheme.primary else Color.Transparent)
+                .clickable(onClick = onClick)
+        ) {
+            Text(
+                date.dayOfMonth.toString(),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = if (selected || isToday) FontWeight.Bold else FontWeight.Normal,
+                color = textColor
+            )
+        }
+        // Past days show how much was worked (heatmap); today and future days show planned jobs
+        // (green today, red ahead). Kept as an empty slot otherwise so rows stay the same height.
+        val markerColor = when {
+            date.isBefore(today) -> {
+                val level = heatLevel(hoursMillis)
+                if (level == 0) {
+                    if (hasSessions) MaterialTheme.colorScheme.primary.copy(alpha = 0.3f) else Color.Transparent
+                } else {
+                    MaterialTheme.colorScheme.primary.copy(alpha = HeatAlphas[level])
+                }
+            }
+            !hasSessions -> Color.Transparent
+            date == today -> PlannerMarkerGreen
+            else -> PlannerMarkerRed
+        }
+        Box(
+            modifier = Modifier
+                .size(6.dp)
+                .clip(CircleShape)
+                .background(if (dimmed && markerColor != Color.Transparent) markerColor.copy(alpha = markerColor.alpha * 0.4f) else markerColor)
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Planning (jobs scheduled per calendar day)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun PlanningScreen(
+    onBack: () -> Unit,
+    isOwner: Boolean = true,
+    members: List<MemberDto> = emptyList(),
+    viewModel: PlanningViewModel = viewModel(),
+    trackerViewModel: LocationTrackerViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val companies by viewModel.companies.collectAsState()
+    val sites by viewModel.sites.collectAsState()
+    val jobTypes by viewModel.jobTypes.collectAsState()
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val dayFormatter = remember(locale) { DateTimeFormatter.ofPattern("EEEE, d MMM", locale) }
+
+    var showAddDialog by remember { mutableStateOf(false) }
+    var showAddSessionDialog by remember { mutableStateOf(false) }
+    var editingJob by remember { mutableStateOf<PlannedJob?>(null) }
+    var deletingJob by remember { mutableStateOf<PlannedJob?>(null) }
+
+    if (showAddDialog) {
+        EditPlannedJobDialog(
+            existing = null,
+            initialDate = uiState.calendar.selectedDate,
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            isOwner = isOwner,
+            members = members,
+            onDismiss = { showAddDialog = false },
+            onConfirm = { job, repeatUntil ->
+                viewModel.saveJob(job, repeatUntil)
+                viewModel.selectDate(job.date)
+                showAddDialog = false
+            }
+        )
+    }
+    if (showAddSessionDialog) {
+        AddSessionDialog(
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            initialCompany = null,
+            initialSite = null,
+            initialJobType = null,
+            initialDate = uiState.calendar.selectedDate,
+            onDismiss = { showAddSessionDialog = false },
+            onConfirm = { company, site, jobType, startMillis, stopMillis, rate ->
+                trackerViewModel.addManualSession(company, site, jobType, startMillis, stopMillis, rate)
+                showAddSessionDialog = false
+            }
+        )
+    }
+    editingJob?.let { job ->
+        EditPlannedJobDialog(
+            existing = job,
+            initialDate = job.date,
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            isOwner = isOwner,
+            members = members,
+            onDismiss = { editingJob = null },
+            onConfirm = { updated, _ ->
+                viewModel.saveJob(updated)
+                editingJob = null
+            }
+        )
+    }
+    deletingJob?.let { job ->
+        DeletePlannedJobDialog(
+            job = job,
+            onDismiss = { deletingJob = null },
+            onConfirm = {
+                viewModel.deleteJob(job)
+                deletingJob = null
+            }
+        )
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_planning), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            CalendarPanel(
+                state = uiState.calendar,
+                onSelectDate = viewModel::selectDate,
+                onToggleExpanded = viewModel::toggleExpanded,
+                onShift = viewModel::shift,
+                onToday = viewModel::goToToday
+            )
+
+            Spacer(Modifier.height(20.dp))
+            Text(
+                uiState.calendar.selectedDate.format(dayFormatter).trimEnd('.').uppercase(locale),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader(title = stringResource(R.string.planning_jobs), count = uiState.dayJobs.size)
+                Spacer(Modifier.weight(1f))
+                FilledIconButton(onClick = { showAddDialog = true }, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.planning_add_job))
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+
+            if (uiState.dayJobs.isEmpty() && uiState.daySessions.isEmpty()) {
+                // Nothing on this day yet: offer the two things the user can do about it.
+                OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            stringResource(R.string.planning_nothing_today),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Button(onClick = { showAddDialog = true }, shape = MaterialTheme.shapes.medium, modifier = Modifier.weight(1f)) {
+                                Icon(Icons.Filled.EventNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.planning_add_job))
+                            }
+                            OutlinedButton(
+                                onClick = { showAddSessionDialog = true },
+                                enabled = companies.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Filled.EditCalendar, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(stringResource(R.string.add_session))
+                            }
+                        }
+                    }
+                }
+            } else if (uiState.dayJobs.isEmpty()) {
+                EmptyState(text = stringResource(R.string.planning_empty))
+            } else {
+                uiState.dayJobs.forEachIndexed { index, job ->
+                    if (index > 0) Spacer(Modifier.height(10.dp))
+                    PlannedJobRow(
+                        job = job,
+                        assigneeLabel = if (isOwner && members.size > 1) {
+                            members.firstOrNull { it.userId == job.assignedUserId }?.let { it.displayName?.takeIf(String::isNotBlank) ?: it.email }
+                        } else null,
+                        onEditClick = { editingJob = job },
+                        onDeleteClick = { deletingJob = job }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            PlanningDaySessions(state = uiState)
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/** The selected day's completed sessions, read-only; editing stays on the tracker screen. */
+@Composable
+private fun PlanningDaySessions(state: PlanningUiState) {
+    val totalMillis = state.dayTotalMillis
+    val totalText = stringResource(
+        R.string.duration_format,
+        TimeUnit.MILLISECONDS.toHours(totalMillis),
+        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+    )
+
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionHeader(title = stringResource(R.string.planning_sessions), count = state.daySessions.size)
+            Spacer(Modifier.weight(1f))
+            if (state.daySessions.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.calendar_day_total, totalText),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        if (state.daySessions.isEmpty()) {
+            EmptyState(text = stringResource(R.string.planning_no_sessions))
+        } else {
+            DayTimeline(sessions = state.daySessions)
+            Spacer(Modifier.height(12.dp))
+            state.daySessions.forEachIndexed { index, session ->
+                if (index > 0) Spacer(Modifier.height(8.dp))
+                PlanningSessionRow(session)
+            }
+        }
+    }
+}
+
+// Distinct block colours for the day timeline, assigned per company in order of appearance.
+private val TimelinePalette = listOf(
+    Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFFB8C00), Color(0xFF8E24AA),
+    Color(0xFF00897B), Color(0xFFE53935), Color(0xFF6D4C41), Color(0xFF3949AB)
+)
+
+/** The day's sessions as blocks on a 06:00–20:00 strip (stretched when a session falls outside). */
+@Composable
+private fun DayTimeline(sessions: List<TrackingSession>) {
+    val zone = remember { ZoneId.systemDefault() }
+    val ranges = sessions.map { session ->
+        val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone)
+        val stop = Instant.ofEpochMilli(session.stopTimestampMillis ?: session.startTimestampMillis).atZone(zone)
+        val startMin = start.hour * 60 + start.minute
+        // A session past midnight is clipped at the end of the day.
+        val stopMin = if (stop.toLocalDate() == start.toLocalDate()) stop.hour * 60 + stop.minute else 24 * 60
+        Triple(session, startMin, stopMin)
+    }
+    val firstHour = minOf(6, ranges.minOf { it.second } / 60)
+    val lastHour = maxOf(20, ranges.maxOf { (it.third + 59) / 60 }).coerceAtMost(24)
+    val spanMin = ((lastHour - firstHour) * 60).coerceAtLeast(60)
+    val companies = sessions.mapNotNull { it.companyName }.distinct()
+    val colorFor = { name: String? -> TimelinePalette[(companies.indexOf(name).coerceAtLeast(0)) % TimelinePalette.size] }
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+            ) {
+                BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                    val width = maxWidth
+                    ranges.forEach { (session, startMin, stopMin) ->
+                        val left = width * ((startMin - firstHour * 60).toFloat() / spanMin).coerceIn(0f, 1f)
+                        val right = width * ((stopMin - firstHour * 60).toFloat() / spanMin).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .padding(start = left)
+                                .width((right - left).coerceAtLeast(3.dp))
+                                .fillMaxHeight()
+                                .padding(vertical = 3.dp)
+                                .clip(MaterialTheme.shapes.extraSmall)
+                                .background(colorFor(session.companyName))
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(4.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                // One label every two hours; the last label sits at the right edge.
+                val labels = (firstHour..lastHour step 2).toList()
+                labels.forEachIndexed { index, hour ->
+                    Text(
+                        String.format(Locale.ENGLISH, "%02d", hour),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = if (index == labels.lastIndex) TextAlign.End else TextAlign.Start,
+                        modifier = if (index == labels.lastIndex) Modifier else Modifier.weight(1f)
+                    )
+                }
+            }
+            if (companies.size > 1) {
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
+                    companies.forEach { name ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(colorFor(name)))
+                            Spacer(Modifier.width(4.dp))
+                            Text(name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlanningSessionRow(session: TrackingSession) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val zone = remember { ZoneId.systemDefault() }
+    val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone).toLocalTime()
+    val end = session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
+    val durationMillis = session.durationMillis ?: 0L
+    val details = listOfNotNull(
+        session.companyName?.takeIf { it.isNotBlank() },
+        session.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    session.siteLabel?.takeIf { it.isNotBlank() } ?: stringResource(R.string.site),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (details.isNotEmpty()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "${start.format(timeFormatter)} – ${end?.format(timeFormatter) ?: ""}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                    ),
+                    style = MaterialTheme.typography.labelLarge.tabularNums,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+
+@Composable
+private fun PlannedJobRow(job: PlannedJob, assigneeLabel: String? = null, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.ENGLISH) }
+    val timeText = job.endTime?.let { "${job.startTime.format(timeFormatter)} – ${it.format(timeFormatter)}" }
+        ?: job.startTime.format(timeFormatter)
+    val details = listOfNotNull(
+        job.companyName?.takeIf { it.isNotBlank() },
+        job.jobTypeLabel?.takeIf { it.isNotBlank() }
+    ).joinToString(" · ")
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.primaryContainer) {
+                Text(
+                    timeText,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                val title = job.siteLabel?.takeIf { it.isNotBlank() }
+                    ?: details.ifBlank { null }
+                    ?: job.notes.orEmpty()
+                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                if (details.isNotBlank() && title != details) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (!job.notes.isNullOrBlank() && title != job.notes) {
+                    Text(job.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+                }
+                if (assigneeLabel != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.secondaryContainer) {
+                        Text(
+                            stringResource(R.string.planning_assigned_to_value, assigneeLabel),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
+            IconButton(onClick = onEditClick) {
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+/** Add (when [existing] is null) or edit a planned job. Company/site/job type are optional here, unlike a tracked session. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditPlannedJobDialog(
+    existing: PlannedJob?,
+    initialDate: LocalDate,
+    companies: List<Company>,
+    sites: List<Site>,
+    jobTypes: List<JobType>,
+    isOwner: Boolean = true,
+    members: List<MemberDto> = emptyList(),
+    onDismiss: () -> Unit,
+    onConfirm: (job: PlannedJob, repeatUntil: LocalDate?) -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+
+    var repeatEnabled by remember { mutableStateOf(false) }
+    var repeatUntil by remember { mutableStateOf(initialDate.plusDays(4)) }
+    var companyName by remember { mutableStateOf(existing?.companyName) }
+    var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
+    var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
+    var assignedUserId by remember { mutableStateOf(existing?.assignedUserId) }
+    var date by remember { mutableStateOf(initialDate) }
+    var startTime by remember { mutableStateOf(existing?.startTime ?: LocalTime.of(7, 0)) }
+    var endTime by remember { mutableStateOf(existing?.endTime) }
+    var notes by remember { mutableStateOf(existing?.notes.orEmpty()) }
+    var companyExpanded by remember { mutableStateOf(false) }
+    var siteExpanded by remember { mutableStateOf(false) }
+    var jobTypeExpanded by remember { mutableStateOf(false) }
+    var assigneeExpanded by remember { mutableStateOf(false) }
+
+    val canSave = companyName != null || siteLabel != null || jobTypeLabel != null || notes.isNotBlank()
+    val none = stringResource(R.string.planning_none)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.EventNote, contentDescription = null) },
+        title = { Text(stringResource(if (existing == null) R.string.planning_add_job else R.string.planning_edit_job)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedButton(
+                    onClick = { showDatePicker(context, date) { date = it } },
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${stringResource(R.string.date)}: ${date.format(dateFormatter)}")
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, startTime) { startTime = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(startTime.format(timeFormatter))
+                    }
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, endTime ?: startTime.plusHours(1)) { endTime = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(endTime?.format(timeFormatter) ?: "–")
+                    }
+                    if (endTime != null) {
+                        IconButton(onClick = { endTime = null }, modifier = Modifier.size(32.dp)) {
+                            Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.planning_clear_end_time), modifier = Modifier.size(18.dp))
+                        }
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.start_time),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        stringResource(R.string.planning_end_time_optional),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.company),
+                    icon = Icons.Filled.Business,
+                    value = companyName ?: stringResource(R.string.select_company),
+                    expanded = companyExpanded,
+                    enabled = true,
+                    onExpandedChange = { companyExpanded = it },
+                    onDismiss = { companyExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { companyName = null; companyExpanded = false })
+                    companies.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { companyName = option.name; companyExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.site),
+                    icon = Icons.Filled.Place,
+                    value = siteLabel ?: stringResource(R.string.select_site),
+                    expanded = siteExpanded,
+                    enabled = true,
+                    onExpandedChange = { siteExpanded = it },
+                    onDismiss = { siteExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { siteLabel = null; siteExpanded = false })
+                    sites.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.label) }, onClick = { siteLabel = option.label; siteExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.job_description),
+                    icon = Icons.Filled.Work,
+                    value = jobTypeLabel ?: stringResource(R.string.select_job_type),
+                    expanded = jobTypeExpanded,
+                    enabled = true,
+                    onExpandedChange = { jobTypeExpanded = it },
+                    onDismiss = { jobTypeExpanded = false }
+                ) {
+                    DropdownMenuItem(text = { Text(none) }, onClick = { jobTypeLabel = null; jobTypeExpanded = false })
+                    jobTypes.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { jobTypeLabel = option.name; jobTypeExpanded = false })
+                    }
+                }
+
+                if (isOwner && members.size > 1) {
+                    Spacer(Modifier.height(10.dp))
+                    val assigneeLabel = members.firstOrNull { it.userId == assignedUserId }
+                        ?.let { it.displayName?.takeIf(String::isNotBlank) ?: it.email }
+                        ?: none
+                    TrackerDropdown(
+                        label = stringResource(R.string.planning_assigned_to),
+                        icon = Icons.Filled.Person,
+                        value = assigneeLabel,
+                        expanded = assigneeExpanded,
+                        enabled = true,
+                        onExpandedChange = { assigneeExpanded = it },
+                        onDismiss = { assigneeExpanded = false }
+                    ) {
+                        DropdownMenuItem(text = { Text(none) }, onClick = { assignedUserId = null; assigneeExpanded = false })
+                        members.forEach { member ->
+                            DropdownMenuItem(
+                                text = { Text(member.displayName?.takeIf(String::isNotBlank) ?: member.email) },
+                                onClick = { assignedUserId = member.userId; assigneeExpanded = false }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text(stringResource(R.string.planning_notes)) },
+                    minLines = 2,
+                    maxLines = 4,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (existing == null) {
+                    Spacer(Modifier.height(10.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Switch(checked = repeatEnabled, onCheckedChange = { repeatEnabled = it })
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.planning_repeat_until), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+                    }
+                    if (repeatEnabled) {
+                        // One job per calendar day from the start date to the chosen end date, inclusive.
+                        val occurrences = (java.time.temporal.ChronoUnit.DAYS.between(date, maxOf(date, repeatUntil)) + 1).toInt()
+                        OutlinedButton(
+                            onClick = { showDatePicker(context, repeatUntil) { picked -> if (!picked.isBefore(date)) repeatUntil = picked } },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Filled.Repeat, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("${repeatUntil.format(dateFormatter)} · ${stringResource(R.string.planning_repeat_count, occurrences)}")
+                        }
+                    }
+                }
+                if (!canSave) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.planning_details_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onConfirm(
+                        PlannedJob(
+                            id = existing?.id ?: 0L,
+                            dateEpochDay = date.toEpochDay(),
+                            startMinute = startTime.toSecondOfDay() / 60,
+                            endMinute = endTime?.let { it.toSecondOfDay() / 60 },
+                            companyName = companyName,
+                            siteLabel = siteLabel,
+                            jobTypeLabel = jobTypeLabel,
+                            notes = notes.trim().ifBlank { null },
+                            assignedUserId = assignedUserId
+                        ),
+                        if (existing == null && repeatEnabled) repeatUntil else null
+                    )
+                },
+                enabled = canSave
+            ) {
+                Text(stringResource(if (existing == null) R.string.add else R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeletePlannedJobDialog(job: PlannedJob, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(R.string.delete_entry)) },
+        text = {
+            val label = job.siteLabel?.takeIf { it.isNotBlank() }
+            Text(
+                if (label != null) stringResource(R.string.delete_entry_confirm_named, label)
+                else stringResource(R.string.delete_entry_confirm)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Site photo (timestamp camera)
+// ---------------------------------------------------------------------------
+
+@Composable
+fun PhotoScreen(onBack: () -> Unit, viewModel: PhotoViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+    val logoBitmap = rememberBitmapFromFile(uiState.logoPath)
+    val lastPhoto = rememberBitmapFromUri(uiState.lastPhotoUri)
+    val focusManager = LocalFocusManager.current
+
+    var cameraOpen by rememberSaveable { mutableStateOf(false) }
+    var cameraDenied by remember { mutableStateOf(false) }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        cameraDenied = !granted
+        if (granted) cameraOpen = true
+    }
+    fun openCamera() {
+        val granted = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+        if (granted) cameraOpen = true else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+    val logoPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri: Uri? ->
+        uri?.let { viewModel.onLogoPicked(it) }
+    }
+    // Below Android 10 the gallery write needs the legacy storage permission; newer versions need nothing.
+    val needsStoragePermission = android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q
+    var storageDenied by remember { mutableStateOf(false) }
+    val storagePermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        storageDenied = !granted
+        if (granted) openCamera()
+    }
+    fun takePhoto() {
+        val granted = !needsStoragePermission || ContextCompat.checkSelfPermission(
+            context, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) openCamera()
+        else storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+
+    if (cameraOpen) {
+        StampCameraView(
+            position = uiState.position,
+            label = uiState.label,
+            logo = logoBitmap,
+            onCapture = { file ->
+                cameraOpen = false
+                viewModel.onPhotoCaptured(file)
+            },
+            newCaptureFile = viewModel::newCaptureFile,
+            onError = {
+                cameraOpen = false
+                viewModel.onCameraError()
+            },
+            onClose = { cameraOpen = false }
+        )
+        return
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_photo), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 12.dp)) {
+                    Text(
+                        stringResource(R.string.photo_settings),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Text(
+                        stringResource(R.string.photo_timestamp_position),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.VerticalAlignTop,
+                        title = stringResource(R.string.photo_position_top),
+                        subtitle = null,
+                        selected = uiState.position == TimestampPosition.TOP,
+                        onClick = { viewModel.setPosition(TimestampPosition.TOP) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.VerticalAlignBottom,
+                        title = stringResource(R.string.photo_position_bottom),
+                        subtitle = null,
+                        selected = uiState.position == TimestampPosition.BOTTOM,
+                        onClick = { viewModel.setPosition(TimestampPosition.BOTTOM) }
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    OutlinedTextField(
+                        value = uiState.label,
+                        onValueChange = viewModel::setLabel,
+                        label = { Text(stringResource(R.string.photo_label)) },
+                        supportingText = { Text(stringResource(R.string.photo_label_hint)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = doneFieldActions(focusManager),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+                    Text(
+                        stringResource(R.string.photo_logo),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.small,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier.size(64.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (logoBitmap != null) {
+                                    Image(
+                                        bitmap = logoBitmap,
+                                        contentDescription = null,
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier.fillMaxSize().padding(6.dp)
+                                    )
+                                } else {
+                                    Icon(Icons.Filled.Image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            if (logoBitmap == null) {
+                                Text(
+                                    stringResource(R.string.photo_logo_none),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(Modifier.height(6.dp))
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        logoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                    shape = MaterialTheme.shapes.medium
+                                ) {
+                                    Text(stringResource(R.string.photo_choose_logo))
+                                }
+                                if (uiState.logoPath != null) {
+                                    TextButton(onClick = { viewModel.clearLogo() }) {
+                                        Text(stringResource(R.string.photo_remove_logo), color = MaterialTheme.colorScheme.error)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Button(
+                onClick = { takePhoto() },
+                enabled = !uiState.isProcessing,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(56.dp)
+            ) {
+                if (uiState.isProcessing) {
+                    CircularProgressIndicator(modifier = Modifier.size(22.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photo_processing))
+                } else {
+                    Icon(Icons.Filled.PhotoCamera, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.photo_open_camera), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            val errorRes = uiState.errorRes
+            if (errorRes != null || storageDenied || cameraDenied) {
+                Spacer(Modifier.height(12.dp))
+                InfoBanner(
+                    icon = Icons.Filled.Warning,
+                    text = stringResource(
+                        errorRes ?: if (cameraDenied) R.string.photo_camera_permission else R.string.photo_storage_permission
+                    ),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+            }
+
+            if (uiState.lastPhotoUri != null) {
+                Spacer(Modifier.height(24.dp))
+                SectionHeader(title = stringResource(R.string.photo_last))
+                Spacer(Modifier.height(8.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column {
+                        if (lastPhoto != null) {
+                            Image(
+                                bitmap = lastPhoto,
+                                contentDescription = null,
+                                contentScale = ContentScale.FillWidth,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                stringResource(R.string.photo_saved),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "image/jpeg"
+                                        putExtra(Intent.EXTRA_STREAM, uiState.lastPhotoUri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, context.getString(R.string.photo_share)))
+                                },
+                                shape = MaterialTheme.shapes.medium,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Icon(Icons.Filled.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.photo_share))
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * In-app camera (CameraX) showing the date/time band and logo live over the viewfinder, in the
+ * same proportions [PhotoStamper] uses, so what the user sees is what gets saved.
+ *
+ * Preview and capture are both 4:3 and the preview is letterboxed (FIT_CENTER), so the overlay
+ * can be laid out on the exact rectangle the frame occupies.
+ */
+@Composable
+private fun StampCameraView(
+    position: TimestampPosition,
+    label: String,
+    logo: ImageBitmap?,
+    onCapture: (File) -> Unit,
+    newCaptureFile: () -> File,
+    onError: () -> Unit,
+    onClose: () -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val imageCapture = remember {
+        ImageCapture.Builder()
+            .setResolutionSelector(
+                ResolutionSelector.Builder().setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY).build()
+            )
+            .build()
+    }
+    var capturing by remember { mutableStateOf(false) }
+
+    // Live clock for the band; the saved photo uses the time of the shutter press.
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = LocalDateTime.now()
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+    val lines = PhotoViewModel.stampLines(label, now)
+
+    BackHandler(onBack = onClose)
+
+    Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth().weight(1f)) {
+            // Rectangle the 4:3 (or 3:4 in portrait) frame occupies inside the letterboxed preview.
+            val frameRatio = if (isLandscape) 4f / 3f else 3f / 4f
+            val boxRatio = maxWidth / maxHeight
+            val frameWidth = if (boxRatio > frameRatio) maxHeight * frameRatio else maxWidth
+            val frameHeight = if (boxRatio > frameRatio) maxHeight else maxWidth / frameRatio
+
+            AndroidView(
+                factory = { ctx ->
+                    PreviewView(ctx).apply {
+                        scaleType = PreviewView.ScaleType.FIT_CENTER
+                        val provider = ProcessCameraProvider.getInstance(ctx)
+                        provider.addListener({
+                            try {
+                                val preview = Preview.Builder()
+                                    .setResolutionSelector(
+                                        ResolutionSelector.Builder()
+                                            .setAspectRatioStrategy(AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY)
+                                            .build()
+                                    )
+                                    .build()
+                                    .also { it.setSurfaceProvider(surfaceProvider) }
+                                val cameraProvider = provider.get()
+                                cameraProvider.unbindAll()
+                                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
+                            } catch (e: Exception) {
+                                onError()
+                            }
+                        }, ContextCompat.getMainExecutor(ctx))
+                    }
+                },
+                update = { view -> view.display?.let { imageCapture.targetRotation = it.rotation } },
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // Overlay drawn on the frame rectangle only, mirroring PhotoStamper's geometry.
+            Box(modifier = Modifier.size(frameWidth, frameHeight).align(Alignment.Center)) {
+                val textSize = frameWidth * PhotoStamper.TEXT_SIZE_FRACTION
+                val padding = frameWidth * PhotoStamper.PADDING_FRACTION
+                val lineHeight = textSize * PhotoStamper.LINE_HEIGHT_FACTOR
+                val blockHeight = padding * 2 + lineHeight * lines.size
+                val density = LocalDensity.current
+                val textSizeSp = with(density) { textSize.toSp() }
+                val lineHeightSp = with(density) { lineHeight.toSp() }
+                val strokePx = with(density) { (textSize * PhotoStamper.STROKE_FACTOR).toPx() }
+                val shadowPx = with(density) { (textSize / 8f).toPx() }
+                val baseStyle = TextStyle(
+                    fontSize = textSizeSp,
+                    lineHeight = lineHeightSp,
+                    fontWeight = FontWeight.Bold,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false)
+                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(if (position == TimestampPosition.TOP) Alignment.TopCenter else Alignment.BottomCenter)
+                        .padding(padding)
+                ) {
+                    lines.forEach { line ->
+                        // Dark outline + white fill, same as PhotoStamper, so the text reads on any background.
+                        Box(modifier = Modifier.height(lineHeight), contentAlignment = Alignment.CenterStart) {
+                            Text(
+                                line,
+                                style = baseStyle.copy(color = Color.Black, drawStyle = Stroke(width = strokePx)),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                line,
+                                style = baseStyle.copy(
+                                    color = Color.White,
+                                    shadow = Shadow(Color.Black.copy(alpha = 0.7f), Offset(0f, shadowPx / 2), shadowPx)
+                                ),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+                if (logo != null) {
+                    val logoWidth = frameWidth * PhotoStamper.LOGO_WIDTH_FRACTION
+                    val logoHeight = logoWidth * logo.height / logo.width
+                    val bottomInset = if (position == TimestampPosition.BOTTOM) blockHeight + padding else padding
+                    Image(
+                        bitmap = logo,
+                        contentDescription = null,
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = padding, bottom = bottomInset)
+                            .size(logoWidth, logoHeight)
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp)) {
+                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.photo_close_camera), tint = Color.White)
+            }
+            // Shutter
+            Surface(
+                onClick = {
+                    if (capturing) return@Surface
+                    capturing = true
+                    val file = newCaptureFile()
+                    imageCapture.takePicture(
+                        ImageCapture.OutputFileOptions.Builder(file).build(),
+                        ContextCompat.getMainExecutor(context),
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
+                                capturing = false
+                                onCapture(file)
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                capturing = false
+                                file.delete()
+                                onError()
+                            }
+                        }
+                    )
+                },
+                enabled = !capturing,
+                shape = CircleShape,
+                color = Color.White,
+                modifier = Modifier.size(72.dp)
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (capturing) {
+                        CircularProgressIndicator(modifier = Modifier.size(28.dp), strokeWidth = 3.dp)
+                    } else {
+                        Surface(shape = CircleShape, color = Color.White, border = BorderStroke(3.dp, Color.Black), modifier = Modifier.size(60.dp)) {}
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Loads a gallery image for preview, downsampled so a full-size photo doesn't blow the UI heap. */
+@Composable
+private fun rememberBitmapFromUri(uri: Uri?): ImageBitmap? {
+    val context = LocalContext.current
+    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(uri) {
+        bitmap = if (uri == null) null else withContext(Dispatchers.IO) {
+            runCatching {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+                var sample = 1
+                while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1200) sample *= 2
+                val options = BitmapFactory.Options().apply { inSampleSize = sample }
+                context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }?.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    return bitmap
+}
+
+// ---------------------------------------------------------------------------
+// Settings
+// ---------------------------------------------------------------------------
+
+@Composable
+fun SettingsScreen(
+    onBack: () -> Unit,
+    viewModel: SettingsViewModel,
+    authViewModel: AuthViewModel,
+    authState: AuthUiState.LoggedIn,
+    onLogout: () -> Unit,
+    onOpenConnection: (ConnectionDto) -> Unit = {},
+    companyViewModel: CompanyViewModel = viewModel()
+) {
+    val themeMode by viewModel.themeMode.collectAsState()
+    val language by viewModel.language.collectAsState()
+    val pendingInvites by authViewModel.pendingInvites.collectAsState()
+    val pendingConnectionInvites by authViewModel.pendingConnectionInvites.collectAsState()
+    val connections by authViewModel.connections.collectAsState()
+    val employerConnections by authViewModel.employerConnections.collectAsState()
+    val myCompanies by companyViewModel.companies.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(Unit) {
+        authViewModel.loadPendingInvites()
+        authViewModel.loadPendingConnectionInvites()
+        authViewModel.loadConnections()
+        if (authState.isOwner) authViewModel.loadEmployerConnections()
+    }
+
+    // The locale is applied in MainActivity.attachBaseContext, so the Activity must be rebuilt.
+    val selectLanguage: (AppLanguage) -> Unit = { picked ->
+        if (picked != language) {
+            viewModel.setLanguage(picked)
+            context.findActivity()?.recreate()
+        }
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.settings), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        stringResource(R.string.appearance),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.BrightnessAuto,
+                        title = stringResource(R.string.theme_system),
+                        subtitle = stringResource(R.string.theme_system_subtitle),
+                        selected = themeMode == ThemeMode.SYSTEM,
+                        onClick = { viewModel.setThemeMode(ThemeMode.SYSTEM) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.LightMode,
+                        title = stringResource(R.string.theme_light),
+                        subtitle = stringResource(R.string.theme_light_subtitle),
+                        selected = themeMode == ThemeMode.LIGHT,
+                        onClick = { viewModel.setThemeMode(ThemeMode.LIGHT) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.DarkMode,
+                        title = stringResource(R.string.theme_dark),
+                        subtitle = stringResource(R.string.theme_dark_subtitle),
+                        selected = themeMode == ThemeMode.DARK,
+                        onClick = { viewModel.setThemeMode(ThemeMode.DARK) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        stringResource(R.string.language),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.Language,
+                        title = stringResource(R.string.language_system),
+                        subtitle = stringResource(R.string.language_system_subtitle),
+                        selected = language == AppLanguage.SYSTEM,
+                        onClick = { selectLanguage(AppLanguage.SYSTEM) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.Translate,
+                        title = stringResource(R.string.language_english),
+                        subtitle = null,
+                        selected = language == AppLanguage.ENGLISH,
+                        onClick = { selectLanguage(AppLanguage.ENGLISH) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.Translate,
+                        title = stringResource(R.string.language_portuguese),
+                        subtitle = null,
+                        selected = language == AppLanguage.PORTUGUESE,
+                        onClick = { selectLanguage(AppLanguage.PORTUGUESE) }
+                    )
+                    SettingsOptionRow(
+                        icon = Icons.Filled.Translate,
+                        title = stringResource(R.string.language_spanish),
+                        subtitle = null,
+                        selected = language == AppLanguage.SPANISH,
+                        onClick = { selectLanguage(AppLanguage.SPANISH) }
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                    Text(
+                        stringResource(R.string.account_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    )
+                    Text(
+                        stringResource(R.string.account_signed_in_as, authState.email),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(horizontal = 20.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(onClick = onLogout)
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Logout,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.width(16.dp))
+                        Text(stringResource(R.string.logout_button), color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            if (authState.memberships.size > 1) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.team_working_as),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        authState.memberships.forEach { membership ->
+                            val roleLabel = if (membership.role == "OWNER") {
+                                stringResource(R.string.team_role_owner)
+                            } else {
+                                stringResource(R.string.team_role_worker)
+                            }
+                            SettingsOptionRow(
+                                icon = if (membership.role == "OWNER") Icons.Filled.Home else Icons.Filled.Groups,
+                                title = membership.accountName,
+                                subtitle = roleLabel,
+                                selected = membership.accountId == authState.activeAccountId,
+                                onClick = { authViewModel.switchAccount(membership.accountId) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (pendingInvites.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.team_pending_invites),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        pendingInvites.forEach { invite ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(invite.accountName, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { authViewModel.acceptInvite(invite.id) }) {
+                                    Text(stringResource(R.string.team_invite_accept))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (authState.isOwner) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            stringResource(R.string.team_section),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        var inviteEmail by rememberSaveable { mutableStateOf("") }
+                        var inviteResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                        val inviteEmailValid = Validators.isValidEmail(inviteEmail)
+                        val focusManager = LocalFocusManager.current
+                        OutlinedTextField(
+                            value = inviteEmail,
+                            onValueChange = { inviteEmail = it; inviteResult = null },
+                            label = { Text(stringResource(R.string.team_invite_email_label)) },
+                            isError = inviteEmail.isNotBlank() && !inviteEmailValid,
+                            supportingText = if (inviteEmail.isNotBlank() && !inviteEmailValid) {
+                                { Text(stringResource(R.string.invalid_email)) }
+                            } else null,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (inviteEmailValid) {
+                                    authViewModel.inviteWorker(inviteEmail) { success ->
+                                        inviteResult = success
+                                        if (success) inviteEmail = ""
+                                    }
+                                }
+                                focusManager.clearFocus()
+                            }),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                authViewModel.inviteWorker(inviteEmail) { success ->
+                                    inviteResult = success
+                                    if (success) inviteEmail = ""
+                                }
+                            },
+                            enabled = inviteEmailValid,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.team_invite_button))
+                        }
+                        inviteResult?.let { success ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(if (success) R.string.team_invite_sent else R.string.team_invite_failed),
+                                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (pendingConnectionInvites.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            stringResource(R.string.connection_pending_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        pendingConnectionInvites.forEach { invite ->
+                            Spacer(Modifier.height(12.dp))
+                            ConnectionInviteRow(
+                                employerName = invite.employerAccountName,
+                                companies = myCompanies,
+                                onAccept = { companyId, onResult -> authViewModel.acceptConnectionInvite(invite.id, companyId, onResult) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (connections.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.connection_my_connections_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        connections.forEach { connection ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(connection.employerAccountName, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        connection.workerCompanyName,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                TextButton(onClick = { authViewModel.revokeConnection(connection.id) }) {
+                                    Text(stringResource(R.string.connection_revoke), color = MaterialTheme.colorScheme.error)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (authState.isOwner) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text(
+                            stringResource(R.string.connection_section),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        var connectionEmail by rememberSaveable { mutableStateOf("") }
+                        var connectionResult by rememberSaveable { mutableStateOf<Boolean?>(null) }
+                        val connectionEmailValid = Validators.isValidEmail(connectionEmail)
+                        val focusManager = LocalFocusManager.current
+                        OutlinedTextField(
+                            value = connectionEmail,
+                            onValueChange = { connectionEmail = it; connectionResult = null },
+                            label = { Text(stringResource(R.string.connection_invite_email_label)) },
+                            isError = connectionEmail.isNotBlank() && !connectionEmailValid,
+                            supportingText = if (connectionEmail.isNotBlank() && !connectionEmailValid) {
+                                { Text(stringResource(R.string.invalid_email)) }
+                            } else null,
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                if (connectionEmailValid) {
+                                    authViewModel.inviteContractor(connectionEmail) { success ->
+                                        connectionResult = success
+                                        if (success) connectionEmail = ""
+                                    }
+                                }
+                                focusManager.clearFocus()
+                            }),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(
+                            onClick = {
+                                authViewModel.inviteContractor(connectionEmail) { success ->
+                                    connectionResult = success
+                                    if (success) connectionEmail = ""
+                                }
+                            },
+                            enabled = connectionEmailValid,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(stringResource(R.string.connection_invite_button))
+                        }
+                        connectionResult?.let { success ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(if (success) R.string.connection_invite_sent else R.string.connection_invite_failed),
+                                color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (authState.isOwner && employerConnections.isNotEmpty()) {
+                Spacer(Modifier.height(16.dp))
+                ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        Text(
+                            stringResource(R.string.connection_connected_contractors_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                        )
+                        employerConnections.forEach { connection ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpenConnection(connection) }
+                                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(connection.workerCompanyName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ConnectionInviteRow(
+    employerName: String,
+    companies: List<Company>,
+    onAccept: (companyId: Long, onResult: (Boolean) -> Unit) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var selected by remember { mutableStateOf<Company?>(null) }
+    var failed by remember { mutableStateOf(false) }
+
+    Text(employerName, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(8.dp))
+    Text(stringResource(R.string.connection_pick_company), style = MaterialTheme.typography.bodySmall)
+    Spacer(Modifier.height(4.dp))
+    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+        OutlinedTextField(
+            readOnly = true,
+            value = selected?.name ?: "",
+            onValueChange = {},
+            modifier = Modifier.menuAnchor().fillMaxWidth(),
+            shape = MaterialTheme.shapes.small
+        )
+        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            companies.forEach { company ->
+                DropdownMenuItem(text = { Text(company.name) }, onClick = { selected = company; expanded = false })
+            }
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    Button(
+        onClick = {
+            val company = selected ?: return@Button
+            failed = false
+            onAccept(company.id) { success -> failed = !success }
+        },
+        enabled = selected != null,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(stringResource(R.string.connection_accept))
+    }
+    if (failed) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            stringResource(R.string.connection_accept_failed),
+            color = MaterialTheme.colorScheme.error,
+            style = MaterialTheme.typography.bodySmall
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Connection detail (employer side): schedule a job on the worker's calendar, view their hours
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ConnectionDetailScreen(
+    connection: ConnectionDto,
+    authViewModel: AuthViewModel,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+
+    var sessions by remember { mutableStateOf<List<ConnectionSessionDto>>(emptyList()) }
+    var loadingSessions by remember { mutableStateOf(true) }
+    LaunchedEffect(connection.id) {
+        loadingSessions = true
+        authViewModel.loadConnectionSessions(connection.id) { result ->
+            sessions = result
+            loadingSessions = false
+        }
+    }
+
+    var date by remember { mutableStateOf(LocalDate.now()) }
+    var startTime by remember { mutableStateOf(LocalTime.of(7, 0)) }
+    var endTime by remember { mutableStateOf<LocalTime?>(null) }
+    var siteLabel by remember { mutableStateOf("") }
+    var jobTypeLabel by remember { mutableStateOf("") }
+    var notes by remember { mutableStateOf("") }
+    var scheduling by remember { mutableStateOf(false) }
+    var scheduleResult by remember { mutableStateOf<Boolean?>(null) }
+
+    val totalMillis = sessions.sumOf { (it.stopTimestampMillis ?: it.startTimestampMillis) - it.startTimestampMillis }
+
+    Scaffold(topBar = { AppTopBar(title = connection.workerCompanyName, onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(
+                        stringResource(R.string.connection_detail_schedule_section),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = { showDatePicker(context, date) { date = it } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("${stringResource(R.string.date)}: ${date.format(dateFormatter)}")
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(
+                            onClick = { showTimePicker(context, startTime) { startTime = it } },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(startTime.format(timeFormatter))
+                        }
+                        OutlinedButton(
+                            onClick = { showTimePicker(context, endTime ?: startTime.plusHours(1)) { endTime = it } },
+                            shape = MaterialTheme.shapes.medium,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(endTime?.format(timeFormatter) ?: "–")
+                        }
+                        if (endTime != null) {
+                            IconButton(onClick = { endTime = null }, modifier = Modifier.size(32.dp)) {
+                                Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.planning_clear_end_time), modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = siteLabel,
+                        onValueChange = { siteLabel = it },
+                        label = { Text(stringResource(R.string.site)) },
+                        leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = jobTypeLabel,
+                        onValueChange = { jobTypeLabel = it },
+                        label = { Text(stringResource(R.string.job_description)) },
+                        leadingIcon = { Icon(Icons.Filled.Work, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = notes,
+                        onValueChange = { notes = it },
+                        label = { Text(stringResource(R.string.planning_notes)) },
+                        minLines = 2,
+                        maxLines = 4,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            scheduling = true
+                            scheduleResult = null
+                            val req = ConnectionPlannedJobRequest(
+                                id = java.util.UUID.randomUUID().toString(),
+                                dateEpochDay = date.toEpochDay(),
+                                startMinute = startTime.toSecondOfDay() / 60,
+                                endMinute = endTime?.let { it.toSecondOfDay() / 60 },
+                                siteLabel = siteLabel.trim().ifBlank { null },
+                                jobTypeLabel = jobTypeLabel.trim().ifBlank { null },
+                                notes = notes.trim().ifBlank { null }
+                            )
+                            authViewModel.scheduleConnectionJob(connection.id, req) { success ->
+                                scheduling = false
+                                scheduleResult = success
+                                if (success) {
+                                    siteLabel = ""
+                                    jobTypeLabel = ""
+                                    notes = ""
+                                    endTime = null
+                                }
+                            }
+                        },
+                        enabled = !scheduling,
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        if (scheduling) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp))
+                        } else {
+                            Icon(Icons.Filled.EventNote, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.connection_detail_schedule_button))
+                        }
+                    }
+                    scheduleResult?.let { success ->
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(if (success) R.string.connection_detail_schedule_sent else R.string.connection_detail_schedule_failed),
+                            color = if (success) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                SectionHeader(title = stringResource(R.string.connection_detail_hours_section), count = sessions.size)
+                Spacer(Modifier.weight(1f))
+                if (sessions.isNotEmpty()) {
+                    val totalText = stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(totalMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+                    )
+                    Text(totalText, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            if (loadingSessions) {
+                Box(modifier = Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            } else if (sessions.isEmpty()) {
+                EmptyState(text = stringResource(R.string.connection_detail_no_sessions))
+            } else {
+                sessions.sortedByDescending { it.startTimestampMillis }.forEachIndexed { index, session ->
+                    if (index > 0) Spacer(Modifier.height(8.dp))
+                    ConnectionSessionRow(session, dateFormatter, timeFormatter)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionSessionRow(session: ConnectionSessionDto, dateFormatter: DateTimeFormatter, timeFormatter: DateTimeFormatter) {
+    val zone = remember { ZoneId.systemDefault() }
+    val start = remember(session) { Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone) }
+    val stop = remember(session) { session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone) } }
+    val durationMillis = (session.stopTimestampMillis ?: session.startTimestampMillis) - session.startTimestampMillis
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(start.toLocalDate().format(dateFormatter), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                val details = listOfNotNull(
+                    session.siteLabel?.takeIf { it.isNotBlank() },
+                    session.jobTypeLabel?.takeIf { it.isNotBlank() }
+                ).joinToString(" · ")
+                if (details.isNotBlank()) {
+                    Text(details, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(
+                    "${start.toLocalTime().format(timeFormatter)} – ${stop?.toLocalTime()?.format(timeFormatter) ?: "…"}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(
+                        R.string.duration_format,
+                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                    ),
+                    style = MaterialTheme.typography.labelLarge.tabularNums,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+@Composable
+private fun SettingsOptionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String?,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (selected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        RadioButton(selected = selected, onClick = onClick)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Reports
+// ---------------------------------------------------------------------------
+
+/** Lets the user turn template columns on/off; order is fixed by [ReportColumn] so every report looks the same. */
+@Composable
+fun ReportColumnsDialog(
+    selection: Set<ReportColumn>,
+    onToggle: (ReportColumn, Boolean) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.ViewColumn, contentDescription = null) },
+        title = { Text(stringResource(R.string.report_columns)) },
+        text = {
+            Column {
+                ReportColumn.entries.forEach { column ->
+                    val checked = column.alwaysShown || column in selection
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !column.alwaysShown) { onToggle(column, !checked) },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = checked,
+                            onCheckedChange = { onToggle(column, it) },
+                            enabled = !column.alwaysShown
+                        )
+                        Text(stringResource(column.labelRes), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.report_columns_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.ok)) } }
+    )
+}
+
+/** On-screen widths for the shared column template; text columns stretch to fill spare width. */
+private fun reportColumnMinWidth(column: ReportColumn): Dp = when (column) {
+    ReportColumn.DATE -> 92.dp
+    ReportColumn.SITE -> 140.dp
+    ReportColumn.ADDRESS -> 220.dp
+    ReportColumn.COMPANY -> 130.dp
+    ReportColumn.JOB_TYPE -> 130.dp
+    ReportColumn.START_TIME -> 64.dp
+    ReportColumn.END_TIME -> 64.dp
+    ReportColumn.HOURS -> 76.dp
+}
+
+private fun ReportColumn.isTextColumn() = this in setOf(
+    ReportColumn.SITE, ReportColumn.ADDRESS, ReportColumn.COMPANY, ReportColumn.JOB_TYPE
+)
+
+private fun ReportColumn.isRightAligned() = this in setOf(
+    ReportColumn.START_TIME, ReportColumn.END_TIME, ReportColumn.HOURS
+)
+
+@Composable
+fun ReportTable(
+    sessions: List<TrackingSession>,
+    sitesByLabel: Map<String, Site>,
+    columns: List<ReportColumn>,
+    totalDurationMillis: Long,
+    modifier: Modifier = Modifier
+) {
+    val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH) }
+    val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.ENGLISH) }
+    val horizontalPadding = 16.dp
+
+    ElevatedCard(modifier = modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            // Fit the template into the card; when it is wider than the screen the table scrolls sideways.
+            val minTableWidth = columns.fold(0.dp) { acc, c -> acc + reportColumnMinWidth(c) } + horizontalPadding * 2
+            val spare = (maxWidth - minTableWidth).coerceAtLeast(0.dp)
+            val stretchable = columns.filter { it.isTextColumn() }.ifEmpty { listOf(columns.first()) }
+            val widths = columns.associateWith { column ->
+                reportColumnMinWidth(column) + if (column in stretchable) spare / stretchable.size else 0.dp
+            }
+            val tableWidth = maxOf(maxWidth, minTableWidth)
+
+            Column(
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .width(tableWidth)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = horizontalPadding, vertical = 12.dp)
+                ) {
+                    columns.forEach { column ->
+                        Text(
+                            stringResource(column.labelRes),
+                            modifier = Modifier.width(widths.getValue(column)),
+                            textAlign = if (column.isRightAligned()) TextAlign.End else TextAlign.Start,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Column {
+                    sessions.forEachIndexed { index, session ->
+                        val rowColor = if (index % 2 == 0) {
+                            MaterialTheme.colorScheme.surface
+                        } else {
+                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(rowColor)
+                                .padding(horizontal = horizontalPadding, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            columns.forEach { column ->
+                                val value = if (column == ReportColumn.HOURS) {
+                                    val durationMillis = session.durationMillis ?: 0L
+                                    stringResource(
+                                        R.string.duration_format,
+                                        TimeUnit.MILLISECONDS.toHours(durationMillis),
+                                        TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+                                    )
+                                } else {
+                                    reportCellValue(session, column, sitesByLabel, dateFormatter, timeFormatter)
+                                }
+                                Text(
+                                    value,
+                                    modifier = Modifier.width(widths.getValue(column)).padding(end = 6.dp),
+                                    textAlign = if (column.isRightAligned()) TextAlign.End else TextAlign.Start,
+                                    maxLines = 2,
+                                    style = if (column.isRightAligned()) MaterialTheme.typography.bodyMedium.tabularNums else MaterialTheme.typography.bodyMedium,
+                                    color = if (column == ReportColumn.DATE) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                val totalHours = TimeUnit.MILLISECONDS.toHours(totalDurationMillis)
+                val totalMinutes = TimeUnit.MILLISECONDS.toMinutes(totalDurationMillis) % 60
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer)
+                        .padding(horizontal = horizontalPadding, vertical = 14.dp)
+                ) {
+                    Text(
+                        stringResource(R.string.total),
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = stringResource(R.string.duration_format, totalHours, totalMinutes),
+                        modifier = Modifier.padding(end = 6.dp),
+                        textAlign = TextAlign.End,
+                        maxLines = 1,
+                        style = LocalTextStyle.current.tabularNums,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Cell text for every column except HOURS (which needs a string resource and is built in the composable). */
+private fun reportCellValue(
+    session: TrackingSession,
+    column: ReportColumn,
+    sitesByLabel: Map<String, Site>,
+    dateFormatter: SimpleDateFormat,
+    timeFormatter: SimpleDateFormat
+): String = when (column) {
+    ReportColumn.DATE -> dateFormatter.format(Date(session.startTimestampMillis))
+    ReportColumn.SITE -> session.siteLabel?.takeIf { it.isNotBlank() }
+        ?: "${"%.6f".format(session.startLatitude)}, ${"%.6f".format(session.startLongitude)}"
+    ReportColumn.ADDRESS -> sitesByLabel[session.siteLabel]?.address.orEmpty()
+    ReportColumn.COMPANY -> session.companyName.orEmpty()
+    ReportColumn.JOB_TYPE -> session.jobTypeLabel.orEmpty()
+    ReportColumn.START_TIME -> timeFormatter.format(Date(session.startTimestampMillis))
+    ReportColumn.END_TIME -> session.stopTimestampMillis?.let { timeFormatter.format(Date(it)) }.orEmpty()
+    ReportColumn.HOURS -> ""
+}
+
+// ---------------------------------------------------------------------------
+// Companies
+// ---------------------------------------------------------------------------
+
+@Composable
+fun CompaniesScreen(
+    onBack: () -> Unit,
+    onReviewInvoice: () -> Unit,
+    onOpenReports: () -> Unit,
+    canManage: Boolean = true,
+    viewModel: CompanyViewModel = viewModel(),
+    trackerViewModel: LocationTrackerViewModel = viewModel(),
+    invoiceViewModel: InvoiceViewModel = viewModel(),
+    reportViewModel: ReportViewModel = viewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val companies by viewModel.companies.collectAsState()
+    val editState by viewModel.editState.collectAsState()
+    val sessions by trackerViewModel.completedSessions.collectAsState()
+    val invoices by invoiceViewModel.invoices.collectAsState()
+    var sheetCompany by remember { mutableStateOf<Company?>(null) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val nameFocusRequester = remember { FocusRequester() }
+
+    sheetCompany?.let { company ->
+        CompanySheet(
+            company = company,
+            sessions = sessions,
+            invoices = invoices,
+            onDismiss = { sheetCompany = null },
+            onGenerateInvoice = { open, start, end ->
+                sheetCompany = null
+                reportViewModel.setCompany(company.name)
+                invoiceViewModel.startReview(open, start, end, company)
+                onReviewInvoice()
+            },
+            onViewReport = {
+                sheetCompany = null
+                reportViewModel.setCompany(company.name)
+                onOpenReports()
+            }
+        )
+    }
+
+    editState?.let { state ->
+        EditCompanyDialog(
+            state = state,
+            onNameChanged = { viewModel.onEditNameChanged(it) },
+            onAbnChanged = { viewModel.onEditAbnChanged(it) },
+            onPhoneChanged = { viewModel.onEditPhoneChanged(it) },
+            onEmailChanged = { viewModel.onEditEmailChanged(it) },
+            onHourlyRateChanged = { viewModel.onEditHourlyRateChanged(it) },
+            onDismiss = { viewModel.cancelEditingCompany() },
+            onConfirm = { viewModel.saveEditedCompany() }
+        )
+    }
+
+    var formExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_companies), onBack = onBack) }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            LaunchedEffect(formExpanded) {
+                if (formExpanded) nameFocusRequester.requestFocus()
+            }
+            NewEntityCard(
+                visible = canManage,
+                title = stringResource(R.string.new_company),
+                expanded = formExpanded,
+                onToggle = { formExpanded = !formExpanded }
+            ) {
+                    OutlinedTextField(
+                        value = uiState.name,
+                        onValueChange = { viewModel.onNameChanged(it) },
+                        label = { Text(stringResource(R.string.company_name)) },
+                        leadingIcon = { Icon(Icons.Filled.Business, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.abn,
+                        onValueChange = { viewModel.onAbnChanged(it) },
+                        label = { Text(stringResource(R.string.company_abn)) },
+                        isError = !Validators.abnOk(uiState.abn),
+                        supportingText = if (!Validators.abnOk(uiState.abn)) {
+                            { Text(stringResource(R.string.invalid_abn)) }
+                        } else null,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.phone,
+                        onValueChange = { viewModel.onPhoneChanged(it) },
+                        label = { Text(stringResource(R.string.contact_phone)) },
+                        isError = !Validators.phoneOk(uiState.phone),
+                        supportingText = if (!Validators.phoneOk(uiState.phone)) {
+                            { Text(stringResource(R.string.invalid_phone)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.email,
+                        onValueChange = { viewModel.onEmailChanged(it) },
+                        label = { Text(stringResource(R.string.billing_email)) },
+                        isError = !Validators.emailOk(uiState.email),
+                        supportingText = if (!Validators.emailOk(uiState.email)) {
+                            { Text(stringResource(R.string.invalid_email)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.hourlyRate,
+                        onValueChange = { viewModel.onHourlyRateChanged(it) },
+                        label = { Text(stringResource(R.string.company_hourly_rate)) },
+                        isError = !Validators.amountOk(uiState.hourlyRate),
+                        supportingText = if (!Validators.amountOk(uiState.hourlyRate)) {
+                            { Text(stringResource(R.string.enter_valid_amount)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                        keyboardActions = doneField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            viewModel.saveCompany()
+                            formExpanded = false
+                        },
+                        enabled = uiState.name.isNotBlank() && Validators.abnOk(uiState.abn) &&
+                            Validators.phoneOk(uiState.phone) && Validators.emailOk(uiState.email) &&
+                            Validators.amountOk(uiState.hourlyRate),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_company))
+                    }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            SectionHeader(title = stringResource(R.string.registered_companies), count = companies.size)
+            Spacer(Modifier.height(8.dp))
+
+            if (companies.isEmpty()) {
+                EmptyState(text = stringResource(R.string.companies_empty))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(companies, key = { it.id }) { company ->
+                        EntityListItem(
+                            icon = Icons.Filled.Business,
+                            title = company.name,
+                            subtitle = listOfNotNull(
+                                company.hourlyRate?.let { stringResource(R.string.rate_per_hour, formatRateInput(it)) },
+                                company.abn?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.abn_value, it) },
+                                company.phone?.takeIf { it.isNotBlank() },
+                                company.email?.takeIf { it.isNotBlank() }
+                            ).joinToString("  •  ").ifBlank { null },
+                            onEdit = if (canManage) { { viewModel.startEditingCompany(company) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteCompany(company) } } else null,
+                            onClick = { sheetCompany = company }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditCompanyDialog(
+    state: CompanyEditUiState,
+    onNameChanged: (String) -> Unit,
+    onAbnChanged: (String) -> Unit,
+    onPhoneChanged: (String) -> Unit,
+    onEmailChanged: (String) -> Unit,
+    onHourlyRateChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val nameFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { nameFocusRequester.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Business, contentDescription = null) },
+        title = { Text(stringResource(R.string.edit_company)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = state.name,
+                    onValueChange = onNameChanged,
+                    label = { Text(stringResource(R.string.company_name)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.abn,
+                    onValueChange = onAbnChanged,
+                    label = { Text(stringResource(R.string.company_abn)) },
+                    isError = !Validators.abnOk(state.abn),
+                    supportingText = if (!Validators.abnOk(state.abn)) {
+                        { Text(stringResource(R.string.invalid_abn)) }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.phone,
+                    onValueChange = onPhoneChanged,
+                    label = { Text(stringResource(R.string.contact_phone)) },
+                    isError = !Validators.phoneOk(state.phone),
+                    supportingText = if (!Validators.phoneOk(state.phone)) {
+                        { Text(stringResource(R.string.invalid_phone)) }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.email,
+                    onValueChange = onEmailChanged,
+                    label = { Text(stringResource(R.string.billing_email)) },
+                    isError = !Validators.emailOk(state.email),
+                    supportingText = if (!Validators.emailOk(state.email)) {
+                        { Text(stringResource(R.string.invalid_email)) }
+                    } else null,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = state.hourlyRate,
+                    onValueChange = onHourlyRateChanged,
+                    label = { Text(stringResource(R.string.company_hourly_rate)) },
+                    isError = !Validators.amountOk(state.hourlyRate),
+                    supportingText = if (!Validators.amountOk(state.hourlyRate)) {
+                        { Text(stringResource(R.string.enter_valid_amount)) }
+                    } else null,
+                    leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                    keyboardActions = doneField,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = onConfirm,
+                enabled = state.name.isNotBlank() && Validators.abnOk(state.abn) &&
+                    Validators.phoneOk(state.phone) && Validators.emailOk(state.email) &&
+                    Validators.amountOk(state.hourlyRate)
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Job types
+// ---------------------------------------------------------------------------
+
+@Composable
+fun JobTypesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: JobTypeViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val jobTypes by viewModel.jobTypes.collectAsState()
+    val editState by viewModel.editState.collectAsState()
+    val focusManager = LocalFocusManager.current
+    val nameFocusRequester = remember { FocusRequester() }
+
+    editState?.let { state ->
+        EditJobTypeDialog(
+            state = state,
+            onNameChanged = { viewModel.onEditNameChanged(it) },
+            onDismiss = { viewModel.cancelEditingJobType() },
+            onConfirm = { viewModel.saveEditedJobType() }
+        )
+    }
+
+    var formExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_job_types), onBack = onBack) }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            LaunchedEffect(formExpanded) {
+                if (formExpanded) nameFocusRequester.requestFocus()
+            }
+            NewEntityCard(
+                visible = canManage,
+                title = stringResource(R.string.new_job_type),
+                expanded = formExpanded,
+                onToggle = { formExpanded = !formExpanded }
+            ) {
+                    OutlinedTextField(
+                        value = uiState.name,
+                        onValueChange = { viewModel.onNameChanged(it) },
+                        label = { Text(stringResource(R.string.job_type_hint)) },
+                        leadingIcon = { Icon(Icons.Filled.Work, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = {
+                            if (uiState.name.isNotBlank()) {
+                                viewModel.saveJobType()
+                                formExpanded = false
+                            }
+                            focusManager.clearFocus()
+                        }),
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            viewModel.saveJobType()
+                            formExpanded = false
+                        },
+                        enabled = uiState.name.isNotBlank(),
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_job_type))
+                    }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            SectionHeader(title = stringResource(R.string.registered_job_types), count = jobTypes.size)
+            Spacer(Modifier.height(8.dp))
+
+            if (jobTypes.isEmpty()) {
+                EmptyState(text = stringResource(R.string.job_types_empty))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(jobTypes, key = { it.id }) { jobType ->
+                        EntityListItem(
+                            icon = Icons.Filled.Work,
+                            title = jobType.name,
+                            subtitle = null,
+                            onEdit = if (canManage) { { viewModel.startEditingJobType(jobType) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteJobType(jobType) } } else null
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun EditJobTypeDialog(
+    state: JobTypeEditUiState,
+    onNameChanged: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val focusManager = LocalFocusManager.current
+    val nameFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { nameFocusRequester.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Work, contentDescription = null) },
+        title = { Text(stringResource(R.string.edit_job_type)) },
+        text = {
+            OutlinedTextField(
+                value = state.name,
+                onValueChange = onNameChanged,
+                label = { Text(stringResource(R.string.job_type_hint)) },
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = {
+                    if (state.name.isNotBlank()) onConfirm()
+                    focusManager.clearFocus()
+                }),
+                singleLine = true,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.fillMaxWidth().focusRequester(nameFocusRequester)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = state.name.isNotBlank()) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Sites
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SitesScreen(onBack: () -> Unit, canManage: Boolean = true, viewModel: SiteViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val suggestions by viewModel.suggestions.collectAsState()
+    val sites by viewModel.sites.collectAsState()
+    val editState by viewModel.editState.collectAsState()
+    val editSuggestions by viewModel.editSuggestions.collectAsState()
+    var addressDropdownExpanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val labelFocusRequester = remember { FocusRequester() }
+
+    editState?.let { state ->
+        EditSiteDialog(
+            state = state,
+            suggestions = editSuggestions,
+            onLabelChanged = { viewModel.onEditLabelChanged(it) },
+            onAddressQueryChanged = { viewModel.onEditAddressQueryChanged(it) },
+            onSelectSuggestion = { viewModel.selectEditAddress(it) },
+            onDismiss = { viewModel.cancelEditingSite() },
+            onConfirm = { viewModel.saveEditedSite() }
+        )
+    }
+
+    var formExpanded by rememberSaveable { mutableStateOf(false) }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_sites), onBack = onBack) }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            LaunchedEffect(formExpanded) {
+                if (formExpanded) labelFocusRequester.requestFocus()
+            }
+            NewEntityCard(
+                visible = canManage,
+                title = stringResource(R.string.new_site),
+                expanded = formExpanded,
+                onToggle = { formExpanded = !formExpanded }
+            ) {
+                    OutlinedTextField(
+                        value = uiState.label,
+                        onValueChange = { viewModel.onLabelChanged(it) },
+                        label = { Text(stringResource(R.string.site_label)) },
+                        leadingIcon = { Icon(Icons.Filled.Place, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth().focusRequester(labelFocusRequester)
+                    )
+                    Spacer(Modifier.height(10.dp))
+
+                    ExposedDropdownMenuBox(
+                        expanded = addressDropdownExpanded && suggestions.isNotEmpty(),
+                        onExpandedChange = { addressDropdownExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = uiState.addressQuery,
+                            onValueChange = {
+                                viewModel.onAddressQueryChanged(it)
+                                addressDropdownExpanded = true
+                            },
+                            label = { Text(stringResource(R.string.address)) },
+                            placeholder = { Text(stringResource(R.string.address_placeholder)) },
+                            leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                            keyboardActions = doneField,
+                            singleLine = true,
+                            shape = MaterialTheme.shapes.small,
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = addressDropdownExpanded && suggestions.isNotEmpty(),
+                            onDismissRequest = { addressDropdownExpanded = false }
+                        ) {
+                            suggestions.forEach { suggestion ->
+                                DropdownMenuItem(
+                                    text = { Text(suggestion.label) },
+                                    onClick = {
+                                        viewModel.selectAddress(suggestion)
+                                        addressDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (uiState.latitude == null && uiState.addressQuery.isNotBlank()) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            stringResource(R.string.site_select_address_set),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+                    Button(
+                        onClick = {
+                            viewModel.saveSite()
+                            formExpanded = false
+                        },
+                        enabled = uiState.label.isNotBlank() && uiState.latitude != null,
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.save_site))
+                    }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            SectionHeader(title = stringResource(R.string.registered_sites), count = sites.size)
+            Spacer(Modifier.height(8.dp))
+
+            if (sites.isEmpty()) {
+                EmptyState(text = stringResource(R.string.sites_empty))
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    items(sites, key = { it.id }) { site ->
+                        EntityListItem(
+                            icon = Icons.Filled.Place,
+                            title = site.label,
+                            subtitle = site.address,
+                            onEdit = if (canManage) { { viewModel.startEditingSite(site) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteSite(site) } } else null
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditSiteDialog(
+    state: SiteEditUiState,
+    suggestions: List<AddressSuggestion>,
+    onLabelChanged: (String) -> Unit,
+    onAddressQueryChanged: (String) -> Unit,
+    onSelectSuggestion: (AddressSuggestion) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+    val labelFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { labelFocusRequester.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Place, contentDescription = null) },
+        title = { Text(stringResource(R.string.edit_site)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = state.label,
+                    onValueChange = onLabelChanged,
+                    label = { Text(stringResource(R.string.site_label)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                    keyboardActions = nextField,
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.small,
+                    modifier = Modifier.fillMaxWidth().focusRequester(labelFocusRequester)
+                )
+                Spacer(Modifier.height(10.dp))
+
+                ExposedDropdownMenuBox(
+                    expanded = dropdownExpanded && suggestions.isNotEmpty(),
+                    onExpandedChange = { dropdownExpanded = it }
+                ) {
+                    OutlinedTextField(
+                        value = state.addressQuery,
+                        onValueChange = {
+                            onAddressQueryChanged(it)
+                            dropdownExpanded = true
+                        },
+                        label = { Text(stringResource(R.string.address)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = doneField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = dropdownExpanded && suggestions.isNotEmpty(),
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        suggestions.forEach { suggestion ->
+                            DropdownMenuItem(
+                                text = { Text(suggestion.label) },
+                                onClick = {
+                                    onSelectSuggestion(suggestion)
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (state.latitude == null && state.addressQuery.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.site_select_address_update),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm, enabled = state.label.isNotBlank() && state.latitude != null) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+@Composable
+fun rememberBitmapFromFile(path: String?): ImageBitmap? {
+    var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(path) {
+        bitmap = if (path != null) {
+            withContext(Dispatchers.IO) {
+                BitmapFactory.decodeFile(path)?.asImageBitmap()
+            }
+        } else {
+            null
+        }
+    }
+    return bitmap
+}
+
+@Composable
+fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val photoBitmap = rememberBitmapFromFile(uiState.photoPath)
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val doneField = doneFieldActions(focusManager)
+
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? -> uri?.let { viewModel.onPhotoPicked(it) } }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_profile), onBack = onBack) }) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Box(
+                    modifier = Modifier
+                        .size(120.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.secondaryContainer)
+                        .clickable {
+                            photoPickerLauncher.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                            )
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (photoBitmap != null) {
+                        Image(
+                            bitmap = photoBitmap,
+                            contentDescription = stringResource(R.string.profile_photo),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(120.dp).clip(CircleShape)
+                        )
+                    } else {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+                }
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary, modifier = Modifier.size(32.dp)) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.PhotoCamera,
+                            contentDescription = stringResource(R.string.change_photo),
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(stringResource(R.string.personal_info), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = uiState.name,
+                        onValueChange = { viewModel.onNameChanged(it) },
+                        label = { Text(stringResource(R.string.full_name)) },
+                        leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.phone,
+                        onValueChange = { viewModel.onPhoneChanged(it) },
+                        label = { Text(stringResource(R.string.phone)) },
+                        isError = !Validators.phoneOk(uiState.phone),
+                        supportingText = if (!Validators.phoneOk(uiState.phone)) {
+                            { Text(stringResource(R.string.invalid_phone)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.Phone, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.email,
+                        onValueChange = { viewModel.onEmailChanged(it) },
+                        label = { Text(stringResource(R.string.email)) },
+                        isError = !Validators.emailOk(uiState.email),
+                        supportingText = if (!Validators.emailOk(uiState.email)) {
+                            { Text(stringResource(R.string.invalid_email)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.Email, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.role,
+                        onValueChange = { viewModel.onRoleChanged(it) },
+                        label = { Text(stringResource(R.string.role_position)) },
+                        leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.abn,
+                        onValueChange = { viewModel.onAbnChanged(it) },
+                        label = { Text(stringResource(R.string.profile_abn)) },
+                        isError = !Validators.abnOk(uiState.abn),
+                        supportingText = if (!Validators.abnOk(uiState.abn)) {
+                            { Text(stringResource(R.string.invalid_abn)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.Numbers, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(stringResource(R.string.banking_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = uiState.bankBsb,
+                        onValueChange = { viewModel.onBankBsbChanged(it) },
+                        label = { Text(stringResource(R.string.bsb)) },
+                        isError = !Validators.bsbOk(uiState.bankBsb),
+                        supportingText = if (!Validators.bsbOk(uiState.bankBsb)) {
+                            { Text(stringResource(R.string.invalid_bsb)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.AccountBalance, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = uiState.bankAccount,
+                        onValueChange = { viewModel.onBankAccountChanged(it) },
+                        label = { Text(stringResource(R.string.account_number)) },
+                        isError = !Validators.accountNumberOk(uiState.bankAccount),
+                        supportingText = if (!Validators.accountNumberOk(uiState.bankAccount)) {
+                            { Text(stringResource(R.string.invalid_account_number)) }
+                        } else null,
+                        leadingIcon = { Icon(Icons.Filled.CreditCard, contentDescription = null) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        keyboardActions = doneField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            Button(
+                onClick = { viewModel.saveProfile() },
+                enabled = uiState.name.isNotBlank() && uiState.isValid,
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.save))
+            }
+
+            if (uiState.isSaved) {
+                Spacer(Modifier.height(12.dp))
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(stringResource(R.string.profile_saved), color = MaterialTheme.colorScheme.onPrimaryContainer, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tracker (Start tracking screen)
+// ---------------------------------------------------------------------------
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = viewModel()) {
+    val uiState by viewModel.uiState.collectAsState()
+    val sessions by viewModel.completedSessions.collectAsState()
+    val companies by viewModel.companies.collectAsState()
+    val sites by viewModel.sites.collectAsState()
+    val jobTypes by viewModel.jobTypes.collectAsState()
+    val recentCombos by viewModel.recentCombos.collectAsState()
+    var editingSession by remember { mutableStateOf<TrackingSession?>(null) }
+    var deletingSession by remember { mutableStateOf<TrackingSession?>(null) }
+    var showAddSessionDialog by remember { mutableStateOf(false) }
+    var companyDropdownExpanded by remember { mutableStateOf(false) }
+    var siteDropdownExpanded by remember { mutableStateOf(false) }
+    var jobTypeDropdownExpanded by remember { mutableStateOf(false) }
+    var hasLocationPermission by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        hasLocationPermission = grants[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            grants[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+    }
+
+    LaunchedEffect(Unit) {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        hasLocationPermission = fineGranted
+        // Ask for notifications (API 33+) in the same prompt so the chronometer notification can be shown.
+        val missing = missingTrackingPermissions(context)
+        if (missing.isNotEmpty()) {
+            permissionLauncher.launch(missing)
+        }
+    }
+
+    uiState.lastCompletedSession?.let { session ->
+        SessionSummaryDialog(session = session, onDismiss = { viewModel.dismissSessionSummary() })
+    }
+
+    editingSession?.let { session ->
+        EditSessionDialog(
+            session = session,
+            companyRate = companies.firstOrNull { it.name == session.companyName }?.hourlyRate,
+            onDismiss = { editingSession = null },
+            onConfirm = { newDurationMillis, rate ->
+                viewModel.updateSession(session, newDurationMillis, rate)
+                editingSession = null
+            }
+        )
+    }
+
+    deletingSession?.let { session ->
+        DeleteSessionDialog(
+            session = session,
+            onDismiss = { deletingSession = null },
+            onConfirm = {
+                viewModel.deleteSession(session)
+                deletingSession = null
+            }
+        )
+    }
+
+    if (showAddSessionDialog) {
+        AddSessionDialog(
+            companies = companies,
+            sites = sites,
+            jobTypes = jobTypes,
+            initialCompany = uiState.selectedCompany,
+            initialSite = uiState.selectedSite,
+            initialJobType = uiState.selectedJobType,
+            onDismiss = { showAddSessionDialog = false },
+            onConfirm = { company, site, jobType, startMillis, stopMillis, rate ->
+                viewModel.addManualSession(company, site, jobType, startMillis, stopMillis, rate)
+                showAddSessionDialog = false
+            }
+        )
+    }
+
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.app_name), onBack = onBack) }) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+            if (!hasLocationPermission) {
+                InfoBanner(
+                    icon = Icons.Filled.LocationOff,
+                    text = stringResource(R.string.location_permission_required),
+                    containerColor = MaterialTheme.colorScheme.errorContainer,
+                    contentColor = MaterialTheme.colorScheme.onErrorContainer
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
+            val missing = listOfNotNull(
+                stringResource(R.string.missing_companies).takeIf { companies.isEmpty() },
+                stringResource(R.string.missing_sites).takeIf { sites.isEmpty() },
+                stringResource(R.string.missing_job_types).takeIf { jobTypes.isEmpty() }
+            )
+            if (missing.isNotEmpty()) {
+                InfoBanner(
+                    icon = Icons.Filled.Info,
+                    text = stringResource(R.string.setup_missing_banner, missing.joinToString(", ")),
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Spacer(Modifier.height(12.dp))
+            }
+
+            ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Text(stringResource(R.string.session_details), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(12.dp))
+
+                    if (recentCombos.isNotEmpty() && !uiState.isSessionActive) {
+                        RecentCombosRow(
+                            combos = recentCombos,
+                            selected = uiState.let { st -> recentCombos.firstOrNull {
+                                it.company.id == st.selectedCompany?.id && it.site.id == st.selectedSite?.id && it.jobType.id == st.selectedJobType?.id
+                            } },
+                            onSelect = { viewModel.selectCombo(it) }
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
+
+                    if (companies.isNotEmpty()) {
+                        TrackerDropdown(
+                            label = stringResource(R.string.company),
+                            icon = Icons.Filled.Business,
+                            value = uiState.selectedCompany?.name ?: stringResource(R.string.select_company),
+                            expanded = companyDropdownExpanded,
+                            enabled = !uiState.isSessionActive,
+                            onExpandedChange = { companyDropdownExpanded = it && !uiState.isSessionActive },
+                            onDismiss = { companyDropdownExpanded = false }
+                        ) {
+                            companies.forEach { company ->
+                                DropdownMenuItem(
+                                    text = { Text(company.name) },
+                                    onClick = {
+                                        viewModel.selectCompany(company)
+                                        companyDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
+
+                    if (sites.isNotEmpty()) {
+                        TrackerDropdown(
+                            label = stringResource(R.string.site),
+                            icon = Icons.Filled.Place,
+                            value = uiState.selectedSite?.label ?: stringResource(R.string.select_site),
+                            expanded = siteDropdownExpanded,
+                            enabled = !uiState.isSessionActive,
+                            onExpandedChange = { siteDropdownExpanded = it && !uiState.isSessionActive },
+                            onDismiss = { siteDropdownExpanded = false }
+                        ) {
+                            sites.forEach { site ->
+                                DropdownMenuItem(
+                                    text = { Text(site.label) },
+                                    onClick = {
+                                        viewModel.selectSite(site)
+                                        siteDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                    }
+
+                    if (jobTypes.isNotEmpty()) {
+                        TrackerDropdown(
+                            label = stringResource(R.string.job_description),
+                            icon = Icons.Filled.Work,
+                            value = uiState.selectedJobType?.name ?: stringResource(R.string.select_job_type),
+                            expanded = jobTypeDropdownExpanded,
+                            enabled = !uiState.isSessionActive,
+                            onExpandedChange = { jobTypeDropdownExpanded = it && !uiState.isSessionActive },
+                            onDismiss = { jobTypeDropdownExpanded = false }
+                        ) {
+                            jobTypes.forEach { jobType ->
+                                DropdownMenuItem(
+                                    text = { Text(jobType.name) },
+                                    onClick = {
+                                        viewModel.selectJobType(jobType)
+                                        jobTypeDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    uiState.locationErrorRes?.let { resId ->
+                        Spacer(Modifier.height(10.dp))
+                        Text(stringResource(resId), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            val canStart = hasLocationPermission && uiState.selectedCompany != null &&
+                uiState.selectedSite != null && uiState.selectedJobType != null &&
+                !uiState.isSessionActive && !uiState.isProcessing
+            val canStop = uiState.isSessionActive && !uiState.isProcessing
+
+            if (!uiState.isSessionActive) {
+                Button(
+                    onClick = { viewModel.startTracking() },
+                    enabled = canStart,
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                ) {
+                    if (uiState.isProcessing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Filled.PlayArrow, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.start), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Button(
+                    onClick = { viewModel.stopTracking() },
+                    enabled = canStop,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth().height(56.dp)
+                ) {
+                    if (uiState.isProcessing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = MaterialTheme.colorScheme.onError,
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(Icons.Filled.Stop, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.stop), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+            OutlinedButton(
+                onClick = { showAddSessionDialog = true },
+                enabled = companies.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
+                shape = MaterialTheme.shapes.medium,
+                modifier = Modifier.fillMaxWidth().height(48.dp)
+            ) {
+                Icon(Icons.Filled.EditCalendar, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.add_session_manually))
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SectionHeader(title = stringResource(R.string.history), count = sessions.size)
+            Spacer(Modifier.height(8.dp))
+
+            if (sessions.isEmpty()) {
+                EmptyState(text = stringResource(R.string.sessions_empty))
+            } else {
+                // Newest day first; each day gets a header with its total, like a timesheet.
+                val zone = remember { ZoneId.systemDefault() }
+                val days = remember(sessions) {
+                    sessions.groupBy { Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate() }
+                        .toSortedMap(compareByDescending { it })
+                        .map { (date, list) -> date to list }
+                }
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(bottom = 16.dp)
+                ) {
+                    days.forEach { (date, daySessions) ->
+                        item(key = "day-$date") {
+                            DayHeader(date = date, totalMillis = daySessions.sumOf { it.durationMillis ?: 0L })
+                        }
+                        items(daySessions, key = { it.id }) { session ->
+                            SessionRow(
+                                session = session,
+                                onEditClick = { editingSession = session },
+                                onDeleteClick = { deletingSession = session }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** One-tap chips with the last few company/site/job type combinations. */
+@Composable
+private fun RecentCombosRow(combos: List<SessionCombo>, selected: SessionCombo?, onSelect: (SessionCombo) -> Unit) {
+    Column {
+        Text(
+            stringResource(R.string.recent_combos),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(Modifier.height(4.dp))
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.horizontalScroll(rememberScrollState())
+        ) {
+            combos.forEach { combo ->
+                val isSelected = combo == selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { onSelect(combo) },
+                    label = {
+                        Column {
+                            Text(combo.site.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+                            Text(
+                                "${combo.company.name} · ${combo.jobType.name}",
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1
+                            )
+                        }
+                    },
+                    leadingIcon = if (isSelected) {
+                        { Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                    } else null,
+                    modifier = Modifier.height(52.dp)
+                )
+            }
+        }
+    }
+}
+
+/** Date header in the tracker history with the day's total hours. */
+@Composable
+private fun DayHeader(date: LocalDate, totalMillis: Long) {
+    val locale = LocalContext.current.resources.configuration.locales[0]
+    val formatter = remember(locale) { DateTimeFormatter.ofPattern("EEE, d MMM", locale) }
+    val totalText = stringResource(
+        R.string.duration_format,
+        TimeUnit.MILLISECONDS.toHours(totalMillis),
+        TimeUnit.MILLISECONDS.toMinutes(totalMillis) % 60
+    )
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+        Text(
+            date.format(formatter).trimEnd('.').replaceFirstChar { it.titlecase(locale) },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            totalText,
+            style = MaterialTheme.typography.labelLarge.tabularNums,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+/** Lets the user type in a session that wasn't tracked with GPS (date + start/end time). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddSessionDialog(
+    companies: List<Company>,
+    sites: List<Site>,
+    jobTypes: List<JobType>,
+    initialCompany: Company?,
+    initialSite: Site?,
+    initialJobType: JobType?,
+    onDismiss: () -> Unit,
+    onConfirm: (company: Company, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long, hourlyRate: Double?) -> Unit,
+    initialDate: LocalDate = LocalDate.now()
+) {
+    val context = LocalContext.current
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+
+    var company by remember { mutableStateOf(initialCompany ?: companies.singleOrNull()) }
+    var rateText by remember { mutableStateOf("") }
+    var site by remember { mutableStateOf(initialSite ?: sites.singleOrNull()) }
+    var jobType by remember { mutableStateOf(initialJobType ?: jobTypes.singleOrNull()) }
+    var date by remember { mutableStateOf(initialDate) }
+    var startTime by remember { mutableStateOf(LocalTime.of(7, 0)) }
+    // Duration is what gets saved; the end time shown is always start + duration, so the
+    // three fields stay consistent whichever one the user edits (and shifts can cross midnight).
+    var hoursText by remember { mutableStateOf("8") }
+    var minutesText by remember { mutableStateOf("30") }
+    var companyExpanded by remember { mutableStateOf(false) }
+    var siteExpanded by remember { mutableStateOf(false) }
+    var jobTypeExpanded by remember { mutableStateOf(false) }
+
+    val durationMinutes = (hoursText.toLongOrNull() ?: 0L) * 60 + (minutesText.toLongOrNull() ?: 0L).coerceIn(0, 59)
+    val endTime = startTime.plusMinutes(durationMinutes)
+    val zone = ZoneId.systemDefault()
+    val startMillis = date.atTime(startTime).atZone(zone).toInstant().toEpochMilli()
+    val stopMillis = startMillis + TimeUnit.MINUTES.toMillis(durationMinutes)
+    val canSave = company != null && site != null && jobType != null && durationMinutes > 0 && Validators.amountOk(rateText)
+
+    // Minutes from [from] to [to] on the clock; a "to" at or before "from" is read as the next day.
+    fun minutesBetween(from: LocalTime, to: LocalTime): Long {
+        val diff = Duration.between(from, to).toMinutes()
+        return if (diff <= 0) diff + 24 * 60 else diff
+    }
+    fun setDuration(minutes: Long) {
+        hoursText = (minutes / 60).toString()
+        minutesText = (minutes % 60).toString()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.EditCalendar, contentDescription = null) },
+        title = { Text(stringResource(R.string.add_session)) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                TrackerDropdown(
+                    label = stringResource(R.string.company),
+                    icon = Icons.Filled.Business,
+                    value = company?.name ?: stringResource(R.string.select_company),
+                    expanded = companyExpanded,
+                    enabled = true,
+                    onExpandedChange = { companyExpanded = it },
+                    onDismiss = { companyExpanded = false }
+                ) {
+                    companies.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { company = option; companyExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.site),
+                    icon = Icons.Filled.Place,
+                    value = site?.label ?: stringResource(R.string.select_site),
+                    expanded = siteExpanded,
+                    enabled = true,
+                    onExpandedChange = { siteExpanded = it },
+                    onDismiss = { siteExpanded = false }
+                ) {
+                    sites.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.label) }, onClick = { site = option; siteExpanded = false })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                TrackerDropdown(
+                    label = stringResource(R.string.job_description),
+                    icon = Icons.Filled.Work,
+                    value = jobType?.name ?: stringResource(R.string.select_job_type),
+                    expanded = jobTypeExpanded,
+                    enabled = true,
+                    onExpandedChange = { jobTypeExpanded = it },
+                    onDismiss = { jobTypeExpanded = false }
+                ) {
+                    jobTypes.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { jobType = option; jobTypeExpanded = false })
+                    }
+                }
+
+                Spacer(Modifier.height(14.dp))
+                OutlinedButton(
+                    onClick = { showDatePicker(context, date) { date = it } },
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Filled.DateRange, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("${stringResource(R.string.date)}: ${date.format(dateFormatter)}")
+                }
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            showTimePicker(context, startTime) { picked ->
+                                val keptEnd = endTime
+                                startTime = picked
+                                setDuration(minutesBetween(picked, keptEnd))
+                            }
+                        },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(startTime.format(timeFormatter))
+                    }
+                    OutlinedButton(
+                        onClick = { showTimePicker(context, endTime) { setDuration(minutesBetween(startTime, it)) } },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Filled.Schedule, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(endTime.format(timeFormatter))
+                    }
+                }
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        stringResource(R.string.start_time),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        stringResource(R.string.end_time),
+                        modifier = Modifier.weight(1f),
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    stringResource(R.string.duration),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = hoursText,
+                        onValueChange = { value -> hoursText = value.filter { it.isDigit() }.take(3) },
+                        label = { Text(stringResource(R.string.hours)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = minutesText,
+                        onValueChange = { value -> minutesText = value.filter { it.isDigit() }.take(2) },
+                        label = { Text(stringResource(R.string.minutes)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        isError = (minutesText.toIntOrNull() ?: 0) > 59,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (durationMinutes <= 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        stringResource(R.string.duration_required),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Spacer(Modifier.height(14.dp))
+                SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = company?.hourlyRate)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(company!!, site!!, jobType!!, startMillis, stopMillis, Validators.parseAmount(rateText)) },
+                enabled = canSave
+            ) {
+                Text(stringResource(R.string.add))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
+    val durationMillis = session.durationMillis ?: 0L
+    val hours = TimeUnit.MILLISECONDS.toHours(durationMillis)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+    val dateFormatter = remember { SimpleDateFormat("dd/MM/yyyy", Locale.ENGLISH) }
+    val dateLine = dateFormatter.format(Date(session.startTimestampMillis))
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.tertiaryContainer, modifier = Modifier.size(40.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Filled.Place,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                if (!session.siteLabel.isNullOrBlank()) {
+                    Text(session.siteLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                if (!session.jobTypeLabel.isNullOrBlank()) {
+                    Text(session.jobTypeLabel, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Text(dateLine, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                session.hourlyRate?.let { rate ->
+                    Spacer(Modifier.height(2.dp))
+                    Surface(shape = MaterialTheme.shapes.extraSmall, color = MaterialTheme.colorScheme.tertiaryContainer) {
+                        Text(
+                            stringResource(R.string.rate_per_hour, formatRateInput(rate)),
+                            style = MaterialTheme.typography.labelSmall.tabularNums,
+                            color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            maxLines = 1,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp)
+                        )
+                    }
+                }
+            }
+            Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.secondaryContainer) {
+                Text(
+                    stringResource(R.string.duration_format, hours, minutes),
+                    style = MaterialTheme.typography.labelLarge.tabularNums,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                )
+            }
+            IconButton(onClick = onEditClick) {
+                Icon(Icons.Filled.Edit, contentDescription = stringResource(R.string.edit))
+            }
+            IconButton(onClick = onDeleteClick) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error)
+            }
+        }
+    }
+}
+
+/** Hourly-rate override input shared by the add/edit session dialogs; blank means "use the company default". */
+@Composable
+internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, companyRate: Double?) {
+    val valid = Validators.amountOk(value)
+    val focusManager = LocalFocusManager.current
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(stringResource(R.string.hourly_rate_optional)) },
+        leadingIcon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
+        isError = !valid,
+        supportingText = {
+            Text(
+                when {
+                    !valid -> stringResource(R.string.enter_valid_amount)
+                    companyRate != null -> stringResource(R.string.session_rate_default_hint, formatRateInput(companyRate))
+                    else -> stringResource(R.string.session_rate_no_default)
+                }
+            )
+        },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+        keyboardActions = doneFieldActions(focusManager),
+        singleLine = true,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+/** Edits a completed session's duration and optional rate override. */
+@Composable
+fun EditSessionDialog(
+    session: TrackingSession,
+    companyRate: Double?,
+    onDismiss: () -> Unit,
+    onConfirm: (durationMillis: Long, hourlyRate: Double?) -> Unit
+) {
+    val durationMillis = session.durationMillis ?: 0L
+    var hoursText by remember { mutableStateOf(TimeUnit.MILLISECONDS.toHours(durationMillis).toString()) }
+    var minutesText by remember { mutableStateOf((TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60).toString()) }
+    var rateText by remember { mutableStateOf(session.hourlyRate?.let { formatRateInput(it) }.orEmpty()) }
+    val focusManager = LocalFocusManager.current
+    val nextField = nextFieldActions(focusManager)
+    val hoursFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { hoursFocusRequester.requestFocus() }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Edit, contentDescription = null) },
+        title = { Text(stringResource(R.string.edit_session)) },
+        text = {
+            Column {
+                Text(
+                    stringResource(R.string.duration),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = hoursText,
+                        onValueChange = { value -> hoursText = value.filter { it.isDigit() } },
+                        label = { Text(stringResource(R.string.hours)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f).focusRequester(hoursFocusRequester)
+                    )
+                    OutlinedTextField(
+                        value = minutesText,
+                        onValueChange = { value -> minutesText = value.filter { it.isDigit() } },
+                        label = { Text(stringResource(R.string.minutes)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                        keyboardActions = nextField,
+                        singleLine = true,
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
+                SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = companyRate)
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val hours = hoursText.toLongOrNull() ?: 0
+                    val minutes = (minutesText.toLongOrNull() ?: 0).coerceIn(0, 59)
+                    onConfirm(TimeUnit.HOURS.toMillis(hours) + TimeUnit.MINUTES.toMillis(minutes), Validators.parseAmount(rateText))
+                },
+                enabled = Validators.amountOk(rateText)
+            ) {
+                Text(stringResource(R.string.save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun DeleteSessionDialog(session: TrackingSession, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+        title = { Text(stringResource(R.string.delete_entry)) },
+        text = {
+            val label = session.siteLabel?.takeIf { it.isNotBlank() }
+            Text(
+                if (label != null) stringResource(R.string.delete_entry_confirm_named, label)
+                else stringResource(R.string.delete_entry_confirm)
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun SessionSummaryDialog(session: TrackingSession, onDismiss: () -> Unit) {
+    val formatter = remember { SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.ENGLISH) }
+    val durationMillis = session.durationMillis ?: 0L
+    val hours = TimeUnit.MILLISECONDS.toHours(durationMillis)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(durationMillis) % 60
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+        title = { Text(stringResource(R.string.session_finished)) },
+        text = {
+            Column {
+                if (!session.siteLabel.isNullOrBlank()) {
+                    Text(stringResource(R.string.session_site, session.siteLabel))
+                }
+                if (!session.companyName.isNullOrBlank()) {
+                    Text(stringResource(R.string.session_company, session.companyName))
+                }
+                if (!session.jobTypeLabel.isNullOrBlank()) {
+                    Text(stringResource(R.string.session_job_type, session.jobTypeLabel))
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.session_start, formatter.format(Date(session.startTimestampMillis))))
+                session.stopTimestampMillis?.let {
+                    Text(stringResource(R.string.session_end, formatter.format(Date(it))))
+                }
+                Spacer(Modifier.height(8.dp))
+                Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
+                    Text(
+                        text = stringResource(R.string.session_duration, hours, minutes),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(
+                        R.string.session_start_location,
+                        "%.6f".format(session.startLatitude),
+                        "%.6f".format(session.startLongitude)
+                    )
+                )
+                if (session.stopLatitude != null && session.stopLongitude != null) {
+                    Text(
+                        stringResource(
+                            R.string.session_end_location,
+                            "%.6f".format(session.stopLatitude),
+                            "%.6f".format(session.stopLongitude)
+                        )
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.ok))
+            }
+        }
+    )
+}

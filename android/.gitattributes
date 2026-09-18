@@ -1,0 +1,8 @@
+# Normalise line endings; keep the Unix launcher LF and the Windows one CRLF
+* text=auto
+gradlew text eol=lf
+*.bat text eol=crlf
+*.sh text eol=lf
+*.png binary
+*.jpg binary
+*.jar binary

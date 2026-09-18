@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Cleartext HTTP only for the loopback address, which is where `adb reverse tcp:8080 tcp:8080`
+  points a physical device at the backend running on the development machine. Remove this once
+  the backend is reachable over HTTPS from a real deployment.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>
