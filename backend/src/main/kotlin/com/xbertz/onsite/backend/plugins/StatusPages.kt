@@ -2,6 +2,7 @@ package com.xbertz.onsite.backend.plugins
 
 import com.xbertz.onsite.backend.connections.ConnectionAccessDenied
 import com.xbertz.onsite.backend.identity.AccountAccessDenied
+import com.xbertz.onsite.backend.identity.EmailAlreadyRegistered
 import com.xbertz.onsite.backend.identity.OwnerRequired
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
@@ -25,6 +26,9 @@ fun Application.configureStatusPages() {
         }
         exception<ConnectionAccessDenied> { call, _ ->
             call.respond(HttpStatusCode.Forbidden, mapOf("error" to "caller is not party to this connection"))
+        }
+        exception<EmailAlreadyRegistered> { call, cause ->
+            call.respond(HttpStatusCode.Conflict, mapOf("error" to "email already registered under a different identity: ${cause.email}"))
         }
         exception<IllegalArgumentException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, mapOf("error" to (cause.message ?: "bad request")))

@@ -14,6 +14,13 @@ import java.time.Instant
 import java.util.UUID
 
 /**
+ * Thrown by [IdentityRepository.bootstrap] when [email] already belongs to a different
+ * `users.id` than the caller's token carries - see that function's kdoc for why this can
+ * happen and why it's reported instead of silently patched over.
+ */
+class EmailAlreadyRegistered(val email: String) : Exception("email already registered under a different identity: $email")
+
+/**
  * Everything a client needs to know right after signing in: who it is, and which
  * account(s) it can act as (its own personal account, plus any account it was invited
  * into later, once memberships beyond the personal one exist).
@@ -24,11 +31,21 @@ class IdentityRepository {
      * Idempotent: safe to call on every login. Creates the `users` row and, only the very
      * first time, a personal account with an OWNER membership. Later calls just refresh the
      * denormalized email/display name and return the current state.
+     *
+     * Looked up by `userId` (the token's `sub`), not by email, because identity is defined by
+     * the token, not the address. That only bites when two different tokens claim the same
+     * email under two different ids - in practice, mixing a real Supabase-issued token with
+     * the dev-only login's token (each mints its own UUID for the same address) on the same
+     * local backend. Rather than let that hit `users_email_key` and bubble up as an opaque
+     * 500, it's reported as [EmailAlreadyRegistered] so the caller knows exactly what
+     * happened: sign in the same way you did the first time for this email.
      */
     fun bootstrap(userId: UUID, email: String): MeResponse = transaction {
         val now = Instant.now()
         val existingUser = Users.selectAll().where { Users.id eq userId }.singleOrNull()
         if (existingUser == null) {
+            val emailTakenByOther = Users.selectAll().where { Users.email eq email }.any()
+            if (emailTakenByOther) throw EmailAlreadyRegistered(email)
             Users.insert {
                 it[id] = userId
                 it[Users.email] = email

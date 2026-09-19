@@ -48,7 +48,11 @@ dependencies {
     implementation("ch.qos.logback:logback-classic:1.5.8")
 
     testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")
-    testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.24")
+    // `useJUnitPlatform()` below runs on the JUnit 5 platform, which needs the Jupiter engine
+    // on the classpath to actually discover and execute tests - kotlin-test-junit (no "5")
+    // only binds kotlin.test to JUnit 4 and silently runs zero tests under the platform.
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:1.9.24")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.3")
 }
 
 tasks.withType<KotlinCompile> {
