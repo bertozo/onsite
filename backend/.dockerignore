@@ -1,0 +1,9 @@
+build
+.gradle
+.env
+*.log
+tools
+*.md
+openapi.yaml
+postman_collection.json
+api-reference.html

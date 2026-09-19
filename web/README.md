@@ -38,6 +38,10 @@ management.
 
 ## Local development
 
+> To run the web app in a container (alongside the backend and Postgres), see the root
+> `../docker-compose.yml` instead - this section is the host-based dev workflow (`npm run
+> dev`, hot-reload), which `Dockerfile` here does not use.
+
 Needs `onsite-backend` running locally (see `../backend/README.md`):
 
 ```bash

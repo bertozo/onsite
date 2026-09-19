@@ -61,6 +61,31 @@ tasks.withType<KotlinCompile> {
     }
 }
 
+// flyway-core and flyway-database-postgresql each ship their own
+// META-INF/services/org.flywaydb.core.extensibility.Plugin file. Shadow's default merge
+// strategy keeps only one, silently dropping the other's plugin registrations - which broke
+// Flyway's migration scanning when run from the fat jar (it saw the 4 SQL migrations but
+// rejected all of them as not matching the naming convention, applying none). buildFatJar
+// and :run use different classpaths (one merged jar vs. exploded directories), so this only
+// ever showed up in the packaged jar. Merging the service files keeps every module's
+// registrations intact, matching how :run resolves them.
+// flyway-core and flyway-database-postgresql each ship their own
+// META-INF/services/org.flywaydb.core.extensibility.Plugin file. Shadow's default merge
+// strategy keeps only one, silently dropping the other's plugin registrations - which broke
+// Flyway's migration scanning when run from the fat jar (it saw the 4 SQL migrations but
+// rejected all of them as not matching the naming convention, applying none). buildFatJar
+// and :run use different classpaths (one merged jar vs. exploded directories), so this only
+// ever showed up in the packaged jar. Merging the service files keeps every module's
+// registrations intact, matching how :run resolves them.
+// The Ktor Gradle plugin applies Shadow internally rather than via this script's own
+// `plugins {}` block, so its task type isn't resolvable here for a typed `tasks.named<>` -
+// withGroovyBuilder configures it dynamically instead.
+tasks.named("shadowJar") {
+    withGroovyBuilder {
+        "mergeServiceFiles"()
+    }
+}
+
 tasks.test {
     useJUnitPlatform()
 }

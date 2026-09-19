@@ -1,0 +1,63 @@
+# Full local/prod-like stack: Postgres + backend + web, all in containers.
+#
+#   docker compose up --build
+#
+# Web:     http://localhost:5173
+# Backend: http://localhost:8080
+#
+# This is NOT the day-to-day dev workflow (no hot-reload for either service - the backend
+# rebuilds its jar and the web app rebuilds its static bundle on every `--build`). For
+# active development, run Postgres from here (or backend/docker-compose.yml) and use
+# `./gradlew run` / `npm run dev` directly instead - see backend/README.md and web/README.md.
+#
+# Override values in a root .env file (see .env.example) rather than editing this file.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: onsite
+      POSTGRES_USER: onsite
+      POSTGRES_PASSWORD: onsite_dev_only
+    ports:
+      - "5432:5432"
+    volumes:
+      - onsite-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U onsite"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8080:8080"
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/onsite
+      DB_USER: onsite
+      DB_PASSWORD: onsite_dev_only
+      SUPABASE_PROJECT_URL: ${SUPABASE_PROJECT_URL:-https://bbxciadhznsdpdnwdynw.supabase.co}
+      SUPABASE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-dev-only-secret-change-me}
+      SUPABASE_JWT_ISSUER: supabase
+      DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
+      PORT: 8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      args:
+        # Baked into the static bundle at build time - must be reachable from the host
+        # browser, not the compose network (see web/Dockerfile). Override via WEB_BACKEND_URL
+        # in .env if the backend is published on a different host/port.
+        VITE_BACKEND_URL: ${WEB_BACKEND_URL:-http://localhost:8080}
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  onsite-postgres-data:

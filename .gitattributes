@@ -1,0 +1,5 @@
+# Gradle wrapper scripts must stay LF regardless of a Windows checkout's autocrlf setting -
+# CRLF in the shebang line breaks `./gradlew` inside any Linux container (see backend's
+# Dockerfile, which build the backend's fat jar in one).
+gradlew text eol=lf
+gradlew.bat text eol=crlf

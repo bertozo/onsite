@@ -37,6 +37,10 @@ side can revoke (`DELETE /v1/connections/{id}`).
 
 ## Local development
 
+> To run the backend itself in a container (alongside Postgres and the web app), see the
+> root `../docker-compose.yml` instead - this section is the host-based dev workflow
+> (`./gradlew run`, hot classes on rebuild), which `Dockerfile` here does not use.
+
 Requires Docker Desktop running, and the JDK already used by the Android project
 (`export JAVA_HOME="$HOME/.jdks/jbr-21.0.11"` on this machine).
 

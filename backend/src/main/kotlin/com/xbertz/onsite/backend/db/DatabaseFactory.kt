@@ -12,6 +12,12 @@ object DatabaseFactory {
         val dataSource = hikariDataSource(config)
         Flyway.configure()
             .dataSource(dataSource)
+            // Without this, a migration Flyway can't resolve is silently skipped (not
+            // failed) - which is exactly what happened when a service-file merge bug in the
+            // Docker build's fat jar broke migration scanning: the app "started fine" against
+            // a schema that had zero tables. Fail loudly instead (see build.gradle.kts's
+            // shadowJar mergeServiceFiles comment for the actual bug this caught).
+            .validateMigrationNaming(true)
             .load()
             .migrate()
         Database.connect(dataSource)
