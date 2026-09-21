@@ -6,7 +6,7 @@ import { loadSession, updateTokens } from "./sessionStore";
 import { refreshSession } from "./supabaseAuth";
 import type {
   AccountMembershipDto,
-  CompanyRequest,
+  ClientRequest,
   ConnectionDto,
   ConnectionInviteDto,
   ConnectionPlannedJobRequest,
@@ -89,8 +89,8 @@ export const backendApi = {
   createConnectionInvite: (accountId: string, email: string) =>
     request<ConnectionInviteDto>("POST", `/v1/accounts/${accountId}/connection-invites`, { email }),
   listMyConnectionInvites: () => request<ConnectionInviteDto[]>("GET", "/v1/me/connection-invites"),
-  acceptConnectionInvite: (inviteId: string, companyId: string) =>
-    request<ConnectionDto>("POST", `/v1/me/connection-invites/${inviteId}/accept`, { companyId }),
+  acceptConnectionInvite: (inviteId: string, clientId: string) =>
+    request<ConnectionDto>("POST", `/v1/me/connection-invites/${inviteId}/accept`, { clientId }),
   listMyConnections: () => request<ConnectionDto[]>("GET", "/v1/me/connections"),
   listEmployerConnections: () => request<ConnectionDto[]>("GET", "/v1/connections"),
   revokeConnection: (connectionId: string) => request<void>("DELETE", `/v1/connections/${connectionId}`),
@@ -100,11 +100,11 @@ export const backendApi = {
   listConnectionSessions: (connectionId: string) =>
     request<ConnectionSessionDto[]>("GET", `/v1/connections/${connectionId}/sessions`),
 
-  // -- companies ----------------------------------------------------------
-  listCompanies: () => request<CompanyRequest[]>("GET", "/v1/companies"),
-  createCompany: (req: CompanyRequest) => request<void>("POST", "/v1/companies", req),
-  updateCompany: (id: string, req: CompanyRequest) => request<void>("PUT", `/v1/companies/${id}`, req),
-  deleteCompany: (id: string) => request<void>("DELETE", `/v1/companies/${id}`),
+  // -- clients ----------------------------------------------------------
+  listClients: () => request<ClientRequest[]>("GET", "/v1/clients"),
+  createClient: (req: ClientRequest) => request<void>("POST", "/v1/clients", req),
+  updateClient: (id: string, req: ClientRequest) => request<void>("PUT", `/v1/clients/${id}`, req),
+  deleteClient: (id: string) => request<void>("DELETE", `/v1/clients/${id}`),
 
   // -- sites ----------------------------------------------------------------
   listSites: () => request<SiteRequest[]>("GET", "/v1/sites"),

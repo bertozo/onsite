@@ -23,7 +23,7 @@ object Connections : Table("connections") {
     val employerAccountId = uuid("employer_account_id").references(Accounts.id)
     val workerAccountId = uuid("worker_account_id").references(Accounts.id)
     val workerUserId = uuid("worker_user_id").references(Users.id)
-    val workerCompanyId = uuid("worker_company_id").references(Companies.id)
+    val workerClientId = uuid("worker_client_id").references(Clients.id)
     val status = varchar("status", 16)
     val createdAt = timestamp("created_at")
     val revokedAt = timestamp("revoked_at").nullable()

@@ -3,8 +3,8 @@ package com.xbertz.onsite.data
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "companies")
-data class Company(
+@Entity(tableName = "clients")
+data class Client(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val name: String,
     val abn: String?,

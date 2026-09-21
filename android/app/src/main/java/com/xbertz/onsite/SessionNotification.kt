@@ -32,7 +32,7 @@ object SessionNotification {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val details = listOfNotNull(
-            session.companyName?.takeIf { it.isNotBlank() },
+            session.clientName?.takeIf { it.isNotBlank() },
             session.jobTypeLabel?.takeIf { it.isNotBlank() }
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)

@@ -71,7 +71,7 @@ import com.xbertz.onsite.report.ReportSummary
 import com.xbertz.onsite.report.WeekTotal
 import com.xbertz.onsite.report.buildCsv
 import com.xbertz.onsite.report.summarize
-import com.xbertz.onsite.report.totalsByCompany
+import com.xbertz.onsite.report.totalsByClient
 import com.xbertz.onsite.report.totalsByJobType
 import com.xbertz.onsite.report.totalsBySite
 import com.xbertz.onsite.report.weeklyTotals
@@ -103,17 +103,17 @@ fun ReportsScreen(
 ) {
     val sessions by viewModel.completedSessions.collectAsState()
     val sites by viewModel.sites.collectAsState()
-    val companies by invoiceViewModel.companies.collectAsState()
+    val clients by invoiceViewModel.clients.collectAsState()
     val columnSelection by reportViewModel.columns.collectAsState()
     val filters by reportViewModel.filters.collectAsState()
     val invoiceState by invoiceViewModel.uiState.collectAsState()
     val columns = remember(columnSelection) { ReportColumn.ordered(columnSelection) }
     val sitesByLabel = remember(sites) { sites.associateBy { it.label } }
-    val ratesByCompany = remember(companies) { companies.associate { it.name to it.hourlyRate } }
+    val ratesByClient = remember(clients) { clients.associate { it.name to it.hourlyRate } }
     val context = LocalContext.current
     val zone = remember { ZoneId.systemDefault() }
     var showColumnsDialog by remember { mutableStateOf(false) }
-    var companyMenuOpen by remember { mutableStateOf(false) }
+    var clientMenuOpen by remember { mutableStateOf(false) }
     var periodMenuOpen by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
@@ -144,14 +144,14 @@ fun ReportsScreen(
         val rangeEndMillis = endDate.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
         sessions
             .filter { it.startTimestampMillis in rangeStartMillis until rangeEndMillis }
-            .filter { filters.company == null || it.companyName == filters.company }
+            .filter { filters.client == null || it.clientName == filters.client }
             .filter { !filters.unbilledOnly || it.invoiceId == null }
             .sortedBy { it.startTimestampMillis }
     }
-    val summary = remember(filteredSessions, ratesByCompany) { summarize(filteredSessions, ratesByCompany, zone) }
+    val summary = remember(filteredSessions, ratesByClient) { summarize(filteredSessions, ratesByClient, zone) }
     val weeks = remember(filteredSessions, startDate, endDate) { weeklyTotals(filteredSessions, startDate, endDate, zone) }
     val bySite = remember(filteredSessions) { totalsBySite(filteredSessions) }
-    val byCompany = remember(filteredSessions) { totalsByCompany(filteredSessions) }
+    val byClient = remember(filteredSessions) { totalsByClient(filteredSessions) }
     val byJobType = remember(filteredSessions) { totalsByJobType(filteredSessions) }
 
     // Column labels resolved here (composable context) so the CSV builder stays a plain function.
@@ -228,26 +228,26 @@ fun ReportsScreen(
                 )
             }
 
-            // Filters: company + unbilled only
+            // Filters: client + unbilled only
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 Box {
                     FilterChip(
-                        selected = filters.company != null,
-                        onClick = { companyMenuOpen = true },
-                        label = { Text(filters.company ?: stringResource(R.string.all_companies)) },
+                        selected = filters.client != null,
+                        onClick = { clientMenuOpen = true },
+                        label = { Text(filters.client ?: stringResource(R.string.all_clients)) },
                         leadingIcon = { Icon(Icons.Filled.Business, contentDescription = null, modifier = Modifier.size(16.dp)) },
                         trailingIcon = { Icon(Icons.Filled.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
-                    DropdownMenu(expanded = companyMenuOpen, onDismissRequest = { companyMenuOpen = false }) {
+                    DropdownMenu(expanded = clientMenuOpen, onDismissRequest = { clientMenuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.all_companies)) },
-                            onClick = { reportViewModel.setCompany(null); companyMenuOpen = false }
+                            text = { Text(stringResource(R.string.all_clients)) },
+                            onClick = { reportViewModel.setClient(null); clientMenuOpen = false }
                         )
-                        companies.forEach { company ->
+                        clients.forEach { client ->
                             DropdownMenuItem(
-                                text = { Text(company.name) },
-                                onClick = { reportViewModel.setCompany(company.name); companyMenuOpen = false }
+                                text = { Text(client.name) },
+                                onClick = { reportViewModel.setClient(client.name); clientMenuOpen = false }
                             )
                         }
                     }
@@ -294,7 +294,7 @@ fun ReportsScreen(
                         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Button(
                                 onClick = {
-                                    val preselected = filters.company?.let { name -> companies.firstOrNull { it.name == name } }
+                                    val preselected = filters.client?.let { name -> clients.firstOrNull { it.name == name } }
                                     invoiceViewModel.startReview(filteredSessions, startDate, endDate, preselected)
                                     onReviewInvoice()
                                 },
@@ -314,7 +314,7 @@ fun ReportsScreen(
                         Spacer(Modifier.height(8.dp))
                         OutlinedButton(
                             onClick = {
-                                val csv = buildCsv(filteredSessions, columns, columnLabels, rateLabel, amountLabel, sitesByLabel, ratesByCompany, zone)
+                                val csv = buildCsv(filteredSessions, columns, columnLabels, rateLabel, amountLabel, sitesByLabel, ratesByClient, zone)
                                 val uri = reportViewModel.writeCsv(csv, startDate, endDate)
                                 val intent = Intent(Intent.ACTION_SEND).apply {
                                     type = "text/csv"
@@ -349,12 +349,12 @@ fun ReportsScreen(
                                 emptyLabel = stringResource(R.string.site)
                             )
                         }
-                        if (byCompany.size > 1) {
+                        if (byClient.size > 1) {
                             Spacer(Modifier.height(12.dp))
                             BreakdownCard(
                                 title = stringResource(R.string.hours_by_client),
-                                totals = byCompany,
-                                emptyLabel = stringResource(R.string.company)
+                                totals = byClient,
+                                emptyLabel = stringResource(R.string.client)
                             )
                         }
                         if (byJobType.size > 1) {

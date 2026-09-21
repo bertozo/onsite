@@ -3,7 +3,7 @@ package com.xbertz.onsite
 import android.util.Patterns
 
 /**
- * Field validation shared by the Profile and Companies forms. Every rule treats a
+ * Field validation shared by the Profile and Clients forms. Every rule treats a
  * blank value as valid — the fields are optional; only non-empty input is checked.
  * Bank/ABN rules follow the Australian formats the app is built around.
  */

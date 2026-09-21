@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendApi, ApiError } from "../lib/backendApi";
 import { useCrud } from "../lib/useCrud";
-import type { CompanyRequest, JobTypeRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
+import type { ClientRequest, JobTypeRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
 import { combineLocalDateTime, formatHours, formatMoney, millisToDateInput, millisToTimeInput } from "../lib/format";
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner } from "../components/ui";
 
@@ -13,20 +13,20 @@ const sessionApi = {
 };
 
 function useCatalog() {
-  const [companies, setCompanies] = useState<CompanyRequest[]>([]);
+  const [clients, setClients] = useState<ClientRequest[]>([]);
   const [sites, setSites] = useState<SiteRequest[]>([]);
   const [jobTypes, setJobTypes] = useState<JobTypeRequest[]>([]);
   useEffect(() => {
-    backendApi.listCompanies().then(setCompanies).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(() => undefined);
     backendApi.listSites().then(setSites).catch(() => undefined);
     backendApi.listJobTypes().then(setJobTypes).catch(() => undefined);
   }, []);
-  return { companies, sites, jobTypes };
+  return { clients, sites, jobTypes };
 }
 
 export function SessionsPage() {
   const { items, loading, error, create, update, remove } = useCrud<TrackingSessionRequest>(sessionApi);
-  const { companies, sites, jobTypes } = useCatalog();
+  const { clients, sites, jobTypes } = useCatalog();
   const [editing, setEditing] = useState<TrackingSessionRequest | "new" | null>(null);
   const [deleting, setDeleting] = useState<TrackingSessionRequest | null>(null);
   const [onlyUnbilled, setOnlyUnbilled] = useState(false);
@@ -86,7 +86,7 @@ export function SessionsPage() {
               {sorted.map((s) => (
                 <tr key={s.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-slate-600">{millisToDateInput(s.startTimestampMillis)}</td>
-                  <td className="px-4 py-3 text-slate-800">{s.companyName || "—"}</td>
+                  <td className="px-4 py-3 text-slate-800">{s.clientName || "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{s.siteLabel || "—"}</td>
                   <td className="px-4 py-3 text-slate-600">{s.jobTypeLabel || "—"}</td>
                   <td className="px-4 py-3 text-slate-600">
@@ -122,7 +122,7 @@ export function SessionsPage() {
       {editing && (
         <SessionFormModal
           initial={editing === "new" ? null : editing}
-          companies={companies}
+          clients={clients}
           sites={sites}
           jobTypes={jobTypes}
           error={saveError}
@@ -153,7 +153,7 @@ export function SessionsPage() {
 
 function SessionFormModal({
   initial,
-  companies,
+  clients,
   sites,
   jobTypes,
   error,
@@ -161,14 +161,14 @@ function SessionFormModal({
   onSave,
 }: {
   initial: TrackingSessionRequest | null;
-  companies: CompanyRequest[];
+  clients: ClientRequest[];
   sites: SiteRequest[];
   jobTypes: JobTypeRequest[];
   error: string | null;
   onClose: () => void;
   onSave: (req: TrackingSessionRequest) => Promise<void>;
 }) {
-  const [companyName, setCompanyName] = useState(initial?.companyName ?? "");
+  const [clientName, setClientName] = useState(initial?.clientName ?? "");
   const [siteLabel, setSiteLabel] = useState(initial?.siteLabel ?? "");
   const [jobTypeLabel, setJobTypeLabel] = useState(initial?.jobTypeLabel ?? "");
   const [date, setDate] = useState(initial ? millisToDateInput(initial.startTimestampMillis) : millisToDateInput(Date.now()));
@@ -179,7 +179,7 @@ function SessionFormModal({
   const [formError, setFormError] = useState<string | null>(null);
 
   const selectedSite = sites.find((s) => s.label === siteLabel);
-  const selectedCompany = companies.find((c) => c.name === companyName);
+  const selectedClient = clients.find((c) => c.name === clientName);
 
   return (
     <Modal title={initial ? "Editar sessão" : "Nova sessão"} onClose={onClose}>
@@ -197,7 +197,7 @@ function SessionFormModal({
           setSaving(true);
           await onSave({
             id: initial?.id ?? crypto.randomUUID(),
-            companyName: companyName || null,
+            clientName: clientName || null,
             siteLabel: siteLabel || null,
             jobTypeLabel: jobTypeLabel || null,
             startTimestampMillis: start,
@@ -213,9 +213,9 @@ function SessionFormModal({
         }}
       >
         <Field label="Cliente">
-          <Select value={companyName} onChange={(e) => setCompanyName(e.target.value)}>
+          <Select value={clientName} onChange={(e) => setClientName(e.target.value)}>
             <option value="">—</option>
-            {companies.map((c) => (
+            {clients.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}
               </option>
@@ -253,7 +253,7 @@ function SessionFormModal({
             <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
           </Field>
         </div>
-        <Field label="Valor/h (substitui o do cliente)" hint={selectedCompany?.hourlyRate != null ? `Padrão do cliente: $${selectedCompany.hourlyRate.toFixed(2)}` : undefined}>
+        <Field label="Valor/h (substitui o do cliente)" hint={selectedClient?.hourlyRate != null ? `Padrão do cliente: $${selectedClient.hourlyRate.toFixed(2)}` : undefined}>
           <Input type="number" step="0.01" min="0" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
         </Field>
 

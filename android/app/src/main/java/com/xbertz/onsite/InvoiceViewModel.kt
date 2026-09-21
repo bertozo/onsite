@@ -8,7 +8,7 @@ import androidx.core.content.FileProvider
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.data.AppDatabase
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.Invoice
 import com.xbertz.onsite.data.InvoiceStatus
 import com.xbertz.onsite.data.TrackingSession
@@ -41,8 +41,8 @@ data class InvoiceReviewRequest(
     val sessions: List<TrackingSession>,
     val periodStart: LocalDate,
     val periodEnd: LocalDate,
-    /** Pre-selected client, e.g. when the review is opened from the company sheet. */
-    val company: Company? = null,
+    /** Pre-selected client, e.g. when the review is opened from the client sheet. */
+    val client: Client? = null,
     /** How many worked days were left out because they were already invoiced. */
     val alreadyInvoicedDays: Int = 0
 )
@@ -61,7 +61,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     private val sessionDao = db.trackingSessionDao()
     private val prefs = application.getSharedPreferences("invoices", Context.MODE_PRIVATE)
 
-    val companies: StateFlow<List<Company>> = db.companyDao().getAll()
+    val clients: StateFlow<List<Client>> = db.clientDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val invoices: StateFlow<List<Invoice>> = invoiceDao.getAll()
@@ -81,14 +81,14 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /** Opens the review step for the completed, not-yet-invoiced sessions of a period. */
-    fun startReview(sessions: List<TrackingSession>, periodStart: LocalDate, periodEnd: LocalDate, company: Company? = null) {
+    fun startReview(sessions: List<TrackingSession>, periodStart: LocalDate, periodEnd: LocalDate, client: Client? = null) {
         val completed = sessions.filter { it.stopTimestampMillis != null }
         val (billed, open) = completed.partition { it.invoiceId != null }
         _review.value = InvoiceReviewRequest(
             sessions = open,
             periodStart = periodStart,
             periodEnd = periodEnd,
-            company = company,
+            client = client,
             alreadyInvoicedDays = buildInvoiceLines(billed).map { it.date }.distinct().size
         )
         _uiState.update { it.copy(error = null) }
@@ -98,7 +98,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         _review.value = null
     }
 
-    /** Rate override for every session of one invoice line (null restores the company default). */
+    /** Rate override for every session of one invoice line (null restores the client default). */
     fun setLineRate(line: InvoiceLine, rate: Double?) {
         viewModelScope.launch {
             sessionDao.setHourlyRate(line.sessionIds, rate)
@@ -115,7 +115,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
      */
     fun generateInvoice(
         sessions: List<TrackingSession>,
-        company: Company,
+        client: Client,
         invoiceNumber: String,
         hourlyRate: Double?,
         periodStart: LocalDate,
@@ -124,9 +124,9 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         notes: String?
     ) {
         val res = LocaleManager.resources(getApplication())
-        val companySessions = sessions.filter { it.companyName == company.name && it.stopTimestampMillis != null }
-        if (companySessions.isEmpty()) {
-            _uiState.update { it.copy(error = UiMessage(R.string.invoice_no_days_for_company, listOf(company.name))) }
+        val clientSessions = sessions.filter { it.clientName == client.name && it.stopTimestampMillis != null }
+        if (clientSessions.isEmpty()) {
+            _uiState.update { it.copy(error = UiMessage(R.string.invoice_no_days_for_client, listOf(client.name))) }
             return
         }
 
@@ -134,7 +134,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             // Sessions only carry the site label; the address column is looked up from the registered sites.
             val sitesByLabel = db.siteDao().getAll().first().associateBy { it.label }
-            val lines = buildInvoiceLines(companySessions, sitesByLabel, defaultRate = hourlyRate)
+            val lines = buildInvoiceLines(clientSessions, sitesByLabel, defaultRate = hourlyRate)
             // Read the profile on demand rather than through a StateFlow: nothing on the
             // Reports screen collects it, so a shared flow would never start and stay null.
             val provider = db.profileDao().get().first()
@@ -149,7 +149,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                 periodStart = periodStart,
                 periodEnd = periodEnd,
                 provider = provider,
-                client = company,
+                client = client,
                 lines = lines,
                 columns = ReportColumn.ordered(columns),
                 hourlyRate = hourlyRate,
@@ -157,7 +157,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             )
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    val file = pdfFile(invoiceNumber, company)
+                    val file = pdfFile(invoiceNumber, client)
                     InvoicePdfTemplate.render(data, file, res)
                     file
                 }
@@ -165,7 +165,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
             result.onSuccess { file ->
                 val invoice = Invoice(
                     number = data.invoiceNumber,
-                    companyName = company.name,
+                    clientName = client.name,
                     periodStartEpochDay = periodStart.toEpochDay(),
                     periodEndEpochDay = periodEnd.toEpochDay(),
                     issueDateEpochDay = data.issueDate.toEpochDay(),
@@ -177,7 +177,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     createdAtMillis = System.currentTimeMillis()
                 )
                 val id = invoiceDao.insert(invoice)
-                sessionDao.markInvoiced(companySessions.map { it.id }, id)
+                sessionDao.markInvoiced(clientSessions.map { it.id }, id)
                 prefs.edit().putInt(KEY_NEXT_NUMBER, prefs.getInt(KEY_NEXT_NUMBER, 1) + 1).apply()
                 _review.value = null
                 _uiState.update { it.copy(isGenerating = false, generatedInvoice = invoice.copy(id = id)) }
@@ -223,16 +223,16 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
 
     fun clearError() = _uiState.update { it.copy(error = null) }
 
-    private fun pdfFile(invoiceNumber: String, company: Company): File {
+    private fun pdfFile(invoiceNumber: String, client: Client): File {
         val application = getApplication<Application>()
         val dir = File(application.filesDir, "invoices").apply { mkdirs() }
         val safeNumber = invoiceNumber.trim().replace(Regex("[^A-Za-z0-9_-]"), "_")
-        val safeCompany = company.name.replace(Regex("[^A-Za-z0-9_-]"), "_")
-        var file = File(dir, "Invoice_${safeNumber}_$safeCompany.pdf")
+        val safeClient = client.name.replace(Regex("[^A-Za-z0-9_-]"), "_")
+        var file = File(dir, "Invoice_${safeNumber}_$safeClient.pdf")
         // Never overwrite an earlier PDF with the same number (e.g. a voided invoice reissued).
         var attempt = 2
         while (file.exists()) {
-            file = File(dir, "Invoice_${safeNumber}_${safeCompany}_$attempt.pdf")
+            file = File(dir, "Invoice_${safeNumber}_${safeClient}_$attempt.pdf")
             attempt++
         }
         return file

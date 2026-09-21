@@ -31,7 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.Invoice
 import com.xbertz.onsite.data.InvoiceStatus
 import com.xbertz.onsite.data.TrackingSession
@@ -52,8 +52,8 @@ private val UnbilledAmber = Color(0xFFB8790F)
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CompanySheet(
-    company: Company,
+fun ClientSheet(
+    client: Client,
     sessions: List<TrackingSession>,
     invoices: List<Invoice>,
     onDismiss: () -> Unit,
@@ -61,23 +61,23 @@ fun CompanySheet(
     onViewReport: () -> Unit
 ) {
     val zone = remember { ZoneId.systemDefault() }
-    val companySessions = remember(sessions, company) { sessions.filter { it.companyName == company.name && it.stopTimestampMillis != null } }
+    val clientSessions = remember(sessions, client) { sessions.filter { it.clientName == client.name && it.stopTimestampMillis != null } }
     val month = YearMonth.now()
-    val monthSessions = remember(companySessions) {
-        companySessions.filter { YearMonth.from(Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate()) == month }
+    val monthSessions = remember(clientSessions) {
+        clientSessions.filter { YearMonth.from(Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate()) == month }
     }
-    val rates = mapOf(company.name to company.hourlyRate)
+    val rates = mapOf(client.name to client.hourlyRate)
     val monthSummary = summarize(monthSessions, rates, zone)
-    val allSummary = summarize(companySessions, rates, zone)
-    val unbilled = companySessions.filter { it.invoiceId == null }
-    val recentInvoices = remember(invoices, company) { invoices.filter { it.companyName == company.name }.take(3) }
+    val allSummary = summarize(clientSessions, rates, zone)
+    val unbilled = clientSessions.filter { it.invoiceId == null }
+    val recentInvoices = remember(invoices, client) { invoices.filter { it.clientName == client.name }.take(3) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("dd/MM/yyyy") }
 
     // Insets are handled by the column below (navigationBarsPadding), so the sheet itself takes none.
     ModalBottomSheet(onDismissRequest = onDismiss, windowInsets = WindowInsets(0, 0, 0, 0)) {
         Column(modifier = Modifier.padding(horizontal = 24.dp).navigationBarsPadding().padding(bottom = 24.dp)) {
-            Text(company.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            company.hourlyRate?.let { rate ->
+            Text(client.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            client.hourlyRate?.let { rate ->
                 Text(
                     stringResource(R.string.rate_per_hour, formatRateInput(rate)),
                     style = MaterialTheme.typography.bodyMedium,
@@ -103,13 +103,13 @@ fun CompanySheet(
 
             Spacer(Modifier.height(16.dp))
             Text(
-                stringResource(R.string.company_recent_invoices),
+                stringResource(R.string.client_recent_invoices),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(6.dp))
             if (recentInvoices.isEmpty()) {
-                Text(stringResource(R.string.company_no_invoices), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.client_no_invoices), style = MaterialTheme.typography.bodyMedium)
             } else {
                 recentInvoices.forEachIndexed { index, invoice ->
                     if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -145,7 +145,7 @@ fun CompanySheet(
             ) {
                 Icon(Icons.Filled.PictureAsPdf, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text(if (unbilled.isEmpty()) stringResource(R.string.company_nothing_to_invoice) else stringResource(R.string.generate_invoice))
+                Text(if (unbilled.isEmpty()) stringResource(R.string.client_nothing_to_invoice) else stringResource(R.string.generate_invoice))
             }
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = onViewReport, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth().height(44.dp)) {

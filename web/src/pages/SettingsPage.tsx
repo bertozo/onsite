@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { backendApi, ApiError } from "../lib/backendApi";
 import { useAuth } from "../context/AuthContext";
-import type { CompanyRequest, ConnectionDto, ConnectionInviteDto, ConnectionSessionDto, InviteDto, MemberDto } from "../lib/types";
+import type { ClientRequest, ConnectionDto, ConnectionInviteDto, ConnectionSessionDto, InviteDto, MemberDto } from "../lib/types";
 import { loadProfile, saveProfile, type BusinessProfile } from "../lib/profileStore";
 import { loadReportColumns, saveReportColumns } from "../lib/columnPrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
@@ -193,7 +193,7 @@ function MyConnectionsCard() {
         {connections.map((c) => (
           <li key={c.id} className="flex items-center justify-between">
             <span>
-              {c.employerAccountName} → {c.workerCompanyName}
+              {c.employerAccountName} → {c.workerClientName}
             </span>
             <Badge tone={c.status === "ACTIVE" ? "green" : "default"}>{c.status}</Badge>
           </li>
@@ -205,16 +205,16 @@ function MyConnectionsCard() {
 
 function ReceivedConnectionInvitesCard() {
   const [invites, setInvites] = useState<ConnectionInviteDto[]>([]);
-  const [companies, setCompanies] = useState<CompanyRequest[]>([]);
+  const [clients, setClients] = useState<ClientRequest[]>([]);
   const [picking, setPicking] = useState<ConnectionInviteDto | null>(null);
-  const [companyId, setCompanyId] = useState("");
+  const [clientId, setClientId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = () => backendApi.listMyConnectionInvites().then(setInvites).catch(() => undefined);
   useEffect(() => {
     reload();
-    backendApi.listCompanies().then(setCompanies).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(() => undefined);
   }, []);
 
   if (invites.length === 0) return null;
@@ -235,9 +235,9 @@ function ReceivedConnectionInvitesCard() {
       {picking && (
         <Modal title="Vincular a qual dos seus clientes?" onClose={() => setPicking(null)}>
           <p className="mb-3 text-sm text-slate-500">Escolha qual cadastro de cliente representa {picking.employerAccountName}.</p>
-          <Select value={companyId} onChange={(e) => setCompanyId(e.target.value)} className="mb-3">
+          <Select value={clientId} onChange={(e) => setClientId(e.target.value)} className="mb-3">
             <option value="">Selecione...</option>
-            {companies.map((c) => (
+            {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
@@ -249,12 +249,12 @@ function ReceivedConnectionInvitesCard() {
               Cancelar
             </Button>
             <Button
-              disabled={!companyId || busy}
+              disabled={!clientId || busy}
               onClick={async () => {
                 setBusy(true);
                 setError(null);
                 try {
-                  await backendApi.acceptConnectionInvite(picking.id, companyId);
+                  await backendApi.acceptConnectionInvite(picking.id, clientId);
                   setPicking(null);
                   await reload();
                 } catch {
@@ -318,7 +318,7 @@ function EmployerConnectionsCard({ accountId }: { accountId: string }) {
           {connections.map((c) => (
             <li key={c.id} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
               <span>
-                {c.workerCompanyName} <Badge tone={c.status === "ACTIVE" ? "green" : "default"}>{c.status}</Badge>
+                {c.workerClientName} <Badge tone={c.status === "ACTIVE" ? "green" : "default"}>{c.status}</Badge>
               </span>
               <div className="flex gap-3">
                 <button onClick={() => setDetail(c)} className="text-violet-600 hover:underline">
@@ -337,7 +337,7 @@ function EmployerConnectionsCard({ accountId }: { accountId: string }) {
 
       {revoking && (
         <Modal title="Revogar conexão" onClose={() => setRevoking(null)}>
-          <p className="mb-4 text-sm text-slate-600">Tem certeza que deseja revogar a conexão com {revoking.workerCompanyName}?</p>
+          <p className="mb-4 text-sm text-slate-600">Tem certeza que deseja revogar a conexão com {revoking.workerClientName}?</p>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setRevoking(null)}>
               Cancelar
@@ -375,7 +375,7 @@ function ConnectionDetailModal({ connection, onClose }: { connection: Connection
   }, [connection.id]);
 
   return (
-    <Modal title={`${connection.workerCompanyName}`} onClose={onClose} wide>
+    <Modal title={`${connection.workerClientName}`} onClose={onClose} wide>
       <h3 className="mb-2 text-sm font-semibold text-slate-700">Horas lançadas</h3>
       {!sessions ? (
         <Spinner className="h-5 w-5 text-violet-600" />

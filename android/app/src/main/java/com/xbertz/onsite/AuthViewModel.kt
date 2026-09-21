@@ -185,10 +185,14 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * Always moves on to the code step regardless of whether the email is registered, so this
-     * can't be used to probe accounts. The recovery email carries a 6-digit code (the
-     * project's template shows {{ .Token }} instead of a link - see [SupabaseAuth.recover]),
-     * so there's no deep link for the app to catch; the user copies the code back in here.
+     * Moves on to the code step regardless of whether the email is registered, so this can't
+     * be used to probe accounts - except when Supabase rejects the request for being rate
+     * limited, which reveals nothing about the account and, left silent, sends the user to
+     * type in a code from an email that was never actually sent (see CLAUDE.md: requesting a
+     * new code invalidates whatever token they were already holding). The recovery email
+     * carries a 6-digit code (the project's template shows {{ .Token }} instead of a link -
+     * see [SupabaseAuth.recover]), so there's no deep link for the app to catch; the user
+     * copies the code back in here.
      */
     fun sendPasswordResetCode(email: String) {
         val trimmed = validateEmail(email)
@@ -239,11 +243,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         "email_not_confirmed" -> UiMessage(R.string.login_error_email_not_confirmed)
         "weak_password" -> UiMessage(R.string.login_error_password_too_short)
         "otp_expired", "otp_disabled" -> UiMessage(R.string.reset_password_error_invalid_code)
+        "over_email_send_rate_limit" -> UiMessage(R.string.reset_password_error_rate_limited)
         else -> UiMessage(fallback)
     }
 
     private suspend fun completeLogin(token: String) {
-        "over_email_send_rate_limit" -> UiMessage(R.string.reset_password_error_rate_limited)
         val me = BackendApi.bootstrap(token)
         val personalAccount = me.memberships.mine(me.email)
         sessionStore.save(token, me.email, personalAccount.accountId)
@@ -357,7 +361,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Employer reads the hours the connected worker has logged against this connection's company. */
+    /** Employer reads the hours the connected worker has logged against this connection's client. */
     fun loadConnectionSessions(connectionId: String, onResult: (List<ConnectionSessionDto>) -> Unit) {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
@@ -366,18 +370,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * [localCompanyId] is one of the caller's own companies (their Room row id) - which of
-     * their clients this link is. The backend only knows companies by their synced UUID, so
-     * this resolves that first; it fails if the company hasn't synced yet.
+     * [localClientId] is one of the caller's own clients (their Room row id) - which of
+     * their clients this link is. The backend only knows clients by their synced UUID, so
+     * this resolves that first; it fails if the client hasn't synced yet.
      */
-    fun acceptConnectionInvite(inviteId: String, localCompanyId: Long, onResult: (success: Boolean) -> Unit) {
+    fun acceptConnectionInvite(inviteId: String, localClientId: Long, onResult: (success: Boolean) -> Unit) {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            val remoteCompanyId = db.syncDao().mappingsFor("company").firstOrNull { it.localId == localCompanyId }?.remoteId
-            val result = if (remoteCompanyId == null) {
-                Result.failure(IllegalStateException("company not synced yet"))
+            val remoteClientId = db.syncDao().mappingsFor("client").firstOrNull { it.localId == localClientId }?.remoteId
+            val result = if (remoteClientId == null) {
+                Result.failure(IllegalStateException("client not synced yet"))
             } else {
-                runCatching { BackendApi.acceptConnectionInvite(token, inviteId, remoteCompanyId) }
+                runCatching { BackendApi.acceptConnectionInvite(token, inviteId, remoteClientId) }
             }
             loadPendingConnectionInvites()
             loadConnections()
@@ -393,7 +397,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** A client invites one of their contractors by email, linking a company the contractor picks. */
+    /** A client invites one of their contractors by email, linking a client the contractor picks. */
     fun inviteContractor(email: String, onResult: (success: Boolean) -> Unit) {
         val token = sessionStore.token ?: return
         val current = _state.value as? AuthUiState.LoggedIn ?: return

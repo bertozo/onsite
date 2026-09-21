@@ -73,14 +73,14 @@ sealed interface SupabaseAuthResult {
 class SupabaseAuthException(val code: String?) : Exception(code)
 
 object SupabaseAuth {
-    private val client = HttpClient(OkHttp) {
+    private val http = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
     }
 
     suspend fun signUp(email: String, password: String): SupabaseAuthResult {
-        val response = client.post("$SUPABASE_URL/auth/v1/signup") {
+        val response = http.post("$SUPABASE_URL/auth/v1/signup") {
             apiKey()
             jsonBody(SupabaseCredentialsRequest(email, password))
         }
@@ -94,7 +94,7 @@ object SupabaseAuth {
     }
 
     suspend fun signIn(email: String, password: String): SupabaseAuthResult.SignedIn {
-        val response = client.post("$SUPABASE_URL/auth/v1/token?grant_type=password") {
+        val response = http.post("$SUPABASE_URL/auth/v1/token?grant_type=password") {
             apiKey()
             jsonBody(SupabaseCredentialsRequest(email, password))
         }
@@ -111,7 +111,7 @@ object SupabaseAuth {
      * user just types the code back into the app.
      */
     suspend fun recover(email: String) {
-        val response = client.post("$SUPABASE_URL/auth/v1/recover") {
+        val response = http.post("$SUPABASE_URL/auth/v1/recover") {
             apiKey()
             jsonBody(SupabaseEmailRequest(email))
         }
@@ -120,7 +120,7 @@ object SupabaseAuth {
 
     /** Exchanges a recovery code for a session, proving the user controls that inbox. */
     suspend fun verifyRecovery(email: String, code: String): String {
-        val response = client.post("$SUPABASE_URL/auth/v1/verify") {
+        val response = http.post("$SUPABASE_URL/auth/v1/verify") {
             apiKey()
             jsonBody(SupabaseVerifyRequest(type = "recovery", email = email, token = code))
         }
@@ -131,7 +131,7 @@ object SupabaseAuth {
 
     /** Sets a new password on the session obtained from [verifyRecovery]. */
     suspend fun updatePassword(accessToken: String, newPassword: String) {
-        val response = client.put("$SUPABASE_URL/auth/v1/user") {
+        val response = http.put("$SUPABASE_URL/auth/v1/user") {
             apiKey()
             header("Authorization", "Bearer $accessToken")
             jsonBody(SupabasePasswordUpdateRequest(newPassword))

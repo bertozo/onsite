@@ -49,19 +49,19 @@ data class LabeledTotal(val label: String, val millis: Long)
 private fun TrackingSession.localDate(zone: ZoneId): LocalDate =
     Instant.ofEpochMilli(startTimestampMillis).atZone(zone).toLocalDate()
 
-/** Rate that applies to a session: its own override, else the company default, else none. */
-fun TrackingSession.effectiveRate(ratesByCompany: Map<String, Double?>): Double? =
-    hourlyRate ?: companyName?.let { ratesByCompany[it] }
+/** Rate that applies to a session: its own override, else the client default, else none. */
+fun TrackingSession.effectiveRate(ratesByClient: Map<String, Double?>): Double? =
+    hourlyRate ?: clientName?.let { ratesByClient[it] }
 
-private fun amountOf(sessions: List<TrackingSession>, ratesByCompany: Map<String, Double?>): Double? {
-    val priced = sessions.mapNotNull { s -> s.effectiveRate(ratesByCompany)?.let { rate -> (s.durationMillis ?: 0L) / 3_600_000.0 * rate } }
+private fun amountOf(sessions: List<TrackingSession>, ratesByClient: Map<String, Double?>): Double? {
+    val priced = sessions.mapNotNull { s -> s.effectiveRate(ratesByClient)?.let { rate -> (s.durationMillis ?: 0L) / 3_600_000.0 * rate } }
     if (priced.isEmpty()) return null
     return Math.round(priced.sum() * 100) / 100.0
 }
 
 fun summarize(
     sessions: List<TrackingSession>,
-    ratesByCompany: Map<String, Double?>,
+    ratesByClient: Map<String, Double?>,
     zone: ZoneId = ZoneId.systemDefault()
 ): ReportSummary {
     val completed = sessions.filter { it.stopTimestampMillis != null }
@@ -69,9 +69,9 @@ fun summarize(
     return ReportSummary(
         totalMillis = completed.sumOf { it.durationMillis ?: 0L },
         workedDays = completed.map { it.localDate(zone) }.distinct().size,
-        estimatedAmount = amountOf(completed, ratesByCompany),
+        estimatedAmount = amountOf(completed, ratesByClient),
         unbilledMillis = unbilled.sumOf { it.durationMillis ?: 0L },
-        unbilledAmount = amountOf(unbilled, ratesByCompany)
+        unbilledAmount = amountOf(unbilled, ratesByClient)
     )
 }
 
@@ -105,7 +105,7 @@ private fun totalsBy(sessions: List<TrackingSession>, keyOf: (TrackingSession) -
 fun totalsBySite(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.siteLabel }
 
 /** Hours per client, biggest first. */
-fun totalsByCompany(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.companyName }
+fun totalsByClient(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.clientName }
 
 /** Hours per service, biggest first. */
 fun totalsByJobType(sessions: List<TrackingSession>): List<LabeledTotal> = totalsBy(sessions) { it.jobTypeLabel }
@@ -121,7 +121,7 @@ fun buildCsv(
     rateLabel: String,
     amountLabel: String,
     sitesByLabel: Map<String, Site>,
-    ratesByCompany: Map<String, Double?>,
+    ratesByClient: Map<String, Double?>,
     zone: ZoneId = ZoneId.systemDefault()
 ): String {
     fun cell(value: String): String = "\"" + value.replace("\"", "\"\"") + "\""
@@ -130,13 +130,13 @@ fun buildCsv(
         val start = Instant.ofEpochMilli(session.startTimestampMillis).atZone(zone)
         val stop = Instant.ofEpochMilli(session.stopTimestampMillis!!).atZone(zone)
         val hours = (session.durationMillis ?: 0L) / 3_600_000.0
-        val rate = session.effectiveRate(ratesByCompany)
+        val rate = session.effectiveRate(ratesByClient)
         val values = columns.map { column ->
             when (column) {
                 ReportColumn.DATE -> String.format(java.util.Locale.ENGLISH, "%04d-%02d-%02d", start.year, start.monthValue, start.dayOfMonth)
                 ReportColumn.SITE -> session.siteLabel.orEmpty()
                 ReportColumn.ADDRESS -> sitesByLabel[session.siteLabel]?.address.orEmpty()
-                ReportColumn.COMPANY -> session.companyName.orEmpty()
+                ReportColumn.CLIENT -> session.clientName.orEmpty()
                 ReportColumn.JOB_TYPE -> session.jobTypeLabel.orEmpty()
                 ReportColumn.START_TIME -> String.format(java.util.Locale.ENGLISH, "%02d:%02d", start.hour, start.minute)
                 ReportColumn.END_TIME -> String.format(java.util.Locale.ENGLISH, "%02d:%02d", stop.hour, stop.minute)

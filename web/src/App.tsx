@@ -4,7 +4,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Layout } from "./components/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { DashboardPage } from "./pages/DashboardPage";
-import { CompaniesPage } from "./pages/CompaniesPage";
+import { ClientsPage } from "./pages/ClientsPage";
 import { SitesPage } from "./pages/SitesPage";
 import { JobTypesPage } from "./pages/JobTypesPage";
 import { SessionsPage } from "./pages/SessionsPage";
@@ -22,7 +22,7 @@ export default function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<Layout />}>
               <Route path="/" element={<DashboardPage />} />
-              <Route path="/companies" element={<CompaniesPage />} />
+              <Route path="/clients" element={<ClientsPage />} />
               <Route path="/sites" element={<SitesPage />} />
               <Route path="/job-types" element={<JobTypesPage />} />
               <Route path="/sessions" element={<SessionsPage />} />

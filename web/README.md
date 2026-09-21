@@ -30,7 +30,7 @@ management.
   `report/ReportSummary.kt` and `invoice/InvoiceData.kt` (period presets, weekly/labeled
   totals, CSV export, day+rate invoice line grouping) so the numbers match between clients.
 - `src/pages/` — one page per nav item (Dashboard, Sessions, Planning, Reports, Invoices,
-  Companies, Sites, Job types, Settings). Companies/Sites/Job types share `lib/useCrud.ts`,
+  Clients, Sites, Job types, Settings). Clients/Sites/Job types share `lib/useCrud.ts`,
   a small list+CRUD hook.
 - Invoices have no generated PDF binary (Android renders one natively via `PdfDocument`);
   instead `InvoiceDetailModal` renders a printable view (`#invoice-print`, see the

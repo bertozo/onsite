@@ -36,7 +36,7 @@ import java.util.UUID
 @Serializable
 data class TrackingSessionDto(
     val id: String,
-    val companyName: String?,
+    val clientName: String?,
     val siteLabel: String?,
     val jobTypeLabel: String?,
     val startTimestampMillis: Long,
@@ -54,7 +54,7 @@ data class TrackingSessionDto(
 @Serializable
 data class TrackingSessionRequest(
     val id: String,
-    val companyName: String? = null,
+    val clientName: String? = null,
     val siteLabel: String? = null,
     val jobTypeLabel: String? = null,
     val startTimestampMillis: Long,
@@ -69,7 +69,7 @@ data class TrackingSessionRequest(
 
 private fun ResultRow.toDto() = TrackingSessionDto(
     id = this[TrackingSessions.id].toString(),
-    companyName = this[TrackingSessions.companyName],
+    clientName = this[TrackingSessions.clientName],
     siteLabel = this[TrackingSessions.siteLabel],
     jobTypeLabel = this[TrackingSessions.jobTypeLabel],
     startTimestampMillis = this[TrackingSessions.startTimestampMillis],
@@ -101,7 +101,7 @@ class TrackingSessionsRepository {
         TrackingSessions.insert {
             it[TrackingSessions.id] = id
             it[TrackingSessions.accountId] = accountId
-            it[companyName] = req.companyName
+            it[clientName] = req.clientName
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[startTimestampMillis] = req.startTimestampMillis
@@ -122,7 +122,7 @@ class TrackingSessionsRepository {
         var condition = (TrackingSessions.id eq id) and (TrackingSessions.accountId eq accountId)
         if (ownerOnlyUserId != null) condition = condition and (TrackingSessions.createdByUserId eq ownerOnlyUserId)
         val updated = TrackingSessions.update({ condition }) {
-            it[companyName] = req.companyName
+            it[clientName] = req.clientName
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[startTimestampMillis] = req.startTimestampMillis

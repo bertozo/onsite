@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { backendApi } from "../lib/backendApi";
 import { useAuth } from "../context/AuthContext";
 import { useCrud } from "../lib/useCrud";
-import type { CompanyRequest, JobTypeRequest, MemberDto, PlannedJobRequest, SiteRequest } from "../lib/types";
+import type { ClientRequest, JobTypeRequest, MemberDto, PlannedJobRequest, SiteRequest } from "../lib/types";
 import { epochDayToIsoDate, epochDayToLabel, isoDateToEpochDay, minuteOfDayToTimeInput, timeInputToMinuteOfDay, todayEpochDay } from "../lib/format";
 import { Button, Card, ConfirmDialog, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from "../components/ui";
 
@@ -17,7 +17,7 @@ export function PlanningPage() {
   const { state } = useAuth();
   const isOwner = state.status === "loggedIn" && state.activeRole === "OWNER";
   const { items, loading, error, create, update, remove } = useCrud<PlannedJobRequest>(api);
-  const [companies, setCompanies] = useState<CompanyRequest[]>([]);
+  const [clients, setClients] = useState<ClientRequest[]>([]);
   const [sites, setSites] = useState<SiteRequest[]>([]);
   const [jobTypes, setJobTypes] = useState<JobTypeRequest[]>([]);
   const [members, setMembers] = useState<MemberDto[]>([]);
@@ -26,7 +26,7 @@ export function PlanningPage() {
   const [fromDate, setFromDate] = useState(epochDayToIsoDate(todayEpochDay()));
 
   useEffect(() => {
-    backendApi.listCompanies().then(setCompanies).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(() => undefined);
     backendApi.listSites().then(setSites).catch(() => undefined);
     backendApi.listJobTypes().then(setJobTypes).catch(() => undefined);
     if (isOwner) backendApi.listAccountMembers().then(setMembers).catch(() => undefined);
@@ -68,7 +68,7 @@ export function PlanningPage() {
                   <div>
                     <p className="font-medium text-slate-800">
                       {minuteOfDayToTimeInput(job.startMinute)}
-                      {job.endMinute != null ? `–${minuteOfDayToTimeInput(job.endMinute)}` : ""} · {job.companyName || "Sem cliente"}
+                      {job.endMinute != null ? `–${minuteOfDayToTimeInput(job.endMinute)}` : ""} · {job.clientName || "Sem cliente"}
                     </p>
                     <p className="text-xs text-slate-400">
                       {[job.siteLabel, job.jobTypeLabel].filter(Boolean).join(" · ")}
@@ -94,7 +94,7 @@ export function PlanningPage() {
       {editing && (
         <PlannedJobFormModal
           initial={editing === "new" ? null : editing}
-          companies={companies}
+          clients={clients}
           sites={sites}
           jobTypes={jobTypes}
           members={isOwner ? members : []}
@@ -126,7 +126,7 @@ export function PlanningPage() {
 
 function PlannedJobFormModal({
   initial,
-  companies,
+  clients,
   sites,
   jobTypes,
   members,
@@ -134,7 +134,7 @@ function PlannedJobFormModal({
   onSave,
 }: {
   initial: PlannedJobRequest | null;
-  companies: CompanyRequest[];
+  clients: ClientRequest[];
   sites: SiteRequest[];
   jobTypes: JobTypeRequest[];
   members: MemberDto[];
@@ -144,7 +144,7 @@ function PlannedJobFormModal({
   const [date, setDate] = useState(initial ? epochDayToIsoDate(initial.dateEpochDay) : epochDayToIsoDate(todayEpochDay()));
   const [startTime, setStartTime] = useState(initial ? minuteOfDayToTimeInput(initial.startMinute) : "08:00");
   const [endTime, setEndTime] = useState(initial?.endMinute != null ? minuteOfDayToTimeInput(initial.endMinute) : "");
-  const [companyName, setCompanyName] = useState(initial?.companyName ?? "");
+  const [clientName, setClientName] = useState(initial?.clientName ?? "");
   const [siteLabel, setSiteLabel] = useState(initial?.siteLabel ?? "");
   const [jobTypeLabel, setJobTypeLabel] = useState(initial?.jobTypeLabel ?? "");
   const [assignedUserId, setAssignedUserId] = useState(initial?.assignedUserId ?? "");
@@ -163,7 +163,7 @@ function PlannedJobFormModal({
             dateEpochDay: isoDateToEpochDay(date),
             startMinute: timeInputToMinuteOfDay(startTime),
             endMinute: endTime ? timeInputToMinuteOfDay(endTime) : null,
-            companyName: companyName || null,
+            clientName: clientName || null,
             siteLabel: siteLabel || null,
             jobTypeLabel: jobTypeLabel || null,
             notes: notes.trim() || null,
@@ -184,9 +184,9 @@ function PlannedJobFormModal({
           </Field>
         </div>
         <Field label="Cliente">
-          <Select value={companyName} onChange={(e) => setCompanyName(e.target.value)}>
+          <Select value={clientName} onChange={(e) => setClientName(e.target.value)}>
             <option value="">—</option>
-            {companies.map((c) => (
+            {clients.map((c) => (
               <option key={c.id} value={c.name}>
                 {c.name}
               </option>

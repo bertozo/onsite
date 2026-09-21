@@ -22,8 +22,8 @@ data class ReportFilters(
     /** Dates used when [period] is CUSTOM; kept in sync with the preset otherwise. */
     val customStart: LocalDate = LocalDate.now().minusDays(6),
     val customEnd: LocalDate = LocalDate.now(),
-    /** Company name to restrict the report to; null = every company. */
-    val company: String? = null,
+    /** Client name to restrict the report to; null = every client. */
+    val client: String? = null,
     val unbilledOnly: Boolean = false,
     val viewMode: ReportViewMode = ReportViewMode.LIST
 ) {
@@ -35,7 +35,7 @@ data class ReportFilters(
 /**
  * Holds the user's column selection for reports and invoices (persisted so every report uses the
  * same layout) and the current report filters (kept in memory so other screens can preset them,
- * e.g. the company sheet opening the report for one client).
+ * e.g. the client sheet opening the report for one client).
  */
 class ReportViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -74,7 +74,7 @@ class ReportViewModel(application: Application) : AndroidViewModel(application) 
         _filters.update { it.copy(period = ReportPeriod.CUSTOM, customEnd = date, customStart = minOf(it.customStart, date)) }
     }
 
-    fun setCompany(name: String?) = _filters.update { it.copy(company = name) }
+    fun setClient(name: String?) = _filters.update { it.copy(client = name) }
 
     fun setUnbilledOnly(enabled: Boolean) = _filters.update { it.copy(unbilledOnly = enabled) }
 

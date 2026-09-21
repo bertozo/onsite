@@ -1,6 +1,6 @@
 package com.xbertz.onsite.invoice
 
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.Profile
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
@@ -21,7 +21,7 @@ data class InvoiceLine(
     val date: LocalDate,
     val sites: List<String>,
     val addresses: List<String>,
-    val companies: List<String>,
+    val clients: List<String>,
     val jobTypes: List<String>,
     val startTime: LocalTime,
     val endTime: LocalTime,
@@ -44,7 +44,7 @@ data class InvoiceLine(
         ReportColumn.DATE -> date.format(DATE_FORMAT)
         ReportColumn.SITE -> sites.joinToString(", ")
         ReportColumn.ADDRESS -> addresses.joinToString(" | ")
-        ReportColumn.COMPANY -> companies.joinToString(", ")
+        ReportColumn.CLIENT -> clients.joinToString(", ")
         ReportColumn.JOB_TYPE -> jobTypes.joinToString(", ")
         ReportColumn.START_TIME -> startTime.format(TIME_FORMAT)
         ReportColumn.END_TIME -> endTime.format(TIME_FORMAT)
@@ -64,7 +64,7 @@ data class InvoiceData(
     val periodStart: LocalDate,
     val periodEnd: LocalDate,
     val provider: Profile,
-    val client: Company,
+    val client: Client,
     val lines: List<InvoiceLine>,
     /** Which template columns to print, in template order (see [ReportColumn.ordered]). */
     val columns: List<ReportColumn>,
@@ -109,7 +109,7 @@ fun buildInvoiceLines(
                 date = date,
                 sites = sites,
                 addresses = sites.mapNotNull { label -> sitesByLabel[label]?.address?.takeIf { it.isNotBlank() } }.distinct(),
-                companies = sorted.mapNotNull { it.companyName?.takeIf { s -> s.isNotBlank() } }.distinct(),
+                clients = sorted.mapNotNull { it.clientName?.takeIf { s -> s.isNotBlank() } }.distinct(),
                 jobTypes = sorted.mapNotNull { it.jobTypeLabel?.takeIf { s -> s.isNotBlank() } }.distinct(),
                 startTime = Instant.ofEpochMilli(sorted.first().startTimestampMillis).atZone(zone).toLocalTime(),
                 endTime = Instant.ofEpochMilli(sorted.last().stopTimestampMillis!!).atZone(zone).toLocalTime(),

@@ -42,7 +42,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
                 val inviteId = UUID.fromString(call.parameters["inviteId"])
                 val req = call.receive<AcceptConnectionInviteRequest>()
                 val connection = withContext(Dispatchers.IO) {
-                    repository.acceptInvite(inviteId, user.email, active.accountId, user.userId, UUID.fromString(req.companyId))
+                    repository.acceptInvite(inviteId, user.email, active.accountId, user.userId, UUID.fromString(req.clientId))
                 }
                 call.respond(connection)
             }

@@ -74,16 +74,16 @@ function durationOf(s: TrackingSessionRequest): number {
   return s.stopTimestampMillis != null ? s.stopTimestampMillis - s.startTimestampMillis : 0;
 }
 
-/** Rate that applies to a session: its own override, else the company default, else none. */
-export function effectiveRate(s: TrackingSessionRequest, ratesByCompany: Map<string, number | null | undefined>): number | null {
+/** Rate that applies to a session: its own override, else the client default, else none. */
+export function effectiveRate(s: TrackingSessionRequest, ratesByClient: Map<string, number | null | undefined>): number | null {
   if (s.hourlyRate != null) return s.hourlyRate;
-  const companyRate = s.companyName ? ratesByCompany.get(s.companyName) : null;
-  return companyRate ?? null;
+  const clientRate = s.clientName ? ratesByClient.get(s.clientName) : null;
+  return clientRate ?? null;
 }
 
-function amountOf(sessions: TrackingSessionRequest[], ratesByCompany: Map<string, number | null | undefined>): number | null {
+function amountOf(sessions: TrackingSessionRequest[], ratesByClient: Map<string, number | null | undefined>): number | null {
   const priced = sessions.map((s) => {
-    const rate = effectiveRate(s, ratesByCompany);
+    const rate = effectiveRate(s, ratesByClient);
     return rate != null ? (durationOf(s) / 3_600_000) * rate : null;
   }).filter((v): v is number => v != null);
   if (priced.length === 0) return null;
@@ -95,15 +95,15 @@ function localDateKey(s: TrackingSessionRequest): string {
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
-export function summarize(sessions: TrackingSessionRequest[], ratesByCompany: Map<string, number | null | undefined>): ReportSummary {
+export function summarize(sessions: TrackingSessionRequest[], ratesByClient: Map<string, number | null | undefined>): ReportSummary {
   const completed = sessions.filter((s) => s.stopTimestampMillis != null);
   const unbilled = completed.filter((s) => s.invoiceId == null);
   return {
     totalMillis: completed.reduce((sum, s) => sum + durationOf(s), 0),
     workedDays: new Set(completed.map(localDateKey)).size,
-    estimatedAmount: amountOf(completed, ratesByCompany),
+    estimatedAmount: amountOf(completed, ratesByClient),
     unbilledMillis: unbilled.reduce((sum, s) => sum + durationOf(s), 0),
-    unbilledAmount: amountOf(unbilled, ratesByCompany),
+    unbilledAmount: amountOf(unbilled, ratesByClient),
   };
 }
 
@@ -136,17 +136,17 @@ function totalsBy(sessions: TrackingSessionRequest[], keyOf: (s: TrackingSession
 }
 
 export const totalsBySite = (sessions: TrackingSessionRequest[]) => totalsBy(sessions, (s) => s.siteLabel);
-export const totalsByCompany = (sessions: TrackingSessionRequest[]) => totalsBy(sessions, (s) => s.companyName);
+export const totalsByClient = (sessions: TrackingSessionRequest[]) => totalsBy(sessions, (s) => s.clientName);
 export const totalsByJobType = (sessions: TrackingSessionRequest[]) => totalsBy(sessions, (s) => s.jobTypeLabel);
 
-export const REPORT_COLUMNS = ["DATE", "SITE", "ADDRESS", "COMPANY", "JOB_TYPE", "START_TIME", "END_TIME", "HOURS"] as const;
+export const REPORT_COLUMNS = ["DATE", "SITE", "ADDRESS", "CLIENT", "JOB_TYPE", "START_TIME", "END_TIME", "HOURS"] as const;
 export type ReportColumn = (typeof REPORT_COLUMNS)[number];
 
 export const REPORT_COLUMN_LABELS: Record<ReportColumn, string> = {
   DATE: "Data",
   SITE: "Local",
   ADDRESS: "Endereço",
-  COMPANY: "Cliente",
+  CLIENT: "Cliente",
   JOB_TYPE: "Serviço",
   START_TIME: "Início",
   END_TIME: "Fim",
@@ -158,7 +158,7 @@ export function buildCsv(
   sessions: TrackingSessionRequest[],
   columns: ReportColumn[],
   sitesByLabel: Map<string, SiteRequest>,
-  ratesByCompany: Map<string, number | null | undefined>,
+  ratesByClient: Map<string, number | null | undefined>,
 ): string {
   const cell = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const header = [...columns.map((c) => REPORT_COLUMN_LABELS[c]), "Valor/h", "Valor"];
@@ -169,7 +169,7 @@ export function buildCsv(
       const start = new Date(s.startTimestampMillis);
       const stop = new Date(s.stopTimestampMillis!);
       const hours = durationOf(s) / 3_600_000;
-      const rate = effectiveRate(s, ratesByCompany);
+      const rate = effectiveRate(s, ratesByClient);
       const pad = (n: number) => String(n).padStart(2, "0");
       const values = columns.map((column) => {
         switch (column) {
@@ -179,8 +179,8 @@ export function buildCsv(
             return s.siteLabel ?? "";
           case "ADDRESS":
             return sitesByLabel.get(s.siteLabel ?? "")?.address ?? "";
-          case "COMPANY":
-            return s.companyName ?? "";
+          case "CLIENT":
+            return s.clientName ?? "";
           case "JOB_TYPE":
             return s.jobTypeLabel ?? "";
           case "START_TIME":

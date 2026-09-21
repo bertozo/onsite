@@ -42,8 +42,8 @@ export interface ConnectionDto {
   employerAccountId: string;
   employerAccountName: string;
   workerAccountId: string;
-  workerCompanyId: string;
-  workerCompanyName: string;
+  workerClientId: string;
+  workerClientName: string;
   status: ConnectionStatus;
 }
 
@@ -72,7 +72,7 @@ export interface ConnectionSessionDto {
   stopTimestampMillis: number | null;
 }
 
-export interface CompanyRequest {
+export interface ClientRequest {
   id: string;
   name: string;
   abn?: string | null;
@@ -100,7 +100,7 @@ export interface JobTypeRequest {
 export interface InvoiceRequest {
   id: string;
   number: string;
-  companyName: string;
+  clientName: string;
   periodStartEpochDay: number;
   periodEndEpochDay: number;
   issueDateEpochDay: number;
@@ -117,7 +117,7 @@ export interface InvoiceRequest {
 
 export interface TrackingSessionRequest {
   id: string;
-  companyName?: string | null;
+  clientName?: string | null;
   siteLabel?: string | null;
   jobTypeLabel?: string | null;
   startTimestampMillis: number;
@@ -135,7 +135,7 @@ export interface PlannedJobRequest {
   dateEpochDay: number;
   startMinute: number;
   endMinute?: number | null;
-  companyName?: string | null;
+  clientName?: string | null;
   siteLabel?: string | null;
   jobTypeLabel?: string | null;
   notes?: string | null;

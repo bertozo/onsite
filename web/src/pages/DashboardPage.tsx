@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { backendApi } from "../lib/backendApi";
 import { useAuth } from "../context/AuthContext";
-import type { CompanyRequest, TrackingSessionRequest } from "../lib/types";
+import type { ClientRequest, TrackingSessionRequest } from "../lib/types";
 import { periodRange, summarize } from "../lib/reportLogic";
 import { formatHours, formatMoney, millisToDateInput, millisToTimeInput } from "../lib/format";
 import { Card, PageHeader, Spinner } from "../components/ui";
@@ -10,23 +10,23 @@ import { Card, PageHeader, Spinner } from "../components/ui";
 export function DashboardPage() {
   const { state } = useAuth();
   const [sessions, setSessions] = useState<TrackingSessionRequest[] | null>(null);
-  const [companies, setCompanies] = useState<CompanyRequest[]>([]);
+  const [clients, setClients] = useState<ClientRequest[]>([]);
 
   useEffect(() => {
     backendApi.listTrackingSessions().then(setSessions).catch(() => setSessions([]));
-    backendApi.listCompanies().then(setCompanies).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(() => undefined);
   }, []);
 
-  const ratesByCompany = useMemo(() => new Map(companies.map((c) => [c.name, c.hourlyRate])), [companies]);
+  const ratesByClient = useMemo(() => new Map(clients.map((c) => [c.name, c.hourlyRate])), [clients]);
 
   if (!sessions) return <Spinner className="h-6 w-6 text-violet-600" />;
 
   const [weekStart, weekEnd] = periodRange("THIS_WEEK")!;
   const weekSessions = sessions.filter((s) => s.startTimestampMillis >= weekStart.getTime() && s.startTimestampMillis < weekEnd.getTime() + 86_400_000);
-  const summary = summarize(weekSessions, ratesByCompany);
+  const summary = summarize(weekSessions, ratesByClient);
   const unbilledAll = summarize(
     sessions.filter((s) => s.invoiceId == null),
-    ratesByCompany,
+    ratesByClient,
   );
   const recent = [...sessions].sort((a, b) => b.startTimestampMillis - a.startTimestampMillis).slice(0, 6);
 
@@ -56,7 +56,7 @@ export function DashboardPage() {
               {recent.map((s) => (
                 <li key={s.id} className="flex items-center justify-between py-2 text-sm">
                   <div>
-                    <p className="font-medium text-slate-800">{s.companyName || "Sem cliente"}</p>
+                    <p className="font-medium text-slate-800">{s.clientName || "Sem cliente"}</p>
                     <p className="text-xs text-slate-400">
                       {millisToDateInput(s.startTimestampMillis)} · {millisToTimeInput(s.startTimestampMillis)}
                       {s.stopTimestampMillis != null ? `–${millisToTimeInput(s.stopTimestampMillis)}` : ""}

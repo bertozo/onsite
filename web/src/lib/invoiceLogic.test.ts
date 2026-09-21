@@ -5,7 +5,7 @@ import { buildInvoiceLines, invoiceShowsAmounts, invoiceTotalAmount, invoiceTota
 function session(partial: Partial<TrackingSessionRequest> & { startTimestampMillis: number }): TrackingSessionRequest {
   return {
     id: crypto.randomUUID(),
-    companyName: "Acme",
+    clientName: "Acme",
     siteLabel: "HQ",
     jobTypeLabel: "Install",
     startLatitude: 0,

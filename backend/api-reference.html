@@ -400,7 +400,7 @@
   <main>
     <div class="intro">
       <h1>OnSite backend API</h1>
-      <p>Kotlin/Ktor monolith behind the OnSite Android app: accounts, team invites, the subcontractor&ndash;client connection bridge, and CRUD for everything the app tracks (companies, sites, job types, sessions, planned jobs, invoices). Rendered from <code>openapi.yaml</code> &mdash; the source of truth if this page and the code ever disagree.</p>
+      <p>Kotlin/Ktor monolith behind the OnSite Android app: accounts, team invites, the subcontractor&ndash;client connection bridge, and CRUD for everything the app tracks (clients, sites, job types, sessions, planned jobs, invoices). Rendered from <code>openapi.yaml</code> &mdash; the source of truth if this page and the code ever disagree.</p>
       <div class="intro-facts">
         <span class="fact">&#128274; <b>Auth:</b> <code>Authorization: Bearer &lt;jwt&gt;</code> on every route except dev-login</span>
         <span class="fact">&#127760; <b>Multi-tenant:</b> optional <code>X-Account-Id</code> header to act as another account you belong to</span>
@@ -492,7 +492,7 @@ const API = [
   },
   {
     tag: "Connections",
-    note: "The subcontractor ↔ client bridge: links one of the worker's own Companies to a client's real account without merging identities.",
+    note: "The subcontractor ↔ client bridge: links one of the worker's own Clients to a client's real account without merging identities.",
     endpoints: [
       {
         method: "POST", path: "/v1/accounts/{accountId}/connection-invites", owner: true,
@@ -512,24 +512,24 @@ const API = [
       {
         method: "POST", path: "/v1/me/connection-invites/{inviteId}/accept",
         summary: "Accept a connection invite",
-        description: "<code>companyId</code> must be one of the contractor's own Companies, representing this client.",
+        description: "<code>clientId</code> must be one of the contractor's own Clients, representing this client.",
         params: [["inviteId", "from the invite"]],
-        request: { companyId: "e7d4b16b-…" },
+        request: { clientId: "e7d4b16b-…" },
         responseStatus: 200,
-        response: { id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerCompanyId: "e7d4b16b-…", workerCompanyName: "Client Co", status: "ACTIVE" }
+        response: { id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerClientId: "e7d4b16b-…", workerClientName: "Client Co", status: "ACTIVE" }
       },
       {
         method: "GET", path: "/v1/connections", owner: true,
         summary: "List connections as the employer/client",
         headers: [["X-Account-Id", "optional — defaults to your personal account"]],
         responseStatus: 200,
-        response: [{ id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerCompanyId: "e7d4b16b-…", workerCompanyName: "Client Co", status: "ACTIVE" }]
+        response: [{ id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerClientId: "e7d4b16b-…", workerClientName: "Client Co", status: "ACTIVE" }]
       },
       {
         method: "GET", path: "/v1/me/connections",
         summary: "List connections as the worker/contractor",
         responseStatus: 200,
-        response: [{ id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerCompanyId: "e7d4b16b-…", workerCompanyName: "Client Co", status: "ACTIVE" }]
+        response: [{ id: "c6d12ddb-…", employerAccountId: "075028c1-…", employerAccountName: "client@example.com", workerAccountId: "7f09c7b5-…", workerClientId: "e7d4b16b-…", workerClientName: "Client Co", status: "ACTIVE" }]
       },
       {
         method: "DELETE", path: "/v1/connections/{id}",
@@ -559,17 +559,17 @@ const API = [
     ]
   },
   {
-    tag: "Companies",
+    tag: "Clients",
     endpoints: [
-      { method: "GET", path: "/v1/companies", summary: "List companies", responseStatus: 200,
+      { method: "GET", path: "/v1/clients", summary: "List clients", responseStatus: 200,
         response: [{ id: "e7d4b16b-…", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 65.0, updatedAt: "2026-09-18T10:38:43Z" }] },
-      { method: "POST", path: "/v1/companies", owner: true, summary: "Create a company", responseStatus: 201,
+      { method: "POST", path: "/v1/clients", owner: true, summary: "Create a client", responseStatus: 201,
         request: { id: "{{$guid}}", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 65.0 },
         response: { id: "e7d4b16b-…", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 65.0, updatedAt: "2026-09-18T10:38:43Z" } },
-      { method: "PUT", path: "/v1/companies/{id}", owner: true, summary: "Update a company", params: [["id", "the company id"]], responseStatus: 200,
+      { method: "PUT", path: "/v1/clients/{id}", owner: true, summary: "Update a client", params: [["id", "the client id"]], responseStatus: 200,
         request: { id: "e7d4b16b-…", name: "Acme Corp", abn: "51824753556", phone: "0412345678", email: "billing@acme.example", createdAtMillis: 1700000000000, hourlyRate: 70.0 },
         response: { id: "e7d4b16b-…", name: "Acme Corp", hourlyRate: 70.0, updatedAt: "2026-09-18T10:41:02Z" } },
-      { method: "DELETE", path: "/v1/companies/{id}", owner: true, summary: "Delete a company (soft delete)", params: [["id", "the company id"]], responseStatus: 204 }
+      { method: "DELETE", path: "/v1/clients/{id}", owner: true, summary: "Delete a client (soft delete)", params: [["id", "the client id"]], responseStatus: 204 }
     ]
   },
   {
@@ -605,12 +605,12 @@ const API = [
     note: "No delete route — the app sets status to VOID instead of removing the row.",
     endpoints: [
       { method: "GET", path: "/v1/invoices", summary: "List invoices", description: "Newest issue date first.", responseStatus: 200,
-        response: [{ id: "d5a6…", number: "INV-0001", companyName: "Acme Corp", totalHours: 24.5, totalAmount: 1592.5, status: "DRAFT", updatedAt: "2026-09-18T10:38Z" }] },
+        response: [{ id: "d5a6…", number: "INV-0001", clientName: "Acme Corp", totalHours: 24.5, totalAmount: 1592.5, status: "DRAFT", updatedAt: "2026-09-18T10:38Z" }] },
       { method: "POST", path: "/v1/invoices", owner: true, summary: "Create an invoice", responseStatus: 201,
-        request: { id: "{{$guid}}", number: "INV-0001", companyName: "Acme Corp", periodStartEpochDay: 19990, periodEndEpochDay: 19996, issueDateEpochDay: 19997, totalHours: 24.5, totalAmount: 1592.5, hourlyRate: 65.0, status: "DRAFT", createdAtMillis: 1700000000000 },
+        request: { id: "{{$guid}}", number: "INV-0001", clientName: "Acme Corp", periodStartEpochDay: 19990, periodEndEpochDay: 19996, issueDateEpochDay: 19997, totalHours: 24.5, totalAmount: 1592.5, hourlyRate: 65.0, status: "DRAFT", createdAtMillis: 1700000000000 },
         response: { id: "d5a6…", number: "INV-0001", status: "DRAFT", updatedAt: "2026-09-18T10:38Z" } },
       { method: "PUT", path: "/v1/invoices/{id}", owner: true, summary: "Update an invoice", params: [["id", "the invoice id"]], responseStatus: 200,
-        request: { id: "d5a6…", number: "INV-0001", companyName: "Acme Corp", periodStartEpochDay: 19990, periodEndEpochDay: 19996, issueDateEpochDay: 19997, totalHours: 24.5, status: "SENT", sentAtMillis: 1700000000000, createdAtMillis: 1700000000000 },
+        request: { id: "d5a6…", number: "INV-0001", clientName: "Acme Corp", periodStartEpochDay: 19990, periodEndEpochDay: 19996, issueDateEpochDay: 19997, totalHours: 24.5, status: "SENT", sentAtMillis: 1700000000000, createdAtMillis: 1700000000000 },
         response: { id: "d5a6…", status: "SENT", updatedAt: "2026-09-18T10:41Z" } }
     ]
   },
@@ -618,12 +618,12 @@ const API = [
     tag: "Tracking sessions",
     endpoints: [
       { method: "GET", path: "/v1/sessions", summary: "List tracking sessions", description: "A WORKER only sees their own; an OWNER sees everyone's.", responseStatus: 200,
-        response: [{ id: "a390cc32-…", companyName: "Acme Corp", siteLabel: "Head Office", startTimestampMillis: 1700000000000, stopTimestampMillis: 1700007200000, createdByUserId: "34c71b3e-…" }] },
+        response: [{ id: "a390cc32-…", clientName: "Acme Corp", siteLabel: "Head Office", startTimestampMillis: 1700000000000, stopTimestampMillis: 1700007200000, createdByUserId: "34c71b3e-…" }] },
       { method: "POST", path: "/v1/sessions", summary: "Create a tracking session", description: "Any member may create their own session; omit stop fields for one still running.", responseStatus: 201,
-        request: { id: "{{$guid}}", companyName: "Acme Corp", siteLabel: "Head Office", jobTypeLabel: "Cleaning", startTimestampMillis: 1700000000000, startLatitude: -33.8688, startLongitude: 151.2093, stopTimestampMillis: 1700007200000, stopLatitude: -33.8688, stopLongitude: 151.2093, hourlyRate: 65.0 },
-        response: { id: "a390cc32-…", companyName: "Acme Corp", updatedAt: "2026-09-18T10:39Z" } },
+        request: { id: "{{$guid}}", clientName: "Acme Corp", siteLabel: "Head Office", jobTypeLabel: "Cleaning", startTimestampMillis: 1700000000000, startLatitude: -33.8688, startLongitude: 151.2093, stopTimestampMillis: 1700007200000, stopLatitude: -33.8688, stopLongitude: 151.2093, hourlyRate: 65.0 },
+        response: { id: "a390cc32-…", clientName: "Acme Corp", updatedAt: "2026-09-18T10:39Z" } },
       { method: "PUT", path: "/v1/sessions/{id}", summary: "Update a tracking session", description: "A WORKER can only update their own.", params: [["id", "the session id"]], responseStatus: 200,
-        request: { id: "a390cc32-…", companyName: "Acme Corp", startTimestampMillis: 1700000000000, startLatitude: -33.8688, startLongitude: 151.2093, stopTimestampMillis: 1700007200000 },
+        request: { id: "a390cc32-…", clientName: "Acme Corp", startTimestampMillis: 1700000000000, startLatitude: -33.8688, startLongitude: 151.2093, stopTimestampMillis: 1700007200000 },
         response: { id: "a390cc32-…", updatedAt: "2026-09-18T10:41Z" } },
       { method: "DELETE", path: "/v1/sessions/{id}", summary: "Delete a tracking session (soft delete)", description: "A WORKER can only delete their own.", params: [["id", "the session id"]], responseStatus: 204 }
     ]
@@ -632,12 +632,12 @@ const API = [
     tag: "Planned jobs",
     endpoints: [
       { method: "GET", path: "/v1/planned-jobs", summary: "List planned jobs", description: "A WORKER only sees jobs they created or are assigned to; an OWNER sees every job.", responseStatus: 200,
-        response: [{ id: "596a147f-…", dateEpochDay: 20000, startMinute: 420, companyName: null, createdByUserId: "34c71b3e-…", assignedUserId: "91bcd602-…", updatedAt: "2026-09-18T10:38Z" }] },
+        response: [{ id: "596a147f-…", dateEpochDay: 20000, startMinute: 420, clientName: null, createdByUserId: "34c71b3e-…", assignedUserId: "91bcd602-…", updatedAt: "2026-09-18T10:38Z" }] },
       { method: "POST", path: "/v1/planned-jobs", summary: "Create a planned job", description: "<code>assignedUserId</code> is OWNER-only — forced to the caller for a WORKER.", responseStatus: 201,
-        request: { id: "{{$guid}}", dateEpochDay: 20000, startMinute: 480, endMinute: 960, companyName: "Acme Corp", siteLabel: "Head Office", jobTypeLabel: "Cleaning", notes: "Bring the extension ladder", assignedUserId: null },
+        request: { id: "{{$guid}}", dateEpochDay: 20000, startMinute: 480, endMinute: 960, clientName: "Acme Corp", siteLabel: "Head Office", jobTypeLabel: "Cleaning", notes: "Bring the extension ladder", assignedUserId: null },
         response: { id: "596a147f-…", dateEpochDay: 20000, startMinute: 480, updatedAt: "2026-09-18T10:38Z" } },
       { method: "PUT", path: "/v1/planned-jobs/{id}", summary: "Update a planned job", description: "Same assignment rule as create.", params: [["id", "the planned job id"]], responseStatus: 200,
-        request: { id: "596a147f-…", dateEpochDay: 20000, startMinute: 480, endMinute: 960, companyName: "Acme Corp", assignedUserId: "91bcd602-…" },
+        request: { id: "596a147f-…", dateEpochDay: 20000, startMinute: 480, endMinute: 960, clientName: "Acme Corp", assignedUserId: "91bcd602-…" },
         response: { id: "596a147f-…", assignedUserId: "91bcd602-…", updatedAt: "2026-09-18T10:41Z" } },
       { method: "DELETE", path: "/v1/planned-jobs/{id}", summary: "Delete a planned job (soft delete)", description: "A WORKER can only delete a job they created or are assigned to.", params: [["id", "the planned job id"]], responseStatus: 204 }
     ]

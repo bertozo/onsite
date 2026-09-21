@@ -14,7 +14,7 @@ enum class ReportColumn(@StringRes val labelRes: Int, val alwaysShown: Boolean =
     DATE(R.string.date, alwaysShown = true),
     SITE(R.string.site),
     ADDRESS(R.string.address),
-    COMPANY(R.string.company),
+    CLIENT(R.string.client),
     JOB_TYPE(R.string.job_type),
     START_TIME(R.string.start_time),
     END_TIME(R.string.end_time),

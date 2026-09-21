@@ -6,13 +6,13 @@ import com.xbertz.onsite.backend.config.AppConfig
 import com.xbertz.onsite.backend.connections.ConnectionsRepository
 import com.xbertz.onsite.backend.connections.connectionRoutes
 import com.xbertz.onsite.backend.db.DatabaseFactory
-import com.xbertz.onsite.backend.domain.CompaniesRepository
+import com.xbertz.onsite.backend.domain.ClientsRepository
 import com.xbertz.onsite.backend.domain.InvoicesRepository
 import com.xbertz.onsite.backend.domain.JobTypesRepository
 import com.xbertz.onsite.backend.domain.PlannedJobsRepository
 import com.xbertz.onsite.backend.domain.SitesRepository
 import com.xbertz.onsite.backend.domain.TrackingSessionsRepository
-import com.xbertz.onsite.backend.domain.companyRoutes
+import com.xbertz.onsite.backend.domain.clientRoutes
 import com.xbertz.onsite.backend.domain.invoiceRoutes
 import com.xbertz.onsite.backend.domain.jobTypeRoutes
 import com.xbertz.onsite.backend.domain.plannedJobRoutes
@@ -67,7 +67,7 @@ fun Application.module(config: AppConfig) {
     val identityRepository = IdentityRepository()
     val inviteRepository = InviteRepository()
     val connectionsRepository = ConnectionsRepository()
-    val companiesRepository = CompaniesRepository()
+    val clientsRepository = ClientsRepository()
     val sitesRepository = SitesRepository()
     val jobTypesRepository = JobTypesRepository()
     val invoicesRepository = InvoicesRepository()
@@ -79,7 +79,7 @@ fun Application.module(config: AppConfig) {
         identityRoutes(identityRepository)
         inviteRoutes(inviteRepository)
         connectionRoutes(connectionsRepository)
-        companyRoutes(companiesRepository)
+        clientRoutes(clientsRepository)
         siteRoutes(sitesRepository)
         jobTypeRoutes(jobTypesRepository)
         invoiceRoutes(invoicesRepository)

@@ -154,7 +154,7 @@ fun InvoiceReviewScreen(
     reportViewModel: ReportViewModel = viewModel()
 ) {
     val request by invoiceViewModel.review.collectAsState()
-    val companies by invoiceViewModel.companies.collectAsState()
+    val clients by invoiceViewModel.clients.collectAsState()
     val sites by trackerViewModel.sites.collectAsState()
     val columnSelection by reportViewModel.columns.collectAsState()
     val uiState by invoiceViewModel.uiState.collectAsState()
@@ -181,45 +181,45 @@ fun InvoiceReviewScreen(
         return
     }
 
-    val companyNamesInPeriod = remember(req) { req.sessions.mapNotNull { it.companyName }.distinct() }
-    var company by remember(req.company, companies) {
-        mutableStateOf(req.company ?: companies.firstOrNull { it.name == companyNamesInPeriod.singleOrNull() })
+    val clientNamesInPeriod = remember(req) { req.sessions.mapNotNull { it.clientName }.distinct() }
+    var client by remember(req.client, clients) {
+        mutableStateOf(req.client ?: clients.firstOrNull { it.name == clientNamesInPeriod.singleOrNull() })
     }
     var number by remember { mutableStateOf(invoiceViewModel.nextInvoiceNumber()) }
     var rateText by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
     var excludedDates by remember { mutableStateOf(setOf<LocalDate>()) }
-    var companyExpanded by remember { mutableStateOf(false) }
+    var clientExpanded by remember { mutableStateOf(false) }
     var rateDialogLine by remember { mutableStateOf<InvoiceLine?>(null) }
 
-    // The company's default rate seeds the field whenever the client changes.
-    LaunchedEffect(company?.id) {
-        rateText = company?.hourlyRate?.let { formatRateInput(it) }.orEmpty()
+    // The client's default rate seeds the field whenever the client changes.
+    LaunchedEffect(client?.id) {
+        rateText = client?.hourlyRate?.let { formatRateInput(it) }.orEmpty()
     }
 
     val zone = remember { ZoneId.systemDefault() }
     val sitesByLabel = remember(sites) { sites.associateBy { it.label } }
     val defaultRate = Validators.parseAmount(rateText)
-    val companySessions = remember(req, company) { req.sessions.filter { it.companyName == company?.name } }
-    val allLines = remember(companySessions, sitesByLabel, defaultRate) {
-        buildInvoiceLines(companySessions, sitesByLabel, zone, defaultRate)
+    val clientSessions = remember(req, client) { req.sessions.filter { it.clientName == client?.name } }
+    val allLines = remember(clientSessions, sitesByLabel, defaultRate) {
+        buildInvoiceLines(clientSessions, sitesByLabel, zone, defaultRate)
     }
     val allDates = remember(allLines) { allLines.map { it.date }.distinct() }
     val includedLines = allLines.filter { it.date !in excludedDates }
-    val includedSessions = companySessions.filter {
+    val includedSessions = clientSessions.filter {
         Instant.ofEpochMilli(it.startTimestampMillis).atZone(zone).toLocalDate() !in excludedDates
     }
     val totalHours = Math.round(includedLines.sumOf { it.hours } * 100) / 100.0
     val showAmounts = includedLines.any { it.hourlyRate != null }
     val totalAmount = if (showAmounts) includedLines.sumOf { it.amount ?: 0.0 } else null
-    val canGenerate = company != null && number.isNotBlank() && Validators.amountOk(rateText) &&
+    val canGenerate = client != null && number.isNotBlank() && Validators.amountOk(rateText) &&
         includedLines.isNotEmpty() && !uiState.isGenerating
 
     rateDialogLine?.let { line ->
         LineRateDialog(
             line = line,
             title = stringResource(R.string.invoice_line_rate_title, line.date.format(lineDateFormatter)),
-            companyRate = company?.hourlyRate,
+            clientRate = client?.hourlyRate,
             onDismiss = { rateDialogLine = null },
             onConfirm = { rate ->
                 invoiceViewModel.setLineRate(line, rate)
@@ -238,25 +238,25 @@ fun InvoiceReviewScreen(
         ) {
             ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Column(modifier = Modifier.padding(20.dp)) {
-                    if (companies.isEmpty()) {
-                        Text(stringResource(R.string.invoice_register_company_first), color = MaterialTheme.colorScheme.error)
+                    if (clients.isEmpty()) {
+                        Text(stringResource(R.string.invoice_register_client_first), color = MaterialTheme.colorScheme.error)
                     } else {
                         TrackerDropdown(
                             label = stringResource(R.string.bill_to),
                             icon = Icons.Filled.Business,
-                            value = company?.name ?: stringResource(R.string.select_company),
-                            expanded = companyExpanded,
-                            enabled = !uiState.isGenerating && req.company == null,
-                            onExpandedChange = { companyExpanded = it },
-                            onDismiss = { companyExpanded = false }
+                            value = client?.name ?: stringResource(R.string.select_client),
+                            expanded = clientExpanded,
+                            enabled = !uiState.isGenerating && req.client == null,
+                            onExpandedChange = { clientExpanded = it },
+                            onDismiss = { clientExpanded = false }
                         ) {
-                            companies.forEach { option ->
+                            clients.forEach { option ->
                                 DropdownMenuItem(
                                     text = { Text(option.name) },
                                     onClick = {
-                                        company = option
+                                        client = option
                                         excludedDates = emptySet()
-                                        companyExpanded = false
+                                        clientExpanded = false
                                     }
                                 )
                             }
@@ -328,10 +328,10 @@ fun InvoiceReviewScreen(
             }
             Spacer(Modifier.height(8.dp))
 
-            if (company == null) {
-                EmptyState(text = stringResource(R.string.select_company))
+            if (client == null) {
+                EmptyState(text = stringResource(R.string.select_client))
             } else if (allLines.isEmpty()) {
-                EmptyState(text = stringResource(R.string.invoice_no_days_for_company, company?.name.orEmpty()))
+                EmptyState(text = stringResource(R.string.invoice_no_days_for_client, client?.name.orEmpty()))
             } else {
                 ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                     Column {
@@ -397,10 +397,10 @@ fun InvoiceReviewScreen(
             Spacer(Modifier.height(16.dp))
             Button(
                 onClick = {
-                    val client = company ?: return@Button
+                    val client = client ?: return@Button
                     invoiceViewModel.generateInvoice(
                         sessions = includedSessions,
-                        company = client,
+                        client = client,
                         invoiceNumber = number,
                         hourlyRate = defaultRate,
                         periodStart = req.periodStart,
@@ -519,7 +519,7 @@ private fun InvoiceLineRow(
 private fun LineRateDialog(
     line: InvoiceLine,
     title: String,
-    companyRate: Double?,
+    clientRate: Double?,
     onDismiss: () -> Unit,
     onConfirm: (Double?) -> Unit
 ) {
@@ -528,7 +528,7 @@ private fun LineRateDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.AttachMoney, contentDescription = null) },
         title = { Text(title) },
-        text = { SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = companyRate) },
+        text = { SessionRateField(value = rateText, onValueChange = { rateText = it }, clientRate = clientRate) },
         confirmButton = {
             TextButton(onClick = { onConfirm(Validators.parseAmount(rateText)) }, enabled = Validators.amountOk(rateText)) {
                 Text(stringResource(R.string.save))
@@ -675,7 +675,7 @@ private fun InvoiceRow(
                     Spacer(Modifier.width(8.dp))
                     InvoiceStatusChip(status)
                 }
-                Text(invoice.companyName, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
+                Text(invoice.clientName, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
                 Text(periodText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Column(horizontalAlignment = Alignment.End) {

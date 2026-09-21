@@ -8,7 +8,7 @@ interface CrudApi<T> {
   remove?: (id: string) => Promise<void>;
 }
 
-/** Generic list+CRUD state for the entity screens (Companies/Sites/Job types/...). */
+/** Generic list+CRUD state for the entity screens (Clients/Sites/Job types/...). */
 export function useCrud<T extends { id: string }>(api: CrudApi<T>) {
   const [items, setItems] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);

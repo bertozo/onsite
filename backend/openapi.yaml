@@ -6,7 +6,7 @@ info:
     API for the OnSite backend (Kotlin/Ktor monolith). Serves the OnSite Android app
     (and, eventually, Web/iOS): multi-tenant accounts, team invites, the subcontractor
     <-> client "connection" bridge, and CRUD for the domain entities the app tracks
-    locally in Room (companies, sites, job types, sessions, planned jobs, invoices).
+    locally in Room (clients, sites, job types, sessions, planned jobs, invoices).
 
     Auth: every route except `/v1/dev/auth/login` requires a bearer JWT. In production
     that token comes from Supabase Auth (verified against the project's JWKS endpoint);
@@ -26,7 +26,7 @@ tags:
   - name: Identity
   - name: Team invites
   - name: Connections
-  - name: Companies
+  - name: Clients
   - name: Sites
   - name: Job types
   - name: Invoices
@@ -205,8 +205,8 @@ paths:
       tags: [Connections]
       summary: Accept a connection invite
       description: |
-        Called by the contractor/worker. `companyId` must be one of *their own*
-        Companies, representing this client - the bridge links that Company to the
+        Called by the contractor/worker. `clientId` must be one of *their own*
+        Clients, representing this client - the bridge links that Client to the
         employer's real account without merging identities.
       parameters:
         - name: inviteId
@@ -219,9 +219,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [companyId]
+              required: [clientId]
               properties:
-                companyId: { type: string, format: uuid }
+                clientId: { type: string, format: uuid }
       responses:
         "200":
           description: The now-active connection.
@@ -301,7 +301,7 @@ paths:
     get:
       tags: [Connections]
       summary: View a connection's logged hours
-      description: OWNER only. Every tracked session the worker logged against this connection's company.
+      description: OWNER only. Every tracked session the worker logged against this connection's client.
       parameters:
         - name: connectionId
           in: path
@@ -317,38 +317,38 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/ConnectionSessionDto" }
 
-  /v1/companies:
+  /v1/clients:
     get:
-      tags: [Companies]
-      summary: List companies
+      tags: [Clients]
+      summary: List clients
       parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
       responses:
         "200":
-          description: Companies in the active account.
+          description: Clients in the active account.
           content:
             application/json:
-              schema: { type: array, items: { $ref: "#/components/schemas/CompanyDto" } }
+              schema: { type: array, items: { $ref: "#/components/schemas/ClientDto" } }
     post:
-      tags: [Companies]
-      summary: Create a company
+      tags: [Clients]
+      summary: Create a client
       description: OWNER only.
       parameters: [{ $ref: "#/components/parameters/AccountIdHeader" }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CompanyRequest" }
+            schema: { $ref: "#/components/schemas/ClientRequest" }
       responses:
         "201":
-          description: The created company.
+          description: The created client.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CompanyDto" }
+              schema: { $ref: "#/components/schemas/ClientDto" }
 
-  /v1/companies/{id}:
+  /v1/clients/{id}:
     put:
-      tags: [Companies]
-      summary: Update a company
+      tags: [Clients]
+      summary: Update a client
       description: OWNER only.
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -357,17 +357,17 @@ paths:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/CompanyRequest" }
+            schema: { $ref: "#/components/schemas/ClientRequest" }
       responses:
         "200":
-          description: The updated company.
+          description: The updated client.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/CompanyDto" }
+              schema: { $ref: "#/components/schemas/ClientDto" }
         "404": { description: Not found. }
     delete:
-      tags: [Companies]
-      summary: Delete a company (soft delete)
+      tags: [Clients]
+      summary: Delete a client (soft delete)
       description: OWNER only.
       parameters:
         - $ref: "#/components/parameters/IdPath"
@@ -749,8 +749,8 @@ components:
         employerAccountId: { type: string, format: uuid }
         employerAccountName: { type: string }
         workerAccountId: { type: string, format: uuid }
-        workerCompanyId: { type: string, format: uuid }
-        workerCompanyName: { type: string }
+        workerClientId: { type: string, format: uuid }
+        workerClientName: { type: string }
         status: { type: string, enum: [ACTIVE, REVOKED] }
 
     ConnectionPlannedJobRequest:
@@ -785,7 +785,7 @@ components:
         startTimestampMillis: { type: integer, format: int64 }
         stopTimestampMillis: { type: integer, format: int64, nullable: true }
 
-    CompanyRequest:
+    ClientRequest:
       type: object
       required: [id, name, createdAtMillis]
       properties:
@@ -797,9 +797,9 @@ components:
         createdAtMillis: { type: integer, format: int64 }
         hourlyRate: { type: number, format: double, nullable: true }
 
-    CompanyDto:
+    ClientDto:
       allOf:
-        - $ref: "#/components/schemas/CompanyRequest"
+        - $ref: "#/components/schemas/ClientRequest"
         - type: object
           properties:
             updatedAt: { type: string, format: date-time }
@@ -839,11 +839,11 @@ components:
 
     InvoiceRequest:
       type: object
-      required: [id, number, companyName, periodStartEpochDay, periodEndEpochDay, issueDateEpochDay, totalHours, createdAtMillis]
+      required: [id, number, clientName, periodStartEpochDay, periodEndEpochDay, issueDateEpochDay, totalHours, createdAtMillis]
       properties:
         id: { type: string, format: uuid }
         number: { type: string }
-        companyName: { type: string }
+        clientName: { type: string }
         periodStartEpochDay: { type: integer, format: int64 }
         periodEndEpochDay: { type: integer, format: int64 }
         issueDateEpochDay: { type: integer, format: int64 }
@@ -869,7 +869,7 @@ components:
       required: [id, startTimestampMillis, startLatitude, startLongitude]
       properties:
         id: { type: string, format: uuid }
-        companyName: { type: string, nullable: true }
+        clientName: { type: string, nullable: true }
         siteLabel: { type: string, nullable: true }
         jobTypeLabel: { type: string, nullable: true }
         startTimestampMillis: { type: integer, format: int64 }
@@ -897,7 +897,7 @@ components:
         dateEpochDay: { type: integer, format: int64 }
         startMinute: { type: integer }
         endMinute: { type: integer, nullable: true }
-        companyName: { type: string, nullable: true }
+        clientName: { type: string, nullable: true }
         siteLabel: { type: string, nullable: true }
         jobTypeLabel: { type: string, nullable: true }
         notes: { type: string, nullable: true }

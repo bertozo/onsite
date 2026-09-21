@@ -3,7 +3,7 @@ package com.xbertz.onsite.backend.db.tables
 import org.jetbrains.exposed.sql.Table
 import org.jetbrains.exposed.sql.javatime.timestamp
 
-object Companies : Table("companies") {
+object Clients : Table("clients") {
     val id = uuid("id")
     val accountId = uuid("account_id").references(Accounts.id)
     val name = text("name")
@@ -47,7 +47,7 @@ object Invoices : Table("invoices") {
     val id = uuid("id")
     val accountId = uuid("account_id").references(Accounts.id)
     val number = text("number")
-    val companyName = text("company_name")
+    val clientName = text("client_name")
     val periodStartEpochDay = long("period_start_epoch_day")
     val periodEndEpochDay = long("period_end_epoch_day")
     val issueDateEpochDay = long("issue_date_epoch_day")
@@ -74,7 +74,7 @@ object Invoices : Table("invoices") {
 object TrackingSessions : Table("tracking_sessions") {
     val id = uuid("id")
     val accountId = uuid("account_id").references(Accounts.id)
-    val companyName = text("company_name").nullable()
+    val clientName = text("client_name").nullable()
     val siteLabel = text("site_label").nullable()
     val jobTypeLabel = text("job_type_label").nullable()
     val startTimestampMillis = long("start_timestamp_millis")
@@ -98,7 +98,7 @@ object PlannedJobs : Table("planned_jobs") {
     val dateEpochDay = long("date_epoch_day")
     val startMinute = integer("start_minute")
     val endMinute = integer("end_minute").nullable()
-    val companyName = text("company_name").nullable()
+    val clientName = text("client_name").nullable()
     val siteLabel = text("site_label").nullable()
     val jobTypeLabel = text("job_type_label").nullable()
     val notes = text("notes").nullable()

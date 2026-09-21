@@ -65,7 +65,7 @@ data class ConnectionInviteDto(
 )
 
 @Serializable
-data class AcceptConnectionInviteRequest(val companyId: String)
+data class AcceptConnectionInviteRequest(val clientId: String)
 
 @Serializable
 data class ConnectionDto(
@@ -73,8 +73,8 @@ data class ConnectionDto(
     val employerAccountId: String,
     val employerAccountName: String,
     val workerAccountId: String,
-    val workerCompanyId: String,
-    val workerCompanyName: String,
+    val workerClientId: String,
+    val workerClientName: String,
     val status: String,
 )
 
@@ -107,7 +107,7 @@ data class ConnectionSessionDto(
 )
 
 @Serializable
-data class CompanyRequest(
+data class ClientRequest(
     val id: String,
     val name: String,
     val abn: String? = null,
@@ -138,7 +138,7 @@ data class JobTypeRequest(
 data class InvoiceRequest(
     val id: String,
     val number: String,
-    val companyName: String,
+    val clientName: String,
     val periodStartEpochDay: Long,
     val periodEndEpochDay: Long,
     val issueDateEpochDay: Long,
@@ -156,7 +156,7 @@ data class InvoiceRequest(
 @Serializable
 data class TrackingSessionRequest(
     val id: String,
-    val companyName: String? = null,
+    val clientName: String? = null,
     val siteLabel: String? = null,
     val jobTypeLabel: String? = null,
     val startTimestampMillis: Long,
@@ -175,7 +175,7 @@ data class PlannedJobRequest(
     val dateEpochDay: Long,
     val startMinute: Int,
     val endMinute: Int? = null,
-    val companyName: String? = null,
+    val clientName: String? = null,
     val siteLabel: String? = null,
     val jobTypeLabel: String? = null,
     val notes: String? = null,
@@ -189,151 +189,151 @@ object BackendApi {
      */
     var activeAccountId: String? = null
 
-    private val client = HttpClient(OkHttp) {
+    private val http = HttpClient(OkHttp) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
     }
 
     suspend fun bootstrap(token: String): MeResponse =
-        client.post("$BASE_URL/v1/me/bootstrap") { bearerAuth(token) }.body()
+        http.post("$BASE_URL/v1/me/bootstrap") { bearerAuth(token) }.body()
 
     suspend fun me(token: String): MeResponse =
-        client.get("$BASE_URL/v1/me") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/me") { bearerAuth(token) }.body()
 
     suspend fun createInvite(token: String, accountId: String, email: String): InviteDto =
-        client.post("$BASE_URL/v1/accounts/$accountId/invites") {
+        http.post("$BASE_URL/v1/accounts/$accountId/invites") {
             bearerAuth(token); jsonBody(CreateInviteRequest(email))
         }.body()
 
     suspend fun listMyInvites(token: String): List<InviteDto> =
-        client.get("$BASE_URL/v1/me/invites") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/me/invites") { bearerAuth(token) }.body()
 
     suspend fun acceptInvite(token: String, inviteId: String): InviteDto =
-        client.post("$BASE_URL/v1/me/invites/$inviteId/accept") { bearerAuth(token) }.body()
+        http.post("$BASE_URL/v1/me/invites/$inviteId/accept") { bearerAuth(token) }.body()
 
     suspend fun createConnectionInvite(token: String, accountId: String, email: String): ConnectionInviteDto =
-        client.post("$BASE_URL/v1/accounts/$accountId/connection-invites") {
+        http.post("$BASE_URL/v1/accounts/$accountId/connection-invites") {
             bearerAuth(token); jsonBody(CreateConnectionInviteRequest(email))
         }.body()
 
     suspend fun listMyConnectionInvites(token: String): List<ConnectionInviteDto> =
-        client.get("$BASE_URL/v1/me/connection-invites") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/me/connection-invites") { bearerAuth(token) }.body()
 
-    suspend fun acceptConnectionInvite(token: String, inviteId: String, companyId: String): ConnectionDto =
-        client.post("$BASE_URL/v1/me/connection-invites/$inviteId/accept") {
-            bearerAuth(token); jsonBody(AcceptConnectionInviteRequest(companyId))
+    suspend fun acceptConnectionInvite(token: String, inviteId: String, clientId: String): ConnectionDto =
+        http.post("$BASE_URL/v1/me/connection-invites/$inviteId/accept") {
+            bearerAuth(token); jsonBody(AcceptConnectionInviteRequest(clientId))
         }.body()
 
     suspend fun listMyConnections(token: String): List<ConnectionDto> =
-        client.get("$BASE_URL/v1/me/connections") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/me/connections") { bearerAuth(token) }.body()
 
     /** OWNER-only: the contractors connected *to* the active account (the employer side, unlike [listMyConnections]). */
     suspend fun listEmployerConnections(token: String): List<ConnectionDto> =
-        client.get("$BASE_URL/v1/connections") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/connections") { bearerAuth(token) }.body()
 
     suspend fun revokeConnection(token: String, connectionId: String) {
-        client.delete("$BASE_URL/v1/connections/$connectionId") { bearerAuth(token) }
+        http.delete("$BASE_URL/v1/connections/$connectionId") { bearerAuth(token) }
     }
 
     /** OWNER-only: every member of the active account, for the "assign to" picker. */
     suspend fun listAccountMembers(token: String): List<MemberDto> =
-        client.get("$BASE_URL/v1/me/account-members") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/me/account-members") { bearerAuth(token) }.body()
 
     /** Employer schedules a job straight onto the connected worker's own calendar. */
     suspend fun createConnectionPlannedJob(token: String, connectionId: String, req: ConnectionPlannedJobRequest) {
-        client.post("$BASE_URL/v1/connections/$connectionId/planned-jobs") { bearerAuth(token); jsonBody(req) }
+        http.post("$BASE_URL/v1/connections/$connectionId/planned-jobs") { bearerAuth(token); jsonBody(req) }
     }
 
-    /** Employer reads the hours the connected worker has logged against this connection's company. */
+    /** Employer reads the hours the connected worker has logged against this connection's client. */
     suspend fun listConnectionSessions(token: String, connectionId: String): List<ConnectionSessionDto> =
-        client.get("$BASE_URL/v1/connections/$connectionId/sessions") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/connections/$connectionId/sessions") { bearerAuth(token) }.body()
 
-    suspend fun createCompany(token: String, req: CompanyRequest) {
-        client.post("$BASE_URL/v1/companies") { bearerAuth(token); jsonBody(req) }
+    suspend fun createClient(token: String, req: ClientRequest) {
+        http.post("$BASE_URL/v1/clients") { bearerAuth(token); jsonBody(req) }
     }
 
-    suspend fun updateCompany(token: String, id: String, req: CompanyRequest) {
-        client.put("$BASE_URL/v1/companies/$id") { bearerAuth(token); jsonBody(req) }
+    suspend fun updateClient(token: String, id: String, req: ClientRequest) {
+        http.put("$BASE_URL/v1/clients/$id") { bearerAuth(token); jsonBody(req) }
     }
 
-    suspend fun deleteCompany(token: String, id: String) {
-        client.delete("$BASE_URL/v1/companies/$id") { bearerAuth(token) }
+    suspend fun deleteClient(token: String, id: String) {
+        http.delete("$BASE_URL/v1/clients/$id") { bearerAuth(token) }
     }
 
-    suspend fun listCompanies(token: String): List<CompanyRequest> =
-        client.get("$BASE_URL/v1/companies") { bearerAuth(token) }.body()
+    suspend fun listClients(token: String): List<ClientRequest> =
+        http.get("$BASE_URL/v1/clients") { bearerAuth(token) }.body()
 
     suspend fun createSite(token: String, req: SiteRequest) {
-        client.post("$BASE_URL/v1/sites") { bearerAuth(token); jsonBody(req) }
+        http.post("$BASE_URL/v1/sites") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun updateSite(token: String, id: String, req: SiteRequest) {
-        client.put("$BASE_URL/v1/sites/$id") { bearerAuth(token); jsonBody(req) }
+        http.put("$BASE_URL/v1/sites/$id") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun deleteSite(token: String, id: String) {
-        client.delete("$BASE_URL/v1/sites/$id") { bearerAuth(token) }
+        http.delete("$BASE_URL/v1/sites/$id") { bearerAuth(token) }
     }
 
     suspend fun listSites(token: String): List<SiteRequest> =
-        client.get("$BASE_URL/v1/sites") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/sites") { bearerAuth(token) }.body()
 
     suspend fun createJobType(token: String, req: JobTypeRequest) {
-        client.post("$BASE_URL/v1/job-types") { bearerAuth(token); jsonBody(req) }
+        http.post("$BASE_URL/v1/job-types") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun updateJobType(token: String, id: String, req: JobTypeRequest) {
-        client.put("$BASE_URL/v1/job-types/$id") { bearerAuth(token); jsonBody(req) }
+        http.put("$BASE_URL/v1/job-types/$id") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun deleteJobType(token: String, id: String) {
-        client.delete("$BASE_URL/v1/job-types/$id") { bearerAuth(token) }
+        http.delete("$BASE_URL/v1/job-types/$id") { bearerAuth(token) }
     }
 
     suspend fun listJobTypes(token: String): List<JobTypeRequest> =
-        client.get("$BASE_URL/v1/job-types") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/job-types") { bearerAuth(token) }.body()
 
     suspend fun createInvoice(token: String, req: InvoiceRequest) {
-        client.post("$BASE_URL/v1/invoices") { bearerAuth(token); jsonBody(req) }
+        http.post("$BASE_URL/v1/invoices") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun updateInvoice(token: String, id: String, req: InvoiceRequest) {
-        client.put("$BASE_URL/v1/invoices/$id") { bearerAuth(token); jsonBody(req) }
+        http.put("$BASE_URL/v1/invoices/$id") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun listInvoices(token: String): List<InvoiceRequest> =
-        client.get("$BASE_URL/v1/invoices") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/invoices") { bearerAuth(token) }.body()
 
     suspend fun createTrackingSession(token: String, req: TrackingSessionRequest) {
-        client.post("$BASE_URL/v1/sessions") { bearerAuth(token); jsonBody(req) }
+        http.post("$BASE_URL/v1/sessions") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun updateTrackingSession(token: String, id: String, req: TrackingSessionRequest) {
-        client.put("$BASE_URL/v1/sessions/$id") { bearerAuth(token); jsonBody(req) }
+        http.put("$BASE_URL/v1/sessions/$id") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun deleteTrackingSession(token: String, id: String) {
-        client.delete("$BASE_URL/v1/sessions/$id") { bearerAuth(token) }
+        http.delete("$BASE_URL/v1/sessions/$id") { bearerAuth(token) }
     }
 
     suspend fun listTrackingSessions(token: String): List<TrackingSessionRequest> =
-        client.get("$BASE_URL/v1/sessions") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/sessions") { bearerAuth(token) }.body()
 
     suspend fun createPlannedJob(token: String, req: PlannedJobRequest) {
-        client.post("$BASE_URL/v1/planned-jobs") { bearerAuth(token); jsonBody(req) }
+        http.post("$BASE_URL/v1/planned-jobs") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun updatePlannedJob(token: String, id: String, req: PlannedJobRequest) {
-        client.put("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token); jsonBody(req) }
+        http.put("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token); jsonBody(req) }
     }
 
     suspend fun deletePlannedJob(token: String, id: String) {
-        client.delete("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token) }
+        http.delete("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token) }
     }
 
     suspend fun listPlannedJobs(token: String): List<PlannedJobRequest> =
-        client.get("$BASE_URL/v1/planned-jobs") { bearerAuth(token) }.body()
+        http.get("$BASE_URL/v1/planned-jobs") { bearerAuth(token) }.body()
 }
 
 private fun io.ktor.client.request.HttpRequestBuilder.bearerAuth(token: String) {

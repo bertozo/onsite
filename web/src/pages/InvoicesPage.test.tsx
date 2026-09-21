@@ -1,11 +1,11 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompanyRequest, InvoiceRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
+import type { ClientRequest, InvoiceRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
 import { InvoicesPage } from "./InvoicesPage";
 
 const listInvoices = vi.fn<() => Promise<InvoiceRequest[]>>();
-const listCompanies = vi.fn<() => Promise<CompanyRequest[]>>();
+const listClients = vi.fn<() => Promise<ClientRequest[]>>();
 const listSites = vi.fn<() => Promise<SiteRequest[]>>();
 const listTrackingSessions = vi.fn<() => Promise<TrackingSessionRequest[]>>();
 const createInvoice = vi.fn().mockResolvedValue(undefined);
@@ -15,7 +15,7 @@ const updateInvoice = vi.fn().mockResolvedValue(undefined);
 vi.mock("../lib/backendApi", () => ({
   backendApi: {
     listInvoices: () => listInvoices(),
-    listCompanies: () => listCompanies(),
+    listClients: () => listClients(),
     listSites: () => listSites(),
     listTrackingSessions: () => listTrackingSessions(),
     createInvoice: (req: unknown) => createInvoice(req),
@@ -25,12 +25,12 @@ vi.mock("../lib/backendApi", () => ({
   ApiError: class ApiError extends Error {},
 }));
 
-const COMPANY: CompanyRequest = { id: "c1", name: "Acme", createdAtMillis: 0, hourlyRate: 50 };
+const CLIENT: ClientRequest = { id: "c1", name: "Acme", createdAtMillis: 0, hourlyRate: 50 };
 const SITE: SiteRequest = { id: "s1", label: "HQ", latitude: 0, longitude: 0, createdAtMillis: 0 };
 const START = Date.UTC(2026, 2, 16, 8, 0);
 const SESSION: TrackingSessionRequest = {
   id: "sess1",
-  companyName: "Acme",
+  clientName: "Acme",
   siteLabel: "HQ",
   jobTypeLabel: "Install",
   startTimestampMillis: START,
@@ -45,7 +45,7 @@ const SESSION: TrackingSessionRequest = {
 
 beforeEach(() => {
   listInvoices.mockResolvedValue([]);
-  listCompanies.mockResolvedValue([COMPANY]);
+  listClients.mockResolvedValue([CLIENT]);
   listSites.mockResolvedValue([SITE]);
   listTrackingSessions.mockResolvedValue([SESSION]);
 });
@@ -56,7 +56,7 @@ afterEach(() => {
 });
 
 describe("InvoicesPage - new invoice review", () => {
-  it("generates an invoice from unbilled sessions using the company's default rate", async () => {
+  it("generates an invoice from unbilled sessions using the client's default rate", async () => {
     const user = userEvent.setup();
     render(<InvoicesPage />);
 
@@ -64,7 +64,7 @@ describe("InvoicesPage - new invoice review", () => {
     const dialog = await screen.findByRole("heading", { name: "Nova fatura" });
     const modal = dialog.closest("div")!.parentElement!;
 
-    // Base rate comes from the company (50/h) and the 2h session should form one line.
+    // Base rate comes from the client (50/h) and the 2h session should form one line.
     await waitFor(() => expect(within(modal).getByText(/1 dia pendente/)).toBeInTheDocument());
     expect(within(modal).getByText("AU$ 100,00")).toBeInTheDocument();
 
@@ -72,7 +72,7 @@ describe("InvoicesPage - new invoice review", () => {
 
     await waitFor(() => expect(createInvoice).toHaveBeenCalledTimes(1));
     const invoiceReq = createInvoice.mock.calls[0][0] as InvoiceRequest;
-    expect(invoiceReq.companyName).toBe("Acme");
+    expect(invoiceReq.clientName).toBe("Acme");
     expect(invoiceReq.totalHours).toBe(2);
     expect(invoiceReq.totalAmount).toBe(100);
 

@@ -1,7 +1,7 @@
 package com.xbertz.onsite.backend
 
 import com.xbertz.onsite.data.AppDatabase
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.Invoice
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.PlannedJob
@@ -12,7 +12,7 @@ import com.xbertz.onsite.data.TrackingSession
 import kotlinx.coroutines.flow.first
 import java.util.UUID
 
-private const val TYPE_COMPANY = "company"
+private const val TYPE_CLIENT = "client"
 private const val TYPE_SITE = "site"
 private const val TYPE_JOB_TYPE = "job_type"
 private const val TYPE_INVOICE = "invoice"
@@ -35,14 +35,14 @@ private const val TYPE_PLANNED_JOB = "planned_job"
 suspend fun runSync(db: AppDatabase, token: String) {
     val sync = db.syncDao()
 
-    pushCompanies(db, sync, token)
+    pushClients(db, sync, token)
     pushSites(db, sync, token)
     pushJobTypes(db, sync, token)
     pushInvoices(db, sync, token)
     pushSessions(db, sync, token)
     pushPlannedJobs(db, sync, token)
 
-    pullCompanies(db, sync, token)
+    pullClients(db, sync, token)
     pullSites(db, sync, token)
     pullJobTypes(db, sync, token)
     pullInvoices(db, sync, token)
@@ -59,7 +59,7 @@ suspend fun runSync(db: AppDatabase, token: String) {
  * lost - only local identity (sync_mapping) resets, not data on the server.
  */
 suspend fun wipeLocalDomainData(db: AppDatabase) {
-    db.companyDao().deleteAll()
+    db.clientDao().deleteAll()
     db.siteDao().deleteAll()
     db.jobTypeDao().deleteAll()
     db.invoiceDao().deleteAll()
@@ -68,16 +68,16 @@ suspend fun wipeLocalDomainData(db: AppDatabase) {
     db.syncDao().clearAll()
 }
 
-private suspend fun pushCompanies(db: AppDatabase, sync: SyncDao, token: String) {
-    val dao = db.companyDao()
+private suspend fun pushClients(db: AppDatabase, sync: SyncDao, token: String) {
+    val dao = db.clientDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
-    val mappings = sync.mappingsFor(TYPE_COMPANY)
+    val mappings = sync.mappingsFor(TYPE_CLIENT)
 
     for (mapping in mappings) {
         if (mapping.localId !in localIds) {
-            runCatching { BackendApi.deleteCompany(token, mapping.remoteId) }
-            sync.deleteMapping(TYPE_COMPANY, mapping.localId)
+            runCatching { BackendApi.deleteClient(token, mapping.remoteId) }
+            sync.deleteMapping(TYPE_CLIENT, mapping.localId)
         }
     }
 
@@ -85,7 +85,7 @@ private suspend fun pushCompanies(db: AppDatabase, sync: SyncDao, token: String)
     for (row in localRows) {
         val mapping = mappingByLocalId[row.id]
         val remoteId = mapping?.remoteId ?: UUID.randomUUID().toString()
-        val req = CompanyRequest(
+        val req = ClientRequest(
             id = remoteId,
             name = row.name,
             abn = row.abn,
@@ -94,21 +94,21 @@ private suspend fun pushCompanies(db: AppDatabase, sync: SyncDao, token: String)
             createdAtMillis = row.createdAtMillis,
             hourlyRate = row.hourlyRate,
         )
-        if (mapping == null) BackendApi.createCompany(token, req) else BackendApi.updateCompany(token, remoteId, req)
-        sync.upsertMapping(SyncMapping(TYPE_COMPANY, row.id, remoteId, System.currentTimeMillis()))
+        if (mapping == null) BackendApi.createClient(token, req) else BackendApi.updateClient(token, remoteId, req)
+        sync.upsertMapping(SyncMapping(TYPE_CLIENT, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullCompanies(db: AppDatabase, sync: SyncDao, token: String) {
-    val dao = db.companyDao()
-    val remoteRows = BackendApi.listCompanies(token)
+private suspend fun pullClients(db: AppDatabase, sync: SyncDao, token: String) {
+    val dao = db.clientDao()
+    val remoteRows = BackendApi.listClients(token)
     val remoteIds = remoteRows.map { it.id }.toSet()
-    val mappings = sync.mappingsFor(TYPE_COMPANY)
+    val mappings = sync.mappingsFor(TYPE_CLIENT)
     val mappingByRemoteId = mappings.associateBy { it.remoteId }
 
     for (remote in remoteRows) {
         val mapping = mappingByRemoteId[remote.id]
-        val company = Company(
+        val client = Client(
             id = mapping?.localId ?: 0,
             name = remote.name,
             abn = remote.abn,
@@ -117,14 +117,14 @@ private suspend fun pullCompanies(db: AppDatabase, sync: SyncDao, token: String)
             createdAtMillis = remote.createdAtMillis,
             hourlyRate = remote.hourlyRate,
         )
-        val localId = if (mapping == null) dao.insert(company) else { dao.update(company); mapping.localId }
-        sync.upsertMapping(SyncMapping(TYPE_COMPANY, localId, remote.id, System.currentTimeMillis()))
+        val localId = if (mapping == null) dao.insert(client) else { dao.update(client); mapping.localId }
+        sync.upsertMapping(SyncMapping(TYPE_CLIENT, localId, remote.id, System.currentTimeMillis()))
     }
 
     for (mapping in mappings) {
         if (mapping.remoteId !in remoteIds) {
             dao.deleteById(mapping.localId)
-            sync.deleteMapping(TYPE_COMPANY, mapping.localId)
+            sync.deleteMapping(TYPE_CLIENT, mapping.localId)
         }
     }
 }
@@ -254,7 +254,7 @@ private suspend fun pushInvoices(db: AppDatabase, sync: SyncDao, token: String) 
         val req = InvoiceRequest(
             id = remoteId,
             number = row.number,
-            companyName = row.companyName,
+            clientName = row.clientName,
             periodStartEpochDay = row.periodStartEpochDay,
             periodEndEpochDay = row.periodEndEpochDay,
             issueDateEpochDay = row.issueDateEpochDay,
@@ -284,7 +284,7 @@ private suspend fun pullInvoices(db: AppDatabase, sync: SyncDao, token: String) 
         val invoice = Invoice(
             id = mapping?.localId ?: 0,
             number = remote.number,
-            companyName = remote.companyName,
+            clientName = remote.clientName,
             periodStartEpochDay = remote.periodStartEpochDay,
             periodEndEpochDay = remote.periodEndEpochDay,
             issueDateEpochDay = remote.issueDateEpochDay,
@@ -325,7 +325,7 @@ private suspend fun pushSessions(db: AppDatabase, sync: SyncDao, token: String) 
         val remoteId = mapping?.remoteId ?: UUID.randomUUID().toString()
         val req = TrackingSessionRequest(
             id = remoteId,
-            companyName = row.companyName,
+            clientName = row.clientName,
             siteLabel = row.siteLabel,
             jobTypeLabel = row.jobTypeLabel,
             startTimestampMillis = row.startTimestampMillis,
@@ -354,7 +354,7 @@ private suspend fun pullSessions(db: AppDatabase, sync: SyncDao, token: String) 
         val mapping = mappingByRemoteId[remote.id]
         val session = TrackingSession(
             id = mapping?.localId ?: 0,
-            companyName = remote.companyName,
+            clientName = remote.clientName,
             siteLabel = remote.siteLabel,
             jobTypeLabel = remote.jobTypeLabel,
             startTimestampMillis = remote.startTimestampMillis,
@@ -400,7 +400,7 @@ private suspend fun pushPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
             dateEpochDay = row.dateEpochDay,
             startMinute = row.startMinute,
             endMinute = row.endMinute,
-            companyName = row.companyName,
+            clientName = row.clientName,
             siteLabel = row.siteLabel,
             jobTypeLabel = row.jobTypeLabel,
             notes = row.notes,
@@ -425,7 +425,7 @@ private suspend fun pullPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
             dateEpochDay = remote.dateEpochDay,
             startMinute = remote.startMinute,
             endMinute = remote.endMinute,
-            companyName = remote.companyName,
+            clientName = remote.clientName,
             siteLabel = remote.siteLabel,
             jobTypeLabel = remote.jobTypeLabel,
             notes = remote.notes,

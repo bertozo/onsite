@@ -6,7 +6,7 @@ export interface InvoiceLine {
   dateEpochDay: number;
   sites: string[];
   addresses: string[];
-  companies: string[];
+  clients: string[];
   jobTypes: string[];
   startTimestampMillis: number;
   endTimestampMillis: number;
@@ -59,7 +59,7 @@ export function buildInvoiceLines(
         dateEpochDay,
         sites,
         addresses: uniq(sites.map((label) => sitesByLabel.get(label)?.address).filter((v): v is string => !!v)),
-        companies: uniq(sorted.map((s) => s.companyName).filter((v): v is string => !!v)),
+        clients: uniq(sorted.map((s) => s.clientName).filter((v): v is string => !!v)),
         jobTypes: uniq(sorted.map((s) => s.jobTypeLabel).filter((v): v is string => !!v)),
         startTimestampMillis: sorted[0].startTimestampMillis,
         endTimestampMillis: sorted[sorted.length - 1].stopTimestampMillis!,

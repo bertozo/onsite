@@ -7,7 +7,7 @@ const NAV_ITEMS = [
   { to: "/planning", label: "Planejamento" },
   { to: "/reports", label: "Relatórios" },
   { to: "/invoices", label: "Faturas" },
-  { to: "/companies", label: "Clientes" },
+  { to: "/clients", label: "Clientes" },
   { to: "/sites", label: "Locais" },
   { to: "/job-types", label: "Serviços" },
   { to: "/settings", label: "Equipe e conta" },

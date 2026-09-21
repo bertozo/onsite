@@ -6,7 +6,7 @@ Supabase Auth (this service never sees a password, only verifies the JWT Supabas
 ## Architecture
 
 See `../on-site-app` for the client. This service is a modular monolith: one deployable,
-packages per domain (`identity/`, and future `domain/` for companies/sites/sessions/etc.).
+packages per domain (`identity/`, and future `domain/` for clients/sites/sessions/etc.).
 Every table carries `id`, `account_id` (where applicable), `created_at`, `updated_at`, and
 will carry `deleted_at` once Phase 1 sync support lands.
 
@@ -18,20 +18,20 @@ their account by email (`invites` table, `POST /v1/accounts/{id}/invites`); the 
 sees it under `GET /v1/me/invites` and accepts it with `POST /v1/me/invites/{id}/accept`,
 which is what actually creates their `WORKER` membership. Every domain write route checks
 the caller's role in the *active* account (`X-Account-Id` header, see `AccountContext.kt`) -
-a `WORKER` can read the shared catalog (companies/sites/job types/invoices) but not create,
+a `WORKER` can read the shared catalog (clients/sites/job types/invoices) but not create,
 edit or delete it; sessions and planned jobs carry `created_by_user_id` (and planned jobs an
 `assigned_user_id`) so a `WORKER`'s own list is scoped to their rows while an `OWNER` sees
 everyone's.
 
 A separate bridge (`connections/`) covers the more common Australian trades case: a
-subcontractor keeps their own account and invoicing, but links one of their own `Company`
+subcontractor keeps their own account and invoicing, but links one of their own `Client`
 rows (their record of a client) to that client's real account, if the client also uses the
 app - without ever becoming a member of it. The client sends a `connection_invites` row by
-email; the worker accepts it and picks *which* of their own companies it maps to
-(`POST /v1/me/connection-invites/{id}/accept`, body `{companyId}`) - the client never sees
-the worker's company list, only the name after linking. Once active, the client can drop a
+email; the worker accepts it and picks *which* of their own clients it maps to
+(`POST /v1/me/connection-invites/{id}/accept`, body `{clientId}`) - the client never sees
+the worker's client list, only the name after linking. Once active, the client can drop a
 `PlannedJob` onto the worker's own calendar (`POST /v1/connections/{id}/planned-jobs`,
-pre-assigned to the worker, company name resolved server-side) and read that one company's
+pre-assigned to the worker, client name resolved server-side) and read that one client's
 sessions (`GET /v1/connections/{id}/sessions` - no rate, no other clients' hours). Either
 side can revoke (`DELETE /v1/connections/{id}`).
 

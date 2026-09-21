@@ -25,7 +25,7 @@ import kotlin.math.min
  *
  * Structure (top to bottom):
  *  1. Header - "INVOICE" title, number/date/period, provider photo.
- *  2. Parties - "FROM" (profile) and "BILL TO" (company) side by side.
+ *  2. Parties - "FROM" (profile) and "BILL TO" (client) side by side.
  *  3. Table - one row per worked day, with the columns the user enabled (see
  *     [ReportColumn]); widths come from [columnSpecs] so the layout stays uniform.
  *  4. Totals - total hours and, when a rate was given, the amount due.
@@ -89,7 +89,7 @@ object InvoicePdfTemplate {
         ReportColumn.DATE to ColumnSpec(72f, 0f, alignRight = false),
         ReportColumn.SITE to ColumnSpec(null, 1f, alignRight = false),
         ReportColumn.ADDRESS to ColumnSpec(null, 1.6f, alignRight = false),
-        ReportColumn.COMPANY to ColumnSpec(null, 1f, alignRight = false),
+        ReportColumn.CLIENT to ColumnSpec(null, 1f, alignRight = false),
         ReportColumn.JOB_TYPE to ColumnSpec(null, 1f, alignRight = false),
         ReportColumn.START_TIME to ColumnSpec(44f, 0f, alignRight = true),
         ReportColumn.END_TIME to ColumnSpec(44f, 0f, alignRight = true),

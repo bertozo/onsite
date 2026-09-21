@@ -43,9 +43,9 @@ interface TrackingSessionDao {
     @Query("SELECT * FROM tracking_sessions WHERE id = :id")
     suspend fun getById(id: Long): TrackingSession?
 
-    /** Sessions store the company by name, so a rename must be propagated to keep reports/invoices matching. */
-    @Query("UPDATE tracking_sessions SET companyName = :newName WHERE companyName = :oldName")
-    suspend fun renameCompany(oldName: String, newName: String)
+    /** Sessions store the client by name, so a rename must be propagated to keep reports/invoices matching. */
+    @Query("UPDATE tracking_sessions SET clientName = :newName WHERE clientName = :oldName")
+    suspend fun renameClient(oldName: String, newName: String)
 
     /** Links the given sessions to the invoice that billed them. */
     @Query("UPDATE tracking_sessions SET invoiceId = :invoiceId WHERE id IN (:ids)")
@@ -59,7 +59,7 @@ interface TrackingSessionDao {
     @Query("UPDATE tracking_sessions SET hourlyRate = :rate WHERE id IN (:ids)")
     suspend fun setHourlyRate(ids: List<Long>, rate: Double?)
 
-    /** Same as [renameCompany] for the job type label. */
+    /** Same as [renameClient] for the job type label. */
     @Query("UPDATE tracking_sessions SET jobTypeLabel = :newName WHERE jobTypeLabel = :oldName")
     suspend fun renameJobType(oldName: String, newName: String)
 }

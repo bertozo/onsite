@@ -15,7 +15,7 @@ data class ConnectionInviteDto(
 )
 
 @Serializable
-data class AcceptConnectionInviteRequest(val companyId: String)
+data class AcceptConnectionInviteRequest(val clientId: String)
 
 @Serializable
 data class ConnectionDto(
@@ -23,8 +23,8 @@ data class ConnectionDto(
     val employerAccountId: String,
     val employerAccountName: String,
     val workerAccountId: String,
-    val workerCompanyId: String,
-    val workerCompanyName: String,
+    val workerClientId: String,
+    val workerClientName: String,
     val status: String,
 )
 

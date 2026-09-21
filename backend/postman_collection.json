@@ -12,7 +12,7 @@
     { "key": "baseUrl", "value": "http://127.0.0.1:8080", "type": "string" },
     { "key": "token", "value": "", "type": "string" },
     { "key": "accountId", "value": "", "type": "string" },
-    { "key": "companyId", "value": "", "type": "string" },
+    { "key": "clientId", "value": "", "type": "string" },
     { "key": "siteId", "value": "", "type": "string" },
     { "key": "jobTypeId", "value": "", "type": "string" },
     { "key": "invoiceId", "value": "", "type": "string" },
@@ -163,13 +163,13 @@
           "request": {
             "method": "POST",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"companyId\": \"{{companyId}}\"\n}" },
+            "body": { "mode": "raw", "raw": "{\n  \"clientId\": \"{{clientId}}\"\n}" },
             "url": {
               "raw": "{{baseUrl}}/v1/me/connection-invites/{{connectionInviteId}}/accept",
               "host": ["{{baseUrl}}"],
               "path": ["v1", "me", "connection-invites", "{{connectionInviteId}}", "accept"]
             },
-            "description": "Called by the contractor/worker. `companyId` is one of *their own* Companies (see the Companies folder) that represents this client - it must already exist in their account."
+            "description": "Called by the contractor/worker. `clientId` is one of *their own* Clients (see the Clients folder) that represents this client - it must already exist in their account."
           }
         },
         {
@@ -239,24 +239,24 @@
               "host": ["{{baseUrl}}"],
               "path": ["v1", "connections", "{{connectionId}}", "sessions"]
             },
-            "description": "OWNER only. Every tracked session the worker logged against this connection's company."
+            "description": "OWNER only. Every tracked session the worker logged against this connection's client."
           }
         }
       ]
     },
     {
-      "name": "Companies",
+      "name": "Clients",
       "item": [
         {
-          "name": "List companies",
+          "name": "List clients",
           "request": {
             "method": "GET",
             "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
-            "url": { "raw": "{{baseUrl}}/v1/companies", "host": ["{{baseUrl}}"], "path": ["v1", "companies"] }
+            "url": { "raw": "{{baseUrl}}/v1/clients", "host": ["{{baseUrl}}"], "path": ["v1", "clients"] }
           }
         },
         {
-          "name": "Create company",
+          "name": "Create client",
           "request": {
             "method": "POST",
             "header": [
@@ -267,12 +267,12 @@
               "mode": "raw",
               "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"name\": \"Acme Corp\",\n  \"abn\": \"51824753556\",\n  \"phone\": \"0412345678\",\n  \"email\": \"billing@acme.example\",\n  \"createdAtMillis\": {{$timestamp}}000,\n  \"hourlyRate\": 65.0\n}"
             },
-            "url": { "raw": "{{baseUrl}}/v1/companies", "host": ["{{baseUrl}}"], "path": ["v1", "companies"] },
+            "url": { "raw": "{{baseUrl}}/v1/clients", "host": ["{{baseUrl}}"], "path": ["v1", "clients"] },
             "description": "OWNER only."
           }
         },
         {
-          "name": "Update company",
+          "name": "Update client",
           "request": {
             "method": "PUT",
             "header": [
@@ -281,25 +281,25 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{companyId}}\",\n  \"name\": \"Acme Corp\",\n  \"abn\": \"51824753556\",\n  \"phone\": \"0412345678\",\n  \"email\": \"billing@acme.example\",\n  \"createdAtMillis\": {{$timestamp}}000,\n  \"hourlyRate\": 70.0\n}"
+              "raw": "{\n  \"id\": \"{{clientId}}\",\n  \"name\": \"Acme Corp\",\n  \"abn\": \"51824753556\",\n  \"phone\": \"0412345678\",\n  \"email\": \"billing@acme.example\",\n  \"createdAtMillis\": {{$timestamp}}000,\n  \"hourlyRate\": 70.0\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/v1/companies/{{companyId}}",
+              "raw": "{{baseUrl}}/v1/clients/{{clientId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "companies", "{{companyId}}"]
+              "path": ["v1", "clients", "{{clientId}}"]
             },
             "description": "OWNER only. `createdAtMillis` is not actually changed by an update, but the field is required in the body."
           }
         },
         {
-          "name": "Delete company",
+          "name": "Delete client",
           "request": {
             "method": "DELETE",
             "header": [{ "key": "X-Account-Id", "value": "{{accountId}}", "disabled": true }],
             "url": {
-              "raw": "{{baseUrl}}/v1/companies/{{companyId}}",
+              "raw": "{{baseUrl}}/v1/clients/{{clientId}}",
               "host": ["{{baseUrl}}"],
-              "path": ["v1", "companies", "{{companyId}}"]
+              "path": ["v1", "clients", "{{clientId}}"]
             },
             "description": "OWNER only. Soft delete."
           }
@@ -451,7 +451,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"number\": \"INV-0001\",\n  \"companyName\": \"Acme Corp\",\n  \"periodStartEpochDay\": 19990,\n  \"periodEndEpochDay\": 19996,\n  \"issueDateEpochDay\": 19997,\n  \"totalHours\": 24.5,\n  \"totalAmount\": 1592.5,\n  \"hourlyRate\": 65.0,\n  \"status\": \"DRAFT\",\n  \"notes\": \"Week ending Friday\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"number\": \"INV-0001\",\n  \"clientName\": \"Acme Corp\",\n  \"periodStartEpochDay\": 19990,\n  \"periodEndEpochDay\": 19996,\n  \"issueDateEpochDay\": 19997,\n  \"totalHours\": 24.5,\n  \"totalAmount\": 1592.5,\n  \"hourlyRate\": 65.0,\n  \"status\": \"DRAFT\",\n  \"notes\": \"Week ending Friday\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
             },
             "url": { "raw": "{{baseUrl}}/v1/invoices", "host": ["{{baseUrl}}"], "path": ["v1", "invoices"] },
             "description": "OWNER only. `status` is one of DRAFT, SENT, PAID, VOID."
@@ -467,7 +467,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{invoiceId}}\",\n  \"number\": \"INV-0001\",\n  \"companyName\": \"Acme Corp\",\n  \"periodStartEpochDay\": 19990,\n  \"periodEndEpochDay\": 19996,\n  \"issueDateEpochDay\": 19997,\n  \"totalHours\": 24.5,\n  \"totalAmount\": 1592.5,\n  \"hourlyRate\": 65.0,\n  \"status\": \"SENT\",\n  \"sentAtMillis\": {{$timestamp}}000,\n  \"notes\": \"Week ending Friday\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
+              "raw": "{\n  \"id\": \"{{invoiceId}}\",\n  \"number\": \"INV-0001\",\n  \"clientName\": \"Acme Corp\",\n  \"periodStartEpochDay\": 19990,\n  \"periodEndEpochDay\": 19996,\n  \"issueDateEpochDay\": 19997,\n  \"totalHours\": 24.5,\n  \"totalAmount\": 1592.5,\n  \"hourlyRate\": 65.0,\n  \"status\": \"SENT\",\n  \"sentAtMillis\": {{$timestamp}}000,\n  \"notes\": \"Week ending Friday\",\n  \"createdAtMillis\": {{$timestamp}}000\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v1/invoices/{{invoiceId}}",
@@ -501,7 +501,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"startTimestampMillis\": {{$timestamp}}000,\n  \"startLatitude\": -33.8688,\n  \"startLongitude\": 151.2093,\n  \"stopTimestampMillis\": {{$timestamp}}000,\n  \"stopLatitude\": -33.8688,\n  \"stopLongitude\": 151.2093,\n  \"hourlyRate\": 65.0\n}"
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"clientName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"startTimestampMillis\": {{$timestamp}}000,\n  \"startLatitude\": -33.8688,\n  \"startLongitude\": 151.2093,\n  \"stopTimestampMillis\": {{$timestamp}}000,\n  \"stopLatitude\": -33.8688,\n  \"stopLongitude\": 151.2093,\n  \"hourlyRate\": 65.0\n}"
             },
             "url": { "raw": "{{baseUrl}}/v1/sessions", "host": ["{{baseUrl}}"], "path": ["v1", "sessions"] },
             "description": "Any member of the account may create their own session. `stopTimestampMillis` (and stop lat/lng) are omitted for a still-running session."
@@ -517,7 +517,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{sessionId}}\",\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"startTimestampMillis\": {{$timestamp}}000,\n  \"startLatitude\": -33.8688,\n  \"startLongitude\": 151.2093,\n  \"stopTimestampMillis\": {{$timestamp}}000,\n  \"stopLatitude\": -33.8688,\n  \"stopLongitude\": 151.2093,\n  \"hourlyRate\": 65.0,\n  \"invoiceId\": null\n}"
+              "raw": "{\n  \"id\": \"{{sessionId}}\",\n  \"clientName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"startTimestampMillis\": {{$timestamp}}000,\n  \"startLatitude\": -33.8688,\n  \"startLongitude\": 151.2093,\n  \"stopTimestampMillis\": {{$timestamp}}000,\n  \"stopLatitude\": -33.8688,\n  \"stopLongitude\": 151.2093,\n  \"hourlyRate\": 65.0,\n  \"invoiceId\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v1/sessions/{{sessionId}}",
@@ -564,7 +564,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Bring the extension ladder\",\n  \"assignedUserId\": null\n}"
+              "raw": "{\n  \"id\": \"{{$guid}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"clientName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Bring the extension ladder\",\n  \"assignedUserId\": null\n}"
             },
             "url": { "raw": "{{baseUrl}}/v1/planned-jobs", "host": ["{{baseUrl}}"], "path": ["v1", "planned-jobs"] },
             "description": "`assignedUserId` (a userId from \"List account members\") is only honoured for an OWNER - a WORKER's own planned job is always self-assigned server-side regardless of what's sent here."
@@ -580,7 +580,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"id\": \"{{plannedJobId}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"companyName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Bring the extension ladder\",\n  \"assignedUserId\": null\n}"
+              "raw": "{\n  \"id\": \"{{plannedJobId}}\",\n  \"dateEpochDay\": 20000,\n  \"startMinute\": 480,\n  \"endMinute\": 960,\n  \"clientName\": \"Acme Corp\",\n  \"siteLabel\": \"Head Office\",\n  \"jobTypeLabel\": \"Cleaning\",\n  \"notes\": \"Bring the extension ladder\",\n  \"assignedUserId\": null\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/v1/planned-jobs/{{plannedJobId}}",

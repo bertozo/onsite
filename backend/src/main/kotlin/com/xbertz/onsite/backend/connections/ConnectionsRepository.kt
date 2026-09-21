@@ -1,7 +1,7 @@
 package com.xbertz.onsite.backend.connections
 
 import com.xbertz.onsite.backend.db.tables.Accounts
-import com.xbertz.onsite.backend.db.tables.Companies
+import com.xbertz.onsite.backend.db.tables.Clients
 import com.xbertz.onsite.backend.db.tables.ConnectionInvites
 import com.xbertz.onsite.backend.db.tables.Connections
 import com.xbertz.onsite.backend.db.tables.PlannedJobs
@@ -24,10 +24,10 @@ class ConnectionAccessDenied : Exception("caller is not party to this connection
 
 /**
  * The bridge between a worker's own account and a client's real account, without the worker
- * ever becoming a member of it: a `connections` row just says "this Company in the worker's
+ * ever becoming a member of it: a `connections` row just says "this Client in the worker's
  * account is this client's account". Every cross-account action below re-derives the
- * client's Company *name* for the worker from that row rather than trusting anything the
- * caller sends, and every read is scoped to just that one company's sessions - never the
+ * client's Client *name* for the worker from that row rather than trusting anything the
+ * caller sends, and every read is scoped to just that one client's sessions - never the
  * worker's whole account.
  */
 class ConnectionsRepository {
@@ -50,16 +50,16 @@ class ConnectionsRepository {
             .map { it.toInviteDto() }
     }
 
-    fun acceptInvite(inviteId: UUID, callerEmail: String, workerAccountId: UUID, workerUserId: UUID, companyId: UUID): ConnectionDto = transaction {
+    fun acceptInvite(inviteId: UUID, callerEmail: String, workerAccountId: UUID, workerUserId: UUID, clientId: UUID): ConnectionDto = transaction {
         val invite = ConnectionInvites.selectAll().where { ConnectionInvites.id eq inviteId }.singleOrNull()
             ?: throw NotFoundException("invite not found")
         if (invite[ConnectionInvites.email] != callerEmail.trim().lowercase() || invite[ConnectionInvites.status] != ConnectionInvites.STATUS_PENDING) {
             throw NotFoundException("invite not found")
         }
-        val companyBelongsToCaller = Companies.selectAll()
-            .where { (Companies.id eq companyId) and (Companies.accountId eq workerAccountId) and Companies.deletedAt.isNull() }
+        val clientBelongsToCaller = Clients.selectAll()
+            .where { (Clients.id eq clientId) and (Clients.accountId eq workerAccountId) and Clients.deletedAt.isNull() }
             .any()
-        if (!companyBelongsToCaller) throw NotFoundException("company not found in this account")
+        if (!clientBelongsToCaller) throw NotFoundException("client not found in this account")
 
         val id = UUID.randomUUID()
         val now = Instant.now()
@@ -68,7 +68,7 @@ class ConnectionsRepository {
             it[employerAccountId] = invite[ConnectionInvites.employerAccountId]
             it[Connections.workerAccountId] = workerAccountId
             it[Connections.workerUserId] = workerUserId
-            it[workerCompanyId] = companyId
+            it[workerClientId] = clientId
             it[status] = Connections.STATUS_ACTIVE
             it[createdAt] = now
         }
@@ -111,7 +111,7 @@ class ConnectionsRepository {
     ): PlannedJobDtoForConnection = transaction {
         val connection = activeConnection(connectionId)
         if (connection[Connections.employerAccountId] != callerEmployerAccountId) throw ConnectionAccessDenied()
-        val companyName = Companies.selectAll().where { Companies.id eq connection[Connections.workerCompanyId] }.single()[Companies.name]
+        val clientName = Clients.selectAll().where { Clients.id eq connection[Connections.workerClientId] }.single()[Clients.name]
 
         val id = UUID.fromString(req.id)
         PlannedJobs.insert {
@@ -120,7 +120,7 @@ class ConnectionsRepository {
             it[dateEpochDay] = req.dateEpochDay
             it[startMinute] = req.startMinute
             it[endMinute] = req.endMinute
-            it[PlannedJobs.companyName] = companyName
+            it[PlannedJobs.clientName] = clientName
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[notes] = req.notes
@@ -134,11 +134,11 @@ class ConnectionsRepository {
     fun sessionsForConnection(connectionId: UUID, callerEmployerAccountId: UUID): List<ConnectionSessionDto> = transaction {
         val connection = activeConnection(connectionId)
         if (connection[Connections.employerAccountId] != callerEmployerAccountId) throw ConnectionAccessDenied()
-        val companyName = Companies.selectAll().where { Companies.id eq connection[Connections.workerCompanyId] }.single()[Companies.name]
+        val clientName = Clients.selectAll().where { Clients.id eq connection[Connections.workerClientId] }.single()[Clients.name]
 
         TrackingSessions.selectAll()
             .where { TrackingSessions.accountId eq connection[Connections.workerAccountId] }
-            .andWhere { TrackingSessions.companyName eq companyName }
+            .andWhere { TrackingSessions.clientName eq clientName }
             .andWhere { TrackingSessions.deletedAt.isNull() }
             .map {
                 ConnectionSessionDto(
@@ -161,10 +161,10 @@ class ConnectionsRepository {
         // column has to be spelled out - Exposed's auto-FK join would otherwise be ambiguous.
         Connections
             .join(Accounts, JoinType.INNER, onColumn = Connections.employerAccountId, otherColumn = Accounts.id)
-            .join(Companies, JoinType.INNER, onColumn = Connections.workerCompanyId, otherColumn = Companies.id)
+            .join(Clients, JoinType.INNER, onColumn = Connections.workerClientId, otherColumn = Clients.id)
             .select(
                 Connections.id, Connections.employerAccountId, Accounts.name,
-                Connections.workerAccountId, Connections.workerCompanyId, Companies.name, Connections.status
+                Connections.workerAccountId, Connections.workerClientId, Clients.name, Connections.status
             )
             .where { Connections.status eq Connections.STATUS_ACTIVE }
 
@@ -194,8 +194,8 @@ class ConnectionsRepository {
         employerAccountId = this[Connections.employerAccountId].toString(),
         employerAccountName = this[Accounts.name],
         workerAccountId = this[Connections.workerAccountId].toString(),
-        workerCompanyId = this[Connections.workerCompanyId].toString(),
-        workerCompanyName = this[Companies.name],
+        workerClientId = this[Connections.workerClientId].toString(),
+        workerClientName = this[Clients.name],
         status = this[Connections.status],
     )
 }

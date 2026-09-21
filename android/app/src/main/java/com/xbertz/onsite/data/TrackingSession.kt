@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "tracking_sessions")
 data class TrackingSession(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val companyName: String?,
+    val clientName: String?,
     val siteLabel: String?,
     val jobTypeLabel: String?,
     val startTimestampMillis: Long,
@@ -15,7 +15,7 @@ data class TrackingSession(
     val stopTimestampMillis: Long?,
     val stopLatitude: Double?,
     val stopLongitude: Double?,
-    /** Rate for this session only, when it differs from the company default. Null = use the company's. */
+    /** Rate for this session only, when it differs from the client default. Null = use the client's. */
     val hourlyRate: Double? = null,
     /** Set once the session has been billed on an invoice (see [Invoice]). */
     val invoiceId: Long? = null

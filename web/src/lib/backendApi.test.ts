@@ -28,7 +28,7 @@ afterEach(() => {
 
 describe("backendApi request auth", () => {
   it("throws without hitting the network when there is no session", async () => {
-    await expect(backendApi.listCompanies()).rejects.toBeInstanceOf(ApiError);
+    await expect(backendApi.listClients()).rejects.toBeInstanceOf(ApiError);
   });
 
   it("sends the stored token as a bearer header", async () => {
@@ -36,7 +36,7 @@ describe("backendApi request auth", () => {
     const fetchMock = mockFetchOnce([]);
     vi.stubGlobal("fetch", fetchMock);
 
-    await backendApi.listCompanies();
+    await backendApi.listClients();
 
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers.Authorization).toBe("Bearer tok-1");
@@ -49,7 +49,7 @@ describe("backendApi request auth", () => {
     const fetchMock = mockFetchOnce([]);
     vi.stubGlobal("fetch", fetchMock);
 
-    await backendApi.listCompanies();
+    await backendApi.listClients();
 
     expect(fetchMock.mock.calls[0][1].headers["X-Account-Id"]).toBe("acc2");
   });
@@ -60,7 +60,7 @@ describe("backendApi request auth", () => {
     const fetchMock = mockFetchOnce([]);
     vi.stubGlobal("fetch", fetchMock);
 
-    await backendApi.listCompanies();
+    await backendApi.listClients();
 
     expect(refreshSession).toHaveBeenCalledWith("refresh-1");
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer new");
@@ -72,6 +72,6 @@ describe("backendApi request auth", () => {
     saveSession({ accessToken: "tok-1", refreshToken: null, expiresAtMillis: Date.now() + 3_600_000, email: "a@b.com", accountId: "acc1", activeAccountId: null });
     vi.stubGlobal("fetch", mockFetchOnce({ error: "nope" }, 403));
 
-    await expect(backendApi.listCompanies()).rejects.toMatchObject({ status: 403 });
+    await expect(backendApi.listClients()).rejects.toMatchObject({ status: 403 });
   });
 });

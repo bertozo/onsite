@@ -40,7 +40,7 @@ data class PlannedJobDto(
     val dateEpochDay: Long,
     val startMinute: Int,
     val endMinute: Int?,
-    val companyName: String?,
+    val clientName: String?,
     val siteLabel: String?,
     val jobTypeLabel: String?,
     val notes: String?,
@@ -55,7 +55,7 @@ data class PlannedJobRequest(
     val dateEpochDay: Long,
     val startMinute: Int,
     val endMinute: Int? = null,
-    val companyName: String? = null,
+    val clientName: String? = null,
     val siteLabel: String? = null,
     val jobTypeLabel: String? = null,
     val notes: String? = null,
@@ -67,7 +67,7 @@ private fun ResultRow.toDto() = PlannedJobDto(
     dateEpochDay = this[PlannedJobs.dateEpochDay],
     startMinute = this[PlannedJobs.startMinute],
     endMinute = this[PlannedJobs.endMinute],
-    companyName = this[PlannedJobs.companyName],
+    clientName = this[PlannedJobs.clientName],
     siteLabel = this[PlannedJobs.siteLabel],
     jobTypeLabel = this[PlannedJobs.jobTypeLabel],
     notes = this[PlannedJobs.notes],
@@ -98,7 +98,7 @@ class PlannedJobsRepository {
             it[dateEpochDay] = req.dateEpochDay
             it[startMinute] = req.startMinute
             it[endMinute] = req.endMinute
-            it[companyName] = req.companyName
+            it[clientName] = req.clientName
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[notes] = req.notes
@@ -119,7 +119,7 @@ class PlannedJobsRepository {
             it[dateEpochDay] = req.dateEpochDay
             it[startMinute] = req.startMinute
             it[endMinute] = req.endMinute
-            it[companyName] = req.companyName
+            it[clientName] = req.clientName
             it[siteLabel] = req.siteLabel
             it[jobTypeLabel] = req.jobTypeLabel
             it[notes] = req.notes

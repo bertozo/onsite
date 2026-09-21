@@ -16,7 +16,7 @@ enum class InvoiceStatus { DRAFT, SENT, PAID, VOID }
 data class Invoice(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val number: String,
-    val companyName: String,
+    val clientName: String,
     val periodStartEpochDay: Long,
     val periodEndEpochDay: Long,
     val issueDateEpochDay: Long,

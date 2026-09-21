@@ -4,11 +4,11 @@ Android app (Kotlin + Jetpack Compose) for logging hours worked per site and gen
 
 ## Features
 
-- **Start tracking** — pick a company, site and job type and tap **Start**; the app records the GPS position. **Stop** ends the session and shows a summary. Sessions can also be **added manually** (date, start time, duration).
-- **Records** — Companies (clients, with ABN/phone/email), Sites (locations, with address search), Job types. All can be edited and deleted.
+- **Start tracking** — pick a client, site and job type and tap **Start**; the app records the GPS position. **Stop** ends the session and shows a summary. Sessions can also be **added manually** (date, start time, duration).
+- **Records** — Clients (clients, with ABN/phone/email), Sites (locations, with address search), Job types. All can be edited and deleted.
 - **Profile** — your details (name, title, phone, email, ABN, photo) and bank details (BSB, account) printed on the invoice.
-- **Reports** — sessions by period, with configurable columns (Date, Site, Address, Company, Job type, Start, End, Hours).
-- **PDF invoice** — from a report, choose the company, invoice number and hourly rate; the PDF uses a fixed A4 template with the same columns as the report and opens in the share sheet.
+- **Reports** — sessions by period, with configurable columns (Date, Site, Address, Client, Job type, Start, End, Hours).
+- **PDF invoice** — from a report, choose the client, invoice number and hourly rate; the PDF uses a fixed A4 template with the same columns as the report and opens in the share sheet.
 - **Languages** — English, Portuguese and Spanish, selectable in Settings (plus light/dark theme).
 
 Data is stored locally (Room/SQLite). There is no background tracking.
@@ -26,7 +26,7 @@ From the command line: `./gradlew assembleDebug` (APK) or `./gradlew installDebu
 ```
 app/src/main/java/com/xbertz/onsite/
 ├── MainActivity.kt            # all Compose UI (menu, screens, dialogs)
-├── *ViewModel.kt              # one ViewModel per area (tracker, companies, sites, job types, profile, invoice, report, settings)
+├── *ViewModel.kt              # one ViewModel per area (tracker, clients, sites, job types, profile, invoice, report, settings)
 ├── AppLocale.kt               # language selection (SharedPreferences + attachBaseContext)
 ├── Validators.kt              # ABN, BSB, account, phone and email rules
 ├── AddressSearch.kt           # address search (Photon/OSM, restricted to Australia)

@@ -2,22 +2,22 @@ import { useState } from "react";
 import { backendApi } from "../lib/backendApi";
 import { useAuth } from "../context/AuthContext";
 import { useCrud } from "../lib/useCrud";
-import type { CompanyRequest } from "../lib/types";
+import type { ClientRequest } from "../lib/types";
 import { Button, Card, ConfirmDialog, EmptyState, Field, Input, Modal, PageHeader, Spinner } from "../components/ui";
 
 const api = {
-  list: backendApi.listCompanies,
-  create: backendApi.createCompany,
-  update: backendApi.updateCompany,
-  remove: backendApi.deleteCompany,
+  list: backendApi.listClients,
+  create: backendApi.createClient,
+  update: backendApi.updateClient,
+  remove: backendApi.deleteClient,
 };
 
-export function CompaniesPage() {
+export function ClientsPage() {
   const { state } = useAuth();
   const canManage = state.status === "loggedIn" && state.activeRole === "OWNER";
-  const { items, loading, error, create, update, remove } = useCrud<CompanyRequest>(api);
-  const [editing, setEditing] = useState<CompanyRequest | "new" | null>(null);
-  const [deleting, setDeleting] = useState<CompanyRequest | null>(null);
+  const { items, loading, error, create, update, remove } = useCrud<ClientRequest>(api);
+  const [editing, setEditing] = useState<ClientRequest | "new" | null>(null);
+  const [deleting, setDeleting] = useState<ClientRequest | null>(null);
 
   return (
     <div>
@@ -71,7 +71,7 @@ export function CompaniesPage() {
       )}
 
       {editing && (
-        <CompanyFormModal
+        <ClientFormModal
           initial={editing === "new" ? null : editing}
           onClose={() => setEditing(null)}
           onSave={async (req) => {
@@ -99,14 +99,14 @@ export function CompaniesPage() {
   );
 }
 
-function CompanyFormModal({
+function ClientFormModal({
   initial,
   onClose,
   onSave,
 }: {
-  initial: CompanyRequest | null;
+  initial: ClientRequest | null;
   onClose: () => void;
-  onSave: (req: CompanyRequest) => Promise<void>;
+  onSave: (req: ClientRequest) => Promise<void>;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [abn, setAbn] = useState(initial?.abn ?? "");

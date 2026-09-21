@@ -16,8 +16,8 @@
     <string name="manage">Gerenciar</string>
     <string name="menu_reports">Relatórios</string>
     <string name="menu_reports_subtitle">Histórico de sessões</string>
-    <string name="menu_companies">Empresas</string>
-    <string name="menu_companies_subtitle">Gerenciar clientes</string>
+    <string name="menu_clients">Clientes</string>
+    <string name="menu_clients_subtitle">Gerenciar clientes</string>
     <string name="menu_sites">Locais</string>
     <string name="menu_sites_subtitle">Gerenciar endereços</string>
     <string name="menu_job_types">Serviços</string>
@@ -31,7 +31,7 @@
     <string name="setup_title">Configuração inicial</string>
     <string name="setup_progress">%1$d de %2$d concluídos</string>
     <string name="setup_profile">Preencha seu nome no perfil</string>
-    <string name="setup_company">Cadastre uma empresa</string>
+    <string name="setup_client">Cadastre um cliente</string>
     <string name="setup_site">Cadastre um local</string>
     <string name="setup_job_type">Cadastre um serviço</string>
     <string name="notification_channel_session">Sessão ativa</string>
@@ -60,14 +60,14 @@
     <string name="total">TOTAL</string>
     <string name="generate_invoice">Gerar invoice</string>
     <string name="share_invoice">Compartilhar invoice</string>
-    <string name="invoice_register_company_first">Cadastre uma empresa antes de faturar.</string>
+    <string name="invoice_register_client_first">Cadastre um cliente antes de faturar.</string>
     <string name="bill_to">Faturar para</string>
-    <string name="select_company">Selecione uma empresa</string>
+    <string name="select_client">Selecione um cliente</string>
     <string name="invoice_number">Número da invoice</string>
     <string name="hourly_rate_optional">Valor por hora (opcional)</string>
     <string name="enter_valid_amount">Informe um valor válido</string>
     <string name="leave_blank_hours_only">Deixe em branco para listar apenas as horas</string>
-    <string name="invoice_no_days_for_company">Nenhum dia trabalhado para %1$s no período selecionado.</string>
+    <string name="invoice_no_days_for_client">Nenhum dia trabalhado para %1$s no período selecionado.</string>
     <string name="invoice_days_to_invoice">%1$d dia(s) trabalhado(s) serão faturados.</string>
     <string name="job_type">Serviço</string>
     <string name="columns">Colunas</string>
@@ -78,26 +78,26 @@
     <string name="invoice_error_profile">Preencha seu perfil antes de gerar uma invoice.</string>
     <string name="invoice_error_generate">Não foi possível gerar o PDF: %1$s</string>
 
-    <!-- Empresas -->
+    <!-- Clientes -->
     <string name="invalid_abn">Informe um ABN válido com 11 dígitos</string>
     <string name="invalid_bsb">O BSB deve ter 6 dígitos (ex.: 062-000)</string>
     <string name="invalid_account_number">O número da conta deve ter de 6 a 10 dígitos</string>
     <string name="invalid_phone">Informe um telefone válido</string>
     <string name="invalid_email">Informe um e-mail válido</string>
-    <string name="new_company">Nova empresa</string>
-    <string name="company_name">Nome da empresa</string>
-    <string name="company_abn">Número de registro (ABN)</string>
+    <string name="new_client">Novo cliente</string>
+    <string name="client_name">Nome do cliente</string>
+    <string name="client_abn">Número de registro (ABN)</string>
     <string name="contact_phone">Telefone de contato</string>
     <string name="billing_email">E-mail de faturamento</string>
-    <string name="save_company">Salvar empresa</string>
-    <string name="registered_companies">Empresas cadastradas</string>
-    <string name="companies_empty">Nenhuma empresa ainda. Adicione a primeira acima.</string>
+    <string name="save_client">Salvar cliente</string>
+    <string name="registered_clients">Clientes cadastrados</string>
+    <string name="clients_empty">Nenhum cliente ainda. Adicione o primeiro acima.</string>
     <string name="abn_value">ABN %1$s</string>
-    <string name="edit_company">Editar empresa</string>
-    <string name="company_hourly_rate">Valor por hora padrão (opcional)</string>
+    <string name="edit_client">Editar cliente</string>
+    <string name="client_hourly_rate">Valor por hora padrão (opcional)</string>
     <string name="rate_per_hour">$%1$s/h</string>
-    <string name="session_rate_default_hint">Padrão da empresa: $%1$s/h</string>
-    <string name="session_rate_no_default">Empresa sem valor por hora cadastrado</string>
+    <string name="session_rate_default_hint">Padrão do cliente: $%1$s/h</string>
+    <string name="session_rate_no_default">Cliente sem valor por hora cadastrado</string>
     <string name="edit_session">Editar sessão</string>
     <string name="recent_combos">Recentes</string>
 
@@ -137,12 +137,12 @@
 
     <!-- Tracker -->
     <string name="location_permission_required">É necessário acesso à localização para usar o OnSite.</string>
-    <string name="missing_companies">empresas</string>
+    <string name="missing_clients">clientes</string>
     <string name="missing_sites">locais</string>
     <string name="missing_job_types">serviços</string>
     <string name="setup_missing_banner">Cadastre %1$s no menu inicial antes de iniciar uma sessão.</string>
     <string name="session_details">Detalhes da sessão</string>
-    <string name="company">Empresa</string>
+    <string name="client">Cliente</string>
     <string name="site">Local</string>
     <string name="select_site">Selecione um local</string>
     <string name="job_description">Serviço</string>
@@ -167,7 +167,7 @@
     <string name="delete_entry_confirm">Tem certeza de que deseja excluir este registro?</string>
     <string name="session_finished">Sessão finalizada</string>
     <string name="session_site">Local: %1$s</string>
-    <string name="session_company">Empresa: %1$s</string>
+    <string name="session_client">Cliente: %1$s</string>
     <string name="session_job_type">Serviço: %1$s</string>
     <string name="session_start">Início: %1$s</string>
     <string name="session_end">Fim: %1$s</string>
@@ -212,14 +212,14 @@
     <string name="planning_none">Nenhum</string>
     <string name="planning_assigned_to">Atribuído a</string>
     <string name="planning_assigned_to_value">Atribuído: %1$s</string>
-    <string name="planning_details_required">Escolha uma empresa, local ou tipo de serviço, ou escreva uma observação.</string>
+    <string name="planning_details_required">Escolha um cliente, local ou tipo de serviço, ou escreva uma observação.</string>
     <string name="planning_sessions">Sessões</string>
     <string name="planning_no_sessions">Nenhuma sessão registrada neste dia.</string>
     <string name="planning_nothing_today">Nada planejado ou registrado neste dia.</string>
     <string name="planning_repeat_until">Repetir até</string>
     <string name="planning_repeat_count">%1$d dias</string>
     <string name="calendar_hours_legend">Horas trabalhadas</string>
-    <string name="timeline_company_legend">Sessões por empresa</string>
+    <string name="timeline_client_legend">Sessões por cliente</string>
     <string name="calendar_day_total">Total: %1$s</string>
     <!-- Site photo (timestamp camera) -->
     <string name="menu_photo">Foto do local</string>
@@ -256,12 +256,12 @@
     <string name="period_this_month">Este mês</string>
     <string name="period_last_month">Mês passado</string>
     <string name="period_custom">Personalizado</string>
-    <string name="all_companies">Todas as empresas</string>
+    <string name="all_clients">Todos os clientes</string>
     <string name="unbilled_only">Só não faturadas</string>
     <string name="summary_days">Dias</string>
     <string name="summary_estimated">Estimado</string>
     <string name="summary_unbilled">Não faturado</string>
-    <string name="no_rate_hint">Cadastre um valor por hora na empresa para estimar valores.</string>
+    <string name="no_rate_hint">Cadastre um valor por hora no cliente para estimar valores.</string>
     <string name="weekly_hours">Horas por semana</string>
     <string name="hours_by_site">Horas por local</string>
     <string name="hours_by_client">Horas por cliente</string>
@@ -269,9 +269,9 @@
     <string name="report_mode_list">Lista</string>
     <string name="report_mode_insights">Análise</string>
     <string name="export_csv">Exportar CSV</string>
-    <string name="company_recent_invoices">Invoices recentes</string>
-    <string name="company_no_invoices">Nenhuma invoice ainda</string>
-    <string name="company_nothing_to_invoice">Nada a faturar</string>
+    <string name="client_recent_invoices">Invoices recentes</string>
+    <string name="client_no_invoices">Nenhuma invoice ainda</string>
+    <string name="client_nothing_to_invoice">Nada a faturar</string>
     <string name="view_report">Ver relatório</string>
     <string name="photo_settings">Configurações do carimbo</string>
     <string name="photo_timestamp_position">Posição da data e hora</string>
@@ -350,9 +350,9 @@
     <string name="connection_invite_sent">Solicitação enviada.</string>
     <string name="connection_invite_failed">Não foi possível enviar. Tente de novo.</string>
     <string name="connection_pending_title">Conexões pendentes</string>
-    <string name="connection_pick_company">Qual dos seus clientes é este?</string>
+    <string name="connection_pick_client">Qual dos seus clientes é este?</string>
     <string name="connection_accept">Conectar</string>
-    <string name="connection_accept_failed">Não foi possível conectar. Confira se essa empresa já sincronizou e tente de novo.</string>
+    <string name="connection_accept_failed">Não foi possível conectar. Confira se esse cliente já sincronizou e tente de novo.</string>
     <string name="connection_my_connections_title">Clientes conectados</string>
     <string name="connection_revoke">Desconectar</string>
     <string name="connection_connected_contractors_title">Prestadores conectados</string>

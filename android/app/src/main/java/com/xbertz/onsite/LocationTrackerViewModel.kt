@@ -11,7 +11,7 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
 import com.xbertz.onsite.data.AppDatabase
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
@@ -29,7 +29,7 @@ import kotlinx.coroutines.tasks.await
 data class TrackerUiState(
     val isSessionActive: Boolean = false,
     val activeSessionId: Long? = null,
-    val selectedCompany: Company? = null,
+    val selectedClient: Client? = null,
     val selectedSite: Site? = null,
     val selectedJobType: JobType? = null,
     val isProcessing: Boolean = false,
@@ -40,8 +40,8 @@ data class TrackerUiState(
 val TrackingSession.durationMillis: Long?
     get() = stopTimestampMillis?.let { it - startTimestampMillis }
 
-/** A company + site + job type triple, the three choices every tracked session needs. */
-data class SessionCombo(val company: Company, val site: Site, val jobType: JobType)
+/** A client + site + job type triple, the three choices every tracked session needs. */
+data class SessionCombo(val client: Client, val site: Site, val jobType: JobType)
 
 private const val MAX_RECENT_COMBOS = 4
 
@@ -57,14 +57,14 @@ private suspend fun fetchCurrentLocation(context: Context): Location? {
 class LocationTrackerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = AppDatabase.getInstance(application).trackingSessionDao()
-    private val companyDao = AppDatabase.getInstance(application).companyDao()
+    private val clientDao = AppDatabase.getInstance(application).clientDao()
     private val siteDao = AppDatabase.getInstance(application).siteDao()
     private val jobTypeDao = AppDatabase.getInstance(application).jobTypeDao()
 
     private val _uiState = MutableStateFlow(TrackerUiState())
     val uiState: StateFlow<TrackerUiState> = _uiState
 
-    val companies: StateFlow<List<Company>> = companyDao.getAll()
+    val clients: StateFlow<List<Client>> = clientDao.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val sites: StateFlow<List<Site>> = siteDao.getAll()
@@ -85,18 +85,18 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /**
-     * The most recently used company/site/job type combinations, newest first, resolved against
+     * The most recently used client/site/job type combinations, newest first, resolved against
      * the current registers so a deleted record drops out. Shown as one-tap chips on the tracker.
      */
-    val recentCombos: StateFlow<List<SessionCombo>> = combine(completedSessions, companies, sites, jobTypes) { sessions, cs, ss, js ->
+    val recentCombos: StateFlow<List<SessionCombo>> = combine(completedSessions, clients, sites, jobTypes) { sessions, cs, ss, js ->
         sessions.asSequence()
-            .map { Triple(it.companyName, it.siteLabel, it.jobTypeLabel) }
+            .map { Triple(it.clientName, it.siteLabel, it.jobTypeLabel) }
             .distinct()
             .mapNotNull { (c, s, j) ->
-                val company = cs.firstOrNull { it.name == c } ?: return@mapNotNull null
+                val client = cs.firstOrNull { it.name == c } ?: return@mapNotNull null
                 val site = ss.firstOrNull { it.label == s } ?: return@mapNotNull null
                 val jobType = js.firstOrNull { it.name == j } ?: return@mapNotNull null
-                SessionCombo(company, site, jobType)
+                SessionCombo(client, site, jobType)
             }
             .take(MAX_RECENT_COMBOS)
             .toList()
@@ -117,23 +117,23 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     /**
-     * Starts a new session with the same company/site/job type as [lastSession]. Names are resolved
+     * Starts a new session with the same client/site/job type as [lastSession]. Names are resolved
      * against the current registers, so a deleted record simply prevents the resume.
      */
     fun resumeLastSession() {
         val last = lastSession.value ?: return
         if (_uiState.value.isSessionActive) return
         viewModelScope.launch {
-            val company = companyDao.getAll().first().firstOrNull { it.name == last.companyName } ?: return@launch
+            val client = clientDao.getAll().first().firstOrNull { it.name == last.clientName } ?: return@launch
             val site = siteDao.getAll().first().firstOrNull { it.label == last.siteLabel } ?: return@launch
             val jobType = jobTypeDao.getAll().first().firstOrNull { it.name == last.jobTypeLabel } ?: return@launch
-            _uiState.update { it.copy(selectedCompany = company, selectedSite = site, selectedJobType = jobType) }
+            _uiState.update { it.copy(selectedClient = client, selectedSite = site, selectedJobType = jobType) }
             startTracking()
         }
     }
 
-    fun selectCompany(company: Company) {
-        _uiState.update { it.copy(selectedCompany = company) }
+    fun selectClient(client: Client) {
+        _uiState.update { it.copy(selectedClient = client) }
     }
 
     fun selectSite(site: Site) {
@@ -145,7 +145,7 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun selectCombo(combo: SessionCombo) {
-        _uiState.update { it.copy(selectedCompany = combo.company, selectedSite = combo.site, selectedJobType = combo.jobType) }
+        _uiState.update { it.copy(selectedClient = combo.client, selectedSite = combo.site, selectedJobType = combo.jobType) }
     }
 
     @SuppressLint("MissingPermission")
@@ -153,7 +153,7 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
         val state = _uiState.value
         if (state.isSessionActive) return
         val site = state.selectedSite ?: return
-        val company = state.selectedCompany ?: return
+        val client = state.selectedClient ?: return
         val jobType = state.selectedJobType ?: return
 
         // Flip synchronously so a rapid double-tap can't launch a second coroutine.
@@ -173,7 +173,7 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
             }
 
             val session = TrackingSession(
-                companyName = company.name,
+                clientName = client.name,
                 siteLabel = site.label,
                 jobTypeLabel = jobType.name,
                 startTimestampMillis = System.currentTimeMillis(),
@@ -235,7 +235,7 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
 
     /** Saves a session typed in by hand. Both ends use the site's registered coordinates, since no GPS fix was taken. */
     fun addManualSession(
-        company: Company,
+        client: Client,
         site: Site,
         jobType: JobType,
         startMillis: Long,
@@ -246,7 +246,7 @@ class LocationTrackerViewModel(application: Application) : AndroidViewModel(appl
         viewModelScope.launch {
             dao.insert(
                 TrackingSession(
-                    companyName = company.name,
+                    clientName = client.name,
                     siteLabel = site.label,
                     jobTypeLabel = jobType.name,
                     startTimestampMillis = startMillis,

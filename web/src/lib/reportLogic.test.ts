@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SiteRequest, TrackingSessionRequest } from "./types";
-import { buildCsv, effectiveRate, periodRange, summarize, totalsByCompany, totalsBySite, weeklyTotals } from "./reportLogic";
+import { buildCsv, effectiveRate, periodRange, summarize, totalsByClient, totalsBySite, weeklyTotals } from "./reportLogic";
 
 function session(partial: Partial<TrackingSessionRequest> & { startTimestampMillis: number }): TrackingSessionRequest {
   return {
     id: crypto.randomUUID(),
-    companyName: null,
+    clientName: null,
     siteLabel: null,
     jobTypeLabel: null,
     startLatitude: 0,
@@ -51,18 +51,18 @@ describe("periodRange", () => {
 });
 
 describe("effectiveRate", () => {
-  it("prefers the session's own rate over the company default", () => {
-    const s = session({ startTimestampMillis: 0, companyName: "Acme", hourlyRate: 80 });
+  it("prefers the session's own rate over the client default", () => {
+    const s = session({ startTimestampMillis: 0, clientName: "Acme", hourlyRate: 80 });
     expect(effectiveRate(s, new Map([["Acme", 50]]))).toBe(80);
   });
 
-  it("falls back to the company default when the session has none", () => {
-    const s = session({ startTimestampMillis: 0, companyName: "Acme" });
+  it("falls back to the client default when the session has none", () => {
+    const s = session({ startTimestampMillis: 0, clientName: "Acme" });
     expect(effectiveRate(s, new Map([["Acme", 50]]))).toBe(50);
   });
 
-  it("is null when neither the session nor the company has a rate", () => {
-    const s = session({ startTimestampMillis: 0, companyName: "Acme" });
+  it("is null when neither the session nor the client has a rate", () => {
+    const s = session({ startTimestampMillis: 0, clientName: "Acme" });
     expect(effectiveRate(s, new Map())).toBeNull();
   });
 });
@@ -70,8 +70,8 @@ describe("effectiveRate", () => {
 describe("summarize", () => {
   const day = Date.UTC(2026, 2, 16); // Monday, local-timezone-independent enough for a 2h session
   const sessions = [
-    session({ startTimestampMillis: day, stopTimestampMillis: day + 2 * 3_600_000, companyName: "Acme", hourlyRate: 50 }),
-    session({ startTimestampMillis: day + 3 * 3_600_000, stopTimestampMillis: day + 4 * 3_600_000, companyName: "Acme", invoiceId: "inv-1" }),
+    session({ startTimestampMillis: day, stopTimestampMillis: day + 2 * 3_600_000, clientName: "Acme", hourlyRate: 50 }),
+    session({ startTimestampMillis: day + 3 * 3_600_000, stopTimestampMillis: day + 4 * 3_600_000, clientName: "Acme", invoiceId: "inv-1" }),
     session({ startTimestampMillis: day + 100 * 3_600_000, stopTimestampMillis: null }), // still open, excluded
   ];
 
@@ -82,7 +82,7 @@ describe("summarize", () => {
   });
 
   it("estimatedAmount is null when nothing has a rate", () => {
-    const noRateSessions = [session({ startTimestampMillis: day, companyName: "Acme" })];
+    const noRateSessions = [session({ startTimestampMillis: day, clientName: "Acme" })];
     expect(summarize(noRateSessions, new Map()).estimatedAmount).toBeNull();
   });
 });
@@ -104,10 +104,10 @@ describe("totalsBy*", () => {
   it("groups and sorts by hours descending", () => {
     const day = Date.UTC(2026, 2, 16);
     const sessions = [
-      session({ startTimestampMillis: day, stopTimestampMillis: day + 1 * 3_600_000, companyName: "A", siteLabel: "Site 1" }),
-      session({ startTimestampMillis: day, stopTimestampMillis: day + 3 * 3_600_000, companyName: "B", siteLabel: "Site 2" }),
+      session({ startTimestampMillis: day, stopTimestampMillis: day + 1 * 3_600_000, clientName: "A", siteLabel: "Site 1" }),
+      session({ startTimestampMillis: day, stopTimestampMillis: day + 3 * 3_600_000, clientName: "B", siteLabel: "Site 2" }),
     ];
-    expect(totalsByCompany(sessions).map((t) => t.label)).toEqual(["B", "A"]);
+    expect(totalsByClient(sessions).map((t) => t.label)).toEqual(["B", "A"]);
     expect(totalsBySite(sessions).map((t) => t.label)).toEqual(["Site 2", "Site 1"]);
   });
 });
@@ -115,7 +115,7 @@ describe("totalsBy*", () => {
 describe("buildCsv", () => {
   it("produces a header row and one row per completed session with rate/amount columns", () => {
     const day = Date.UTC(2026, 2, 16, 8, 0);
-    const sessions = [session({ startTimestampMillis: day, stopTimestampMillis: day + 3_600_000, companyName: "Acme", siteLabel: "HQ", hourlyRate: 40 })];
+    const sessions = [session({ startTimestampMillis: day, stopTimestampMillis: day + 3_600_000, clientName: "Acme", siteLabel: "HQ", hourlyRate: 40 })];
     const sitesByLabel = new Map<string, SiteRequest>([["HQ", { id: "s1", label: "HQ", address: "1 Main St", latitude: 0, longitude: 0, createdAtMillis: 0 }]]);
     const csv = buildCsv(sessions, ["DATE", "SITE", "ADDRESS", "HOURS"], sitesByLabel, new Map());
     const lines = csv.trim().split("\r\n");

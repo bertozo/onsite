@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendApi } from "../lib/backendApi";
-import type { CompanyRequest, InvoiceRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
+import type { ClientRequest, InvoiceRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
 import { buildInvoiceLines, invoiceTotalAmount, invoiceTotalHours, lineAmount, lineHours, type InvoiceLine } from "../lib/invoiceLogic";
 import { epochDayToLabel, formatMoney, millisToLocalEpochDay, millisToTimeInput, todayEpochDay } from "../lib/format";
 import { loadProfile, saveProfile, type BusinessProfile } from "../lib/profileStore";
@@ -18,7 +18,7 @@ const STATUS_LABEL: Record<InvoiceRequest["status"], string> = { DRAFT: "Rascunh
 
 export function InvoicesPage() {
   const [invoices, setInvoices] = useState<InvoiceRequest[] | null>(null);
-  const [companies, setCompanies] = useState<CompanyRequest[]>([]);
+  const [clients, setClients] = useState<ClientRequest[]>([]);
   const [sites, setSites] = useState<SiteRequest[]>([]);
   const [sessions, setSessions] = useState<TrackingSessionRequest[]>([]);
   const [creating, setCreating] = useState(false);
@@ -28,12 +28,12 @@ export function InvoicesPage() {
   async function reload() {
     const [inv, comp, st, ses] = await Promise.all([
       backendApi.listInvoices(),
-      backendApi.listCompanies(),
+      backendApi.listClients(),
       backendApi.listSites(),
       backendApi.listTrackingSessions(),
     ]);
     setInvoices(inv);
-    setCompanies(comp);
+    setClients(comp);
     setSites(st);
     setSessions(ses);
   }
@@ -74,7 +74,7 @@ export function InvoicesPage() {
                 .map((inv) => (
                   <tr key={inv.id} className="hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-800">{inv.number}</td>
-                    <td className="px-4 py-3 text-slate-600">{inv.companyName}</td>
+                    <td className="px-4 py-3 text-slate-600">{inv.clientName}</td>
                     <td className="px-4 py-3 text-slate-500">
                       {epochDayToLabel(inv.periodStartEpochDay)} – {epochDayToLabel(inv.periodEndEpochDay)}
                     </td>
@@ -97,7 +97,7 @@ export function InvoicesPage() {
 
       {creating && (
         <NewInvoiceModal
-          companies={companies}
+          clients={clients}
           sessions={sessions}
           sitesByLabel={sitesByLabel}
           existingInvoices={invoices}
@@ -136,7 +136,7 @@ function nextInvoiceNumber(existing: InvoiceRequest[]): string {
 }
 
 function NewInvoiceModal({
-  companies,
+  clients,
   sessions,
   sitesByLabel,
   existingInvoices,
@@ -144,7 +144,7 @@ function NewInvoiceModal({
   onCreated,
   onError,
 }: {
-  companies: CompanyRequest[];
+  clients: ClientRequest[];
   sessions: TrackingSessionRequest[];
   sitesByLabel: Map<string, SiteRequest>;
   existingInvoices: InvoiceRequest[];
@@ -152,20 +152,20 @@ function NewInvoiceModal({
   onCreated: () => Promise<void>;
   onError: (msg: string | null) => void;
 }) {
-  const [companyId, setCompanyId] = useState(companies[0]?.id ?? "");
-  const company = companies.find((c) => c.id === companyId) ?? null;
-  const [hourlyRate, setHourlyRate] = useState(company?.hourlyRate?.toString() ?? "");
+  const [clientId, setClientId] = useState(clients[0]?.id ?? "");
+  const client = clients.find((c) => c.id === clientId) ?? null;
+  const [hourlyRate, setHourlyRate] = useState(client?.hourlyRate?.toString() ?? "");
   const [notes, setNotes] = useState("");
   const [number, setNumber] = useState(nextInvoiceNumber(existingInvoices));
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setHourlyRate(company?.hourlyRate?.toString() ?? "");
-  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+    setHourlyRate(client?.hourlyRate?.toString() ?? "");
+  }, [clientId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const unbilled = useMemo(
-    () => sessions.filter((s) => s.companyName === company?.name && s.stopTimestampMillis != null && s.invoiceId == null),
-    [sessions, company],
+    () => sessions.filter((s) => s.clientName === client?.name && s.stopTimestampMillis != null && s.invoiceId == null),
+    [sessions, client],
   );
   const rate = hourlyRate ? Number(hourlyRate) : null;
   const baseLines = useMemo(() => buildInvoiceLines(unbilled, sitesByLabel, rate), [unbilled, sitesByLabel, rate]);
@@ -176,7 +176,7 @@ function NewInvoiceModal({
    * what an override changes). "" clears back to the line's base rate.
    */
   const [rateOverrides, setRateOverrides] = useState<Record<number, string>>({});
-  useEffect(() => setRateOverrides({}), [companyId]);
+  useEffect(() => setRateOverrides({}), [clientId]);
 
   const lines = useMemo(
     () =>
@@ -190,9 +190,9 @@ function NewInvoiceModal({
   );
 
   async function handleCreate() {
-    if (!company) return;
+    if (!client) return;
     if (unbilled.length === 0) {
-      onError(`Nenhuma sessão pendente de fatura para ${company.name}.`);
+      onError(`Nenhuma sessão pendente de fatura para ${client.name}.`);
       return;
     }
     onError(null);
@@ -218,7 +218,7 @@ function NewInvoiceModal({
       await backendApi.createInvoice({
         id: invoiceId,
         number: number.trim(),
-        companyName: company.name,
+        clientName: client.name,
         periodStartEpochDay: periodStart,
         periodEndEpochDay: periodEnd,
         issueDateEpochDay: todayEpochDay(),
@@ -243,8 +243,8 @@ function NewInvoiceModal({
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Cliente">
-            <Select value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
-              {companies.map((c) => (
+            <Select value={clientId} onChange={(e) => setClientId(e.target.value)}>
+              {clients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
@@ -401,7 +401,7 @@ function InvoiceDetailModal({
 
         <p className="mb-4 text-sm">
           <span className="text-slate-400">Cliente: </span>
-          {invoice.companyName}
+          {invoice.clientName}
         </p>
 
         <table className="mb-4 w-full text-left text-xs">
@@ -410,7 +410,7 @@ function InvoiceDetailModal({
               <th className="py-1.5">Data</th>
               {colOn("SITE") && <th className="py-1.5">Local</th>}
               {colOn("ADDRESS") && <th className="py-1.5">Endereço</th>}
-              {colOn("COMPANY") && <th className="py-1.5">Cliente</th>}
+              {colOn("CLIENT") && <th className="py-1.5">Cliente</th>}
               {colOn("JOB_TYPE") && <th className="py-1.5">Serviço</th>}
               {colOn("START_TIME") && <th className="py-1.5">Início</th>}
               {colOn("END_TIME") && <th className="py-1.5">Fim</th>}
@@ -429,7 +429,7 @@ function InvoiceDetailModal({
                 <td className="py-1.5">{epochDayToLabel(l.dateEpochDay)}</td>
                 {colOn("SITE") && <td className="py-1.5">{l.sites.join(", ") || "—"}</td>}
                 {colOn("ADDRESS") && <td className="py-1.5">{l.addresses.join(" | ") || "—"}</td>}
-                {colOn("COMPANY") && <td className="py-1.5">{l.companies.join(", ") || "—"}</td>}
+                {colOn("CLIENT") && <td className="py-1.5">{l.clients.join(", ") || "—"}</td>}
                 {colOn("JOB_TYPE") && <td className="py-1.5">{l.jobTypes.join(", ") || "—"}</td>}
                 {colOn("START_TIME") && <td className="py-1.5">{millisToTimeInput(l.startTimestampMillis)}</td>}
                 {colOn("END_TIME") && <td className="py-1.5">{millisToTimeInput(l.endTimestampMillis)}</td>}

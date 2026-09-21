@@ -2,7 +2,7 @@ package com.xbertz.onsite.backend.domain
 
 import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
-import com.xbertz.onsite.backend.db.tables.Companies
+import com.xbertz.onsite.backend.db.tables.Clients
 import com.xbertz.onsite.backend.identity.requestedAccountId
 import com.xbertz.onsite.backend.identity.resolveActiveAccount
 import com.xbertz.onsite.backend.identity.resolveActiveAccountId
@@ -34,7 +34,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Serializable
-data class CompanyDto(
+data class ClientDto(
     val id: String,
     val name: String,
     val abn: String?,
@@ -46,7 +46,7 @@ data class CompanyDto(
 )
 
 @Serializable
-data class CompanyRequest(
+data class ClientRequest(
     val id: String,
     val name: String,
     val abn: String? = null,
@@ -56,32 +56,32 @@ data class CompanyRequest(
     val hourlyRate: Double? = null,
 )
 
-private fun ResultRow.toDto() = CompanyDto(
-    id = this[Companies.id].toString(),
-    name = this[Companies.name],
-    abn = this[Companies.abn],
-    phone = this[Companies.phone],
-    email = this[Companies.email],
-    createdAtMillis = this[Companies.createdAtMillis],
-    hourlyRate = this[Companies.hourlyRate],
-    updatedAt = this[Companies.updatedAt].toString(),
+private fun ResultRow.toDto() = ClientDto(
+    id = this[Clients.id].toString(),
+    name = this[Clients.name],
+    abn = this[Clients.abn],
+    phone = this[Clients.phone],
+    email = this[Clients.email],
+    createdAtMillis = this[Clients.createdAtMillis],
+    hourlyRate = this[Clients.hourlyRate],
+    updatedAt = this[Clients.updatedAt].toString(),
 )
 
-class CompaniesRepository {
-    fun list(accountId: UUID): List<CompanyDto> = transaction {
-        Companies.selectAll()
-            .where { Companies.accountId eq accountId }
-            .andWhere { Companies.deletedAt.isNull() }
-            .orderBy(Companies.name, SortOrder.ASC)
+class ClientsRepository {
+    fun list(accountId: UUID): List<ClientDto> = transaction {
+        Clients.selectAll()
+            .where { Clients.accountId eq accountId }
+            .andWhere { Clients.deletedAt.isNull() }
+            .orderBy(Clients.name, SortOrder.ASC)
             .map { it.toDto() }
     }
 
-    fun create(accountId: UUID, req: CompanyRequest): CompanyDto = transaction {
+    fun create(accountId: UUID, req: ClientRequest): ClientDto = transaction {
         val id = UUID.fromString(req.id)
         val now = Instant.now()
-        Companies.insert {
-            it[Companies.id] = id
-            it[Companies.accountId] = accountId
+        Clients.insert {
+            it[Clients.id] = id
+            it[Clients.accountId] = accountId
             it[name] = req.name
             it[abn] = req.abn
             it[phone] = req.phone
@@ -90,11 +90,11 @@ class CompaniesRepository {
             it[hourlyRate] = req.hourlyRate
             it[updatedAt] = now
         }
-        Companies.selectAll().where { Companies.id eq id }.single().toDto()
+        Clients.selectAll().where { Clients.id eq id }.single().toDto()
     }
 
-    fun update(accountId: UUID, id: UUID, req: CompanyRequest): CompanyDto? = transaction {
-        val updated = Companies.update({ (Companies.id eq id) and (Companies.accountId eq accountId) }) {
+    fun update(accountId: UUID, id: UUID, req: ClientRequest): ClientDto? = transaction {
+        val updated = Clients.update({ (Clients.id eq id) and (Clients.accountId eq accountId) }) {
             it[name] = req.name
             it[abn] = req.abn
             it[phone] = req.phone
@@ -102,20 +102,20 @@ class CompaniesRepository {
             it[hourlyRate] = req.hourlyRate
             it[updatedAt] = Instant.now()
         }
-        if (updated == 0) null else Companies.selectAll().where { Companies.id eq id }.single().toDto()
+        if (updated == 0) null else Clients.selectAll().where { Clients.id eq id }.single().toDto()
     }
 
     fun softDelete(accountId: UUID, id: UUID): Boolean = transaction {
-        Companies.update({ (Companies.id eq id) and (Companies.accountId eq accountId) }) {
+        Clients.update({ (Clients.id eq id) and (Clients.accountId eq accountId) }) {
             it[deletedAt] = Instant.now()
             it[updatedAt] = Instant.now()
         } > 0
     }
 }
 
-fun Route.companyRoutes(repository: CompaniesRepository) {
+fun Route.clientRoutes(repository: ClientsRepository) {
     authenticate(*AUTH_JWT) {
-        route("/v1/companies") {
+        route("/v1/clients") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
                 val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
@@ -124,14 +124,14 @@ fun Route.companyRoutes(repository: CompaniesRepository) {
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
                 val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
-                val req = call.receive<CompanyRequest>()
+                val req = call.receive<ClientRequest>()
                 call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(accountId, req) })
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
                 val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
                 val id = UUID.fromString(call.parameters["id"])
-                val req = call.receive<CompanyRequest>()
+                val req = call.receive<ClientRequest>()
                 val result = withContext(Dispatchers.IO) { repository.update(accountId, id, req) }
                 if (result == null) call.respond(HttpStatusCode.NotFound) else call.respond(result)
             }

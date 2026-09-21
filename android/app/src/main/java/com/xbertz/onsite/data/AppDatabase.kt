@@ -9,15 +9,15 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [
-        TrackingSession::class, Company::class, Profile::class, Site::class, JobType::class,
+        TrackingSession::class, Client::class, Profile::class, Site::class, JobType::class,
         PlannedJob::class, Invoice::class, SyncMapping::class
     ],
-    version = 13,
+    version = 14,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun trackingSessionDao(): TrackingSessionDao
-    abstract fun companyDao(): CompanyDao
+    abstract fun clientDao(): ClientDao
     abstract fun profileDao(): ProfileDao
     abstract fun siteDao(): SiteDao
     abstract fun jobTypeDao(): JobTypeDao
@@ -244,6 +244,105 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        private val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // "Company" became "Client" everywhere (table, columns, sync entity type). The
+                // three companyName columns are renamed by rebuilding their tables: RENAME COLUMN
+                // needs SQLite 3.25 (API 30) and minSdk is 26.
+                db.execSQL("ALTER TABLE companies RENAME TO clients")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `tracking_sessions_new` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `clientName` TEXT,
+                        `siteLabel` TEXT,
+                        `jobTypeLabel` TEXT,
+                        `startTimestampMillis` INTEGER NOT NULL,
+                        `startLatitude` REAL NOT NULL,
+                        `startLongitude` REAL NOT NULL,
+                        `stopTimestampMillis` INTEGER,
+                        `stopLatitude` REAL,
+                        `stopLongitude` REAL,
+                        `hourlyRate` REAL,
+                        `invoiceId` INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO tracking_sessions_new (id, clientName, siteLabel, jobTypeLabel, startTimestampMillis,
+                        startLatitude, startLongitude, stopTimestampMillis, stopLatitude, stopLongitude, hourlyRate, invoiceId)
+                    SELECT id, companyName, siteLabel, jobTypeLabel, startTimestampMillis,
+                        startLatitude, startLongitude, stopTimestampMillis, stopLatitude, stopLongitude, hourlyRate, invoiceId
+                    FROM tracking_sessions
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE tracking_sessions")
+                db.execSQL("ALTER TABLE tracking_sessions_new RENAME TO tracking_sessions")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `planned_jobs_new` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `dateEpochDay` INTEGER NOT NULL,
+                        `startMinute` INTEGER NOT NULL,
+                        `endMinute` INTEGER,
+                        `clientName` TEXT,
+                        `siteLabel` TEXT,
+                        `jobTypeLabel` TEXT,
+                        `notes` TEXT,
+                        `assignedUserId` TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO planned_jobs_new (id, dateEpochDay, startMinute, endMinute, clientName, siteLabel, jobTypeLabel, notes, assignedUserId)
+                    SELECT id, dateEpochDay, startMinute, endMinute, companyName, siteLabel, jobTypeLabel, notes, assignedUserId
+                    FROM planned_jobs
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE planned_jobs")
+                db.execSQL("ALTER TABLE planned_jobs_new RENAME TO planned_jobs")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `invoices_new` (
+                        `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+                        `number` TEXT NOT NULL,
+                        `clientName` TEXT NOT NULL,
+                        `periodStartEpochDay` INTEGER NOT NULL,
+                        `periodEndEpochDay` INTEGER NOT NULL,
+                        `issueDateEpochDay` INTEGER NOT NULL,
+                        `totalHours` REAL NOT NULL,
+                        `totalAmount` REAL,
+                        `hourlyRate` REAL,
+                        `status` TEXT NOT NULL,
+                        `sentAtMillis` INTEGER,
+                        `paidAtMillis` INTEGER,
+                        `pdfPath` TEXT NOT NULL,
+                        `notes` TEXT,
+                        `createdAtMillis` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO invoices_new (id, number, clientName, periodStartEpochDay, periodEndEpochDay, issueDateEpochDay,
+                        totalHours, totalAmount, hourlyRate, status, sentAtMillis, paidAtMillis, pdfPath, notes, createdAtMillis)
+                    SELECT id, number, companyName, periodStartEpochDay, periodEndEpochDay, issueDateEpochDay,
+                        totalHours, totalAmount, hourlyRate, status, sentAtMillis, paidAtMillis, pdfPath, notes, createdAtMillis
+                    FROM invoices
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE invoices")
+                db.execSQL("ALTER TABLE invoices_new RENAME TO invoices")
+
+                db.execSQL("UPDATE sync_mapping SET entityType = 'client' WHERE entityType = 'company'")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(
@@ -253,7 +352,7 @@ abstract class AppDatabase : RoomDatabase() {
                 ).addMigrations(
                     MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6,
                     MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11,
-                    MIGRATION_11_12, MIGRATION_12_13
+                    MIGRATION_11_12, MIGRATION_12_13, MIGRATION_13_14
                 ).build().also { INSTANCE = it }
             }
         }

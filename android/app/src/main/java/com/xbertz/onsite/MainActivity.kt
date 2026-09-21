@@ -148,7 +148,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
@@ -209,7 +209,7 @@ class MainActivity : ComponentActivity() {
 }
 
 internal enum class Screen {
-    MENU, TRACKER, REPORTS, COMPANIES, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO, INVOICES, INVOICE_REVIEW,
+    MENU, TRACKER, REPORTS, CLIENTS, SITES, JOB_TYPES, PROFILE, SETTINGS, PLANNING, PHOTO, INVOICES, INVOICE_REVIEW,
     CONNECTION_DETAIL
 }
 
@@ -277,7 +277,7 @@ private fun SignedInAppRoot(
     when (screen) {
         Screen.MENU -> MainMenuScreen(
             onProfileClick = { screen = Screen.PROFILE },
-            onCompaniesClick = { screen = Screen.COMPANIES },
+            onClientsClick = { screen = Screen.CLIENTS },
             onSitesClick = { screen = Screen.SITES },
             onJobTypesClick = { screen = Screen.JOB_TYPES },
             onTrackerClick = { screen = Screen.TRACKER },
@@ -295,7 +295,7 @@ private fun SignedInAppRoot(
         )
         Screen.INVOICES -> InvoicesScreen(onBack = { screen = Screen.MENU }, onGoToReports = { screen = Screen.REPORTS })
         Screen.INVOICE_REVIEW -> InvoiceReviewScreen(onBack = { screen = Screen.REPORTS }, onGenerated = { screen = Screen.REPORTS })
-        Screen.COMPANIES -> CompaniesScreen(
+        Screen.CLIENTS -> ClientsScreen(
             onBack = { screen = Screen.MENU },
             onReviewInvoice = { screen = Screen.INVOICE_REVIEW },
             onOpenReports = { screen = Screen.REPORTS },
@@ -559,7 +559,7 @@ private fun showTimePicker(context: Context, initialTime: LocalTime, onTimePicke
 @Composable
 fun MainMenuScreen(
     onProfileClick: () -> Unit,
-    onCompaniesClick: () -> Unit,
+    onClientsClick: () -> Unit,
     onSitesClick: () -> Unit,
     onJobTypesClick: () -> Unit,
     onTrackerClick: () -> Unit,
@@ -576,7 +576,7 @@ fun MainMenuScreen(
     val activeSession by trackerViewModel.activeSession.collectAsState()
     val lastSession by trackerViewModel.lastSession.collectAsState()
     val trackerState by trackerViewModel.uiState.collectAsState()
-    val companies by trackerViewModel.companies.collectAsState()
+    val clients by trackerViewModel.clients.collectAsState()
     val sites by trackerViewModel.sites.collectAsState()
     val jobTypes by trackerViewModel.jobTypes.collectAsState()
     val context = LocalContext.current
@@ -598,7 +598,7 @@ fun MainMenuScreen(
     val secondaryActions = listOf(
         MenuAction(stringResource(R.string.menu_reports), stringResource(R.string.menu_reports_subtitle), Icons.Filled.Assessment, onReportsClick),
         MenuAction(stringResource(R.string.menu_invoices), stringResource(R.string.menu_invoices_subtitle), Icons.Filled.Receipt, onInvoicesClick),
-        MenuAction(stringResource(R.string.menu_companies), stringResource(R.string.menu_companies_subtitle), Icons.Filled.Business, onCompaniesClick),
+        MenuAction(stringResource(R.string.menu_clients), stringResource(R.string.menu_clients_subtitle), Icons.Filled.Business, onClientsClick),
         MenuAction(stringResource(R.string.menu_sites), stringResource(R.string.menu_sites_subtitle), Icons.Filled.Place, onSitesClick),
         MenuAction(stringResource(R.string.menu_job_types), stringResource(R.string.menu_job_types_subtitle), Icons.Filled.Work, onJobTypesClick),
         MenuAction(stringResource(R.string.menu_photo), stringResource(R.string.menu_photo_subtitle), Icons.Filled.PhotoCamera, onPhotoClick)
@@ -690,7 +690,7 @@ fun MainMenuScreen(
 
         val setupSteps = listOf(
             SetupStep(stringResource(R.string.setup_profile), Icons.Filled.Person, profile.name.isNotBlank(), onProfileClick),
-            SetupStep(stringResource(R.string.setup_company), Icons.Filled.Business, companies.isNotEmpty(), onCompaniesClick),
+            SetupStep(stringResource(R.string.setup_client), Icons.Filled.Business, clients.isNotEmpty(), onClientsClick),
             SetupStep(stringResource(R.string.setup_site), Icons.Filled.Place, sites.isNotEmpty(), onSitesClick),
             SetupStep(stringResource(R.string.setup_job_type), Icons.Filled.Work, jobTypes.isNotEmpty(), onJobTypesClick)
         )
@@ -767,7 +767,7 @@ private fun ActiveSessionCard(
         }
     }
     val details = listOfNotNull(
-        session.companyName?.takeIf { it.isNotBlank() },
+        session.clientName?.takeIf { it.isNotBlank() },
         session.jobTypeLabel?.takeIf { it.isNotBlank() }
     ).joinToString(" · ")
 
@@ -881,7 +881,7 @@ private fun StartTrackingCard(
                 Text(stringResource(resId), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
             val resumable = lastSession?.takeIf {
-                !it.siteLabel.isNullOrBlank() && !it.companyName.isNullOrBlank() && !it.jobTypeLabel.isNullOrBlank()
+                !it.siteLabel.isNullOrBlank() && !it.clientName.isNullOrBlank() && !it.jobTypeLabel.isNullOrBlank()
             }
             if (resumable != null) {
                 Spacer(Modifier.height(12.dp))
@@ -896,7 +896,7 @@ private fun StartTrackingCard(
                     )
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        stringResource(R.string.last_session_hint, resumable.siteLabel.orEmpty(), resumable.companyName.orEmpty()),
+                        stringResource(R.string.last_session_hint, resumable.siteLabel.orEmpty(), resumable.clientName.orEmpty()),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         maxLines = 1,
@@ -1230,7 +1230,7 @@ fun PlanningScreen(
     trackerViewModel: LocationTrackerViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val companies by viewModel.companies.collectAsState()
+    val clients by viewModel.clients.collectAsState()
     val sites by viewModel.sites.collectAsState()
     val jobTypes by viewModel.jobTypes.collectAsState()
     val locale = LocalContext.current.resources.configuration.locales[0]
@@ -1245,7 +1245,7 @@ fun PlanningScreen(
         EditPlannedJobDialog(
             existing = null,
             initialDate = uiState.calendar.selectedDate,
-            companies = companies,
+            clients = clients,
             sites = sites,
             jobTypes = jobTypes,
             isOwner = isOwner,
@@ -1260,16 +1260,16 @@ fun PlanningScreen(
     }
     if (showAddSessionDialog) {
         AddSessionDialog(
-            companies = companies,
+            clients = clients,
             sites = sites,
             jobTypes = jobTypes,
-            initialCompany = null,
+            initialClient = null,
             initialSite = null,
             initialJobType = null,
             initialDate = uiState.calendar.selectedDate,
             onDismiss = { showAddSessionDialog = false },
-            onConfirm = { company, site, jobType, startMillis, stopMillis, rate ->
-                trackerViewModel.addManualSession(company, site, jobType, startMillis, stopMillis, rate)
+            onConfirm = { client, site, jobType, startMillis, stopMillis, rate ->
+                trackerViewModel.addManualSession(client, site, jobType, startMillis, stopMillis, rate)
                 showAddSessionDialog = false
             }
         )
@@ -1278,7 +1278,7 @@ fun PlanningScreen(
         EditPlannedJobDialog(
             existing = job,
             initialDate = job.date,
-            companies = companies,
+            clients = clients,
             sites = sites,
             jobTypes = jobTypes,
             isOwner = isOwner,
@@ -1353,7 +1353,7 @@ fun PlanningScreen(
                             }
                             OutlinedButton(
                                 onClick = { showAddSessionDialog = true },
-                                enabled = companies.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
+                                enabled = clients.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
                                 shape = MaterialTheme.shapes.medium,
                                 modifier = Modifier.weight(1f)
                             ) {
@@ -1424,7 +1424,7 @@ private fun PlanningDaySessions(state: PlanningUiState) {
     }
 }
 
-// Distinct block colours for the day timeline, assigned per company in order of appearance.
+// Distinct block colours for the day timeline, assigned per client in order of appearance.
 private val TimelinePalette = listOf(
     Color(0xFF1E88E5), Color(0xFF43A047), Color(0xFFFB8C00), Color(0xFF8E24AA),
     Color(0xFF00897B), Color(0xFFE53935), Color(0xFF6D4C41), Color(0xFF3949AB)
@@ -1445,8 +1445,8 @@ private fun DayTimeline(sessions: List<TrackingSession>) {
     val firstHour = minOf(6, ranges.minOf { it.second } / 60)
     val lastHour = maxOf(20, ranges.maxOf { (it.third + 59) / 60 }).coerceAtMost(24)
     val spanMin = ((lastHour - firstHour) * 60).coerceAtLeast(60)
-    val companies = sessions.mapNotNull { it.companyName }.distinct()
-    val colorFor = { name: String? -> TimelinePalette[(companies.indexOf(name).coerceAtLeast(0)) % TimelinePalette.size] }
+    val clients = sessions.mapNotNull { it.clientName }.distinct()
+    val colorFor = { name: String? -> TimelinePalette[(clients.indexOf(name).coerceAtLeast(0)) % TimelinePalette.size] }
 
     OutlinedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium) {
         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -1469,7 +1469,7 @@ private fun DayTimeline(sessions: List<TrackingSession>) {
                                 .fillMaxHeight()
                                 .padding(vertical = 3.dp)
                                 .clip(MaterialTheme.shapes.extraSmall)
-                                .background(colorFor(session.companyName))
+                                .background(colorFor(session.clientName))
                         )
                     }
                 }
@@ -1488,10 +1488,10 @@ private fun DayTimeline(sessions: List<TrackingSession>) {
                     )
                 }
             }
-            if (companies.size > 1) {
+            if (clients.size > 1) {
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-                    companies.forEach { name ->
+                    clients.forEach { name ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(colorFor(name)))
                             Spacer(Modifier.width(4.dp))
@@ -1512,7 +1512,7 @@ private fun PlanningSessionRow(session: TrackingSession) {
     val end = session.stopTimestampMillis?.let { Instant.ofEpochMilli(it).atZone(zone).toLocalTime() }
     val durationMillis = session.durationMillis ?: 0L
     val details = listOfNotNull(
-        session.companyName?.takeIf { it.isNotBlank() },
+        session.clientName?.takeIf { it.isNotBlank() },
         session.jobTypeLabel?.takeIf { it.isNotBlank() }
     ).joinToString(" · ")
 
@@ -1560,7 +1560,7 @@ private fun PlannedJobRow(job: PlannedJob, assigneeLabel: String? = null, onEdit
     val timeText = job.endTime?.let { "${job.startTime.format(timeFormatter)} – ${it.format(timeFormatter)}" }
         ?: job.startTime.format(timeFormatter)
     val details = listOfNotNull(
-        job.companyName?.takeIf { it.isNotBlank() },
+        job.clientName?.takeIf { it.isNotBlank() },
         job.jobTypeLabel?.takeIf { it.isNotBlank() }
     ).joinToString(" · ")
 
@@ -1613,13 +1613,13 @@ private fun PlannedJobRow(job: PlannedJob, assigneeLabel: String? = null, onEdit
     }
 }
 
-/** Add (when [existing] is null) or edit a planned job. Company/site/job type are optional here, unlike a tracked session. */
+/** Add (when [existing] is null) or edit a planned job. Client/site/job type are optional here, unlike a tracked session. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditPlannedJobDialog(
     existing: PlannedJob?,
     initialDate: LocalDate,
-    companies: List<Company>,
+    clients: List<Client>,
     sites: List<Site>,
     jobTypes: List<JobType>,
     isOwner: Boolean = true,
@@ -1633,7 +1633,7 @@ private fun EditPlannedJobDialog(
 
     var repeatEnabled by remember { mutableStateOf(false) }
     var repeatUntil by remember { mutableStateOf(initialDate.plusDays(4)) }
-    var companyName by remember { mutableStateOf(existing?.companyName) }
+    var clientName by remember { mutableStateOf(existing?.clientName) }
     var siteLabel by remember { mutableStateOf(existing?.siteLabel) }
     var jobTypeLabel by remember { mutableStateOf(existing?.jobTypeLabel) }
     var assignedUserId by remember { mutableStateOf(existing?.assignedUserId) }
@@ -1641,12 +1641,12 @@ private fun EditPlannedJobDialog(
     var startTime by remember { mutableStateOf(existing?.startTime ?: LocalTime.of(7, 0)) }
     var endTime by remember { mutableStateOf(existing?.endTime) }
     var notes by remember { mutableStateOf(existing?.notes.orEmpty()) }
-    var companyExpanded by remember { mutableStateOf(false) }
+    var clientExpanded by remember { mutableStateOf(false) }
     var siteExpanded by remember { mutableStateOf(false) }
     var jobTypeExpanded by remember { mutableStateOf(false) }
     var assigneeExpanded by remember { mutableStateOf(false) }
 
-    val canSave = companyName != null || siteLabel != null || jobTypeLabel != null || notes.isNotBlank()
+    val canSave = clientName != null || siteLabel != null || jobTypeLabel != null || notes.isNotBlank()
     val none = stringResource(R.string.planning_none)
 
     AlertDialog(
@@ -1709,17 +1709,17 @@ private fun EditPlannedJobDialog(
 
                 Spacer(Modifier.height(14.dp))
                 TrackerDropdown(
-                    label = stringResource(R.string.company),
+                    label = stringResource(R.string.client),
                     icon = Icons.Filled.Business,
-                    value = companyName ?: stringResource(R.string.select_company),
-                    expanded = companyExpanded,
+                    value = clientName ?: stringResource(R.string.select_client),
+                    expanded = clientExpanded,
                     enabled = true,
-                    onExpandedChange = { companyExpanded = it },
-                    onDismiss = { companyExpanded = false }
+                    onExpandedChange = { clientExpanded = it },
+                    onDismiss = { clientExpanded = false }
                 ) {
-                    DropdownMenuItem(text = { Text(none) }, onClick = { companyName = null; companyExpanded = false })
-                    companies.forEach { option ->
-                        DropdownMenuItem(text = { Text(option.name) }, onClick = { companyName = option.name; companyExpanded = false })
+                    DropdownMenuItem(text = { Text(none) }, onClick = { clientName = null; clientExpanded = false })
+                    clients.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { clientName = option.name; clientExpanded = false })
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -1827,7 +1827,7 @@ private fun EditPlannedJobDialog(
                             dateEpochDay = date.toEpochDay(),
                             startMinute = startTime.toSecondOfDay() / 60,
                             endMinute = endTime?.let { it.toSecondOfDay() / 60 },
-                            companyName = companyName,
+                            clientName = clientName,
                             siteLabel = siteLabel,
                             jobTypeLabel = jobTypeLabel,
                             notes = notes.trim().ifBlank { null },
@@ -2334,7 +2334,7 @@ fun SettingsScreen(
     authState: AuthUiState.LoggedIn,
     onLogout: () -> Unit,
     onOpenConnection: (ConnectionDto) -> Unit = {},
-    companyViewModel: CompanyViewModel = viewModel()
+    clientViewModel: ClientViewModel = viewModel()
 ) {
     val themeMode by viewModel.themeMode.collectAsState()
     val language by viewModel.language.collectAsState()
@@ -2342,7 +2342,7 @@ fun SettingsScreen(
     val pendingConnectionInvites by authViewModel.pendingConnectionInvites.collectAsState()
     val connections by authViewModel.connections.collectAsState()
     val employerConnections by authViewModel.employerConnections.collectAsState()
-    val myCompanies by companyViewModel.companies.collectAsState()
+    val myClients by clientViewModel.clients.collectAsState()
     val context = LocalContext.current
 
     LaunchedEffect(Unit) {
@@ -2600,8 +2600,8 @@ fun SettingsScreen(
                             Spacer(Modifier.height(12.dp))
                             ConnectionInviteRow(
                                 employerName = invite.employerAccountName,
-                                companies = myCompanies,
-                                onAccept = { companyId, onResult -> authViewModel.acceptConnectionInvite(invite.id, companyId, onResult) }
+                                clients = myClients,
+                                onAccept = { clientId, onResult -> authViewModel.acceptConnectionInvite(invite.id, clientId, onResult) }
                             )
                         }
                     }
@@ -2626,7 +2626,7 @@ fun SettingsScreen(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(connection.employerAccountName, fontWeight = FontWeight.SemiBold)
                                     Text(
-                                        connection.workerCompanyName,
+                                        connection.workerClientName,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -2718,7 +2718,7 @@ fun SettingsScreen(
                                     .padding(horizontal = 20.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(connection.workerCompanyName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                                Text(connection.workerClientName, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                                 Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                         }
@@ -2733,16 +2733,16 @@ fun SettingsScreen(
 @Composable
 private fun ConnectionInviteRow(
     employerName: String,
-    companies: List<Company>,
-    onAccept: (companyId: Long, onResult: (Boolean) -> Unit) -> Unit
+    clients: List<Client>,
+    onAccept: (clientId: Long, onResult: (Boolean) -> Unit) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    var selected by remember { mutableStateOf<Company?>(null) }
+    var selected by remember { mutableStateOf<Client?>(null) }
     var failed by remember { mutableStateOf(false) }
 
     Text(employerName, fontWeight = FontWeight.SemiBold)
     Spacer(Modifier.height(8.dp))
-    Text(stringResource(R.string.connection_pick_company), style = MaterialTheme.typography.bodySmall)
+    Text(stringResource(R.string.connection_pick_client), style = MaterialTheme.typography.bodySmall)
     Spacer(Modifier.height(4.dp))
     ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
         OutlinedTextField(
@@ -2753,17 +2753,17 @@ private fun ConnectionInviteRow(
             shape = MaterialTheme.shapes.small
         )
         ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            companies.forEach { company ->
-                DropdownMenuItem(text = { Text(company.name) }, onClick = { selected = company; expanded = false })
+            clients.forEach { client ->
+                DropdownMenuItem(text = { Text(client.name) }, onClick = { selected = client; expanded = false })
             }
         }
     }
     Spacer(Modifier.height(8.dp))
     Button(
         onClick = {
-            val company = selected ?: return@Button
+            val client = selected ?: return@Button
             failed = false
-            onAccept(company.id) { success -> failed = !success }
+            onAccept(client.id) { success -> failed = !success }
         },
         enabled = selected != null,
         modifier = Modifier.fillMaxWidth()
@@ -2817,7 +2817,7 @@ private fun ConnectionDetailScreen(
 
     val totalMillis = sessions.sumOf { (it.stopTimestampMillis ?: it.startTimestampMillis) - it.startTimestampMillis }
 
-    Scaffold(topBar = { AppTopBar(title = connection.workerCompanyName, onBack = onBack) }) { padding ->
+    Scaffold(topBar = { AppTopBar(title = connection.workerClientName, onBack = onBack) }) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -3120,7 +3120,7 @@ private fun reportColumnMinWidth(column: ReportColumn): Dp = when (column) {
     ReportColumn.DATE -> 92.dp
     ReportColumn.SITE -> 140.dp
     ReportColumn.ADDRESS -> 220.dp
-    ReportColumn.COMPANY -> 130.dp
+    ReportColumn.CLIENT -> 130.dp
     ReportColumn.JOB_TYPE -> 130.dp
     ReportColumn.START_TIME -> 64.dp
     ReportColumn.END_TIME -> 64.dp
@@ -3128,7 +3128,7 @@ private fun reportColumnMinWidth(column: ReportColumn): Dp = when (column) {
 }
 
 private fun ReportColumn.isTextColumn() = this in setOf(
-    ReportColumn.SITE, ReportColumn.ADDRESS, ReportColumn.COMPANY, ReportColumn.JOB_TYPE
+    ReportColumn.SITE, ReportColumn.ADDRESS, ReportColumn.CLIENT, ReportColumn.JOB_TYPE
 )
 
 private fun ReportColumn.isRightAligned() = this in setOf(
@@ -3263,7 +3263,7 @@ private fun reportCellValue(
     ReportColumn.SITE -> session.siteLabel?.takeIf { it.isNotBlank() }
         ?: "${"%.6f".format(session.startLatitude)}, ${"%.6f".format(session.startLongitude)}"
     ReportColumn.ADDRESS -> sitesByLabel[session.siteLabel]?.address.orEmpty()
-    ReportColumn.COMPANY -> session.companyName.orEmpty()
+    ReportColumn.CLIENT -> session.clientName.orEmpty()
     ReportColumn.JOB_TYPE -> session.jobTypeLabel.orEmpty()
     ReportColumn.START_TIME -> timeFormatter.format(Date(session.startTimestampMillis))
     ReportColumn.END_TIME -> session.stopTimestampMillis?.let { timeFormatter.format(Date(it)) }.orEmpty()
@@ -3271,81 +3271,81 @@ private fun reportCellValue(
 }
 
 // ---------------------------------------------------------------------------
-// Companies
+// Clients
 // ---------------------------------------------------------------------------
 
 @Composable
-fun CompaniesScreen(
+fun ClientsScreen(
     onBack: () -> Unit,
     onReviewInvoice: () -> Unit,
     onOpenReports: () -> Unit,
     canManage: Boolean = true,
-    viewModel: CompanyViewModel = viewModel(),
+    viewModel: ClientViewModel = viewModel(),
     trackerViewModel: LocationTrackerViewModel = viewModel(),
     invoiceViewModel: InvoiceViewModel = viewModel(),
     reportViewModel: ReportViewModel = viewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    val companies by viewModel.companies.collectAsState()
+    val clients by viewModel.clients.collectAsState()
     val editState by viewModel.editState.collectAsState()
     val sessions by trackerViewModel.completedSessions.collectAsState()
     val invoices by invoiceViewModel.invoices.collectAsState()
-    var sheetCompany by remember { mutableStateOf<Company?>(null) }
+    var sheetClient by remember { mutableStateOf<Client?>(null) }
     val focusManager = LocalFocusManager.current
     val nextField = nextFieldActions(focusManager)
     val doneField = doneFieldActions(focusManager)
     val nameFocusRequester = remember { FocusRequester() }
 
-    sheetCompany?.let { company ->
-        CompanySheet(
-            company = company,
+    sheetClient?.let { client ->
+        ClientSheet(
+            client = client,
             sessions = sessions,
             invoices = invoices,
-            onDismiss = { sheetCompany = null },
+            onDismiss = { sheetClient = null },
             onGenerateInvoice = { open, start, end ->
-                sheetCompany = null
-                reportViewModel.setCompany(company.name)
-                invoiceViewModel.startReview(open, start, end, company)
+                sheetClient = null
+                reportViewModel.setClient(client.name)
+                invoiceViewModel.startReview(open, start, end, client)
                 onReviewInvoice()
             },
             onViewReport = {
-                sheetCompany = null
-                reportViewModel.setCompany(company.name)
+                sheetClient = null
+                reportViewModel.setClient(client.name)
                 onOpenReports()
             }
         )
     }
 
     editState?.let { state ->
-        EditCompanyDialog(
+        EditClientDialog(
             state = state,
             onNameChanged = { viewModel.onEditNameChanged(it) },
             onAbnChanged = { viewModel.onEditAbnChanged(it) },
             onPhoneChanged = { viewModel.onEditPhoneChanged(it) },
             onEmailChanged = { viewModel.onEditEmailChanged(it) },
             onHourlyRateChanged = { viewModel.onEditHourlyRateChanged(it) },
-            onDismiss = { viewModel.cancelEditingCompany() },
-            onConfirm = { viewModel.saveEditedCompany() }
+            onDismiss = { viewModel.cancelEditingClient() },
+            onConfirm = { viewModel.saveEditedClient() }
         )
     }
 
     var formExpanded by rememberSaveable { mutableStateOf(false) }
 
-    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_companies), onBack = onBack) }) { padding ->
+    Scaffold(topBar = { AppTopBar(title = stringResource(R.string.menu_clients), onBack = onBack) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
             LaunchedEffect(formExpanded) {
                 if (formExpanded) nameFocusRequester.requestFocus()
             }
             NewEntityCard(
                 visible = canManage,
-                title = stringResource(R.string.new_company),
+                title = stringResource(R.string.new_client),
                 expanded = formExpanded,
                 onToggle = { formExpanded = !formExpanded }
             ) {
                     OutlinedTextField(
                         value = uiState.name,
                         onValueChange = { viewModel.onNameChanged(it) },
-                        label = { Text(stringResource(R.string.company_name)) },
+                        label = { Text(stringResource(R.string.client_name)) },
                         leadingIcon = { Icon(Icons.Filled.Business, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = nextField,
@@ -3357,7 +3357,7 @@ fun CompaniesScreen(
                     OutlinedTextField(
                         value = uiState.abn,
                         onValueChange = { viewModel.onAbnChanged(it) },
-                        label = { Text(stringResource(R.string.company_abn)) },
+                        label = { Text(stringResource(R.string.client_abn)) },
                         isError = !Validators.abnOk(uiState.abn),
                         supportingText = if (!Validators.abnOk(uiState.abn)) {
                             { Text(stringResource(R.string.invalid_abn)) }
@@ -3404,7 +3404,7 @@ fun CompaniesScreen(
                     OutlinedTextField(
                         value = uiState.hourlyRate,
                         onValueChange = { viewModel.onHourlyRateChanged(it) },
-                        label = { Text(stringResource(R.string.company_hourly_rate)) },
+                        label = { Text(stringResource(R.string.client_hourly_rate)) },
                         isError = !Validators.amountOk(uiState.hourlyRate),
                         supportingText = if (!Validators.amountOk(uiState.hourlyRate)) {
                             { Text(stringResource(R.string.enter_valid_amount)) }
@@ -3419,7 +3419,7 @@ fun CompaniesScreen(
                     Spacer(Modifier.height(16.dp))
                     Button(
                         onClick = {
-                            viewModel.saveCompany()
+                            viewModel.saveClient()
                             formExpanded = false
                         },
                         enabled = uiState.name.isNotBlank() && Validators.abnOk(uiState.abn) &&
@@ -3430,35 +3430,35 @@ fun CompaniesScreen(
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.save_company))
+                        Text(stringResource(R.string.save_client))
                     }
             }
 
             Spacer(Modifier.height(16.dp))
-            SectionHeader(title = stringResource(R.string.registered_companies), count = companies.size)
+            SectionHeader(title = stringResource(R.string.registered_clients), count = clients.size)
             Spacer(Modifier.height(8.dp))
 
-            if (companies.isEmpty()) {
-                EmptyState(text = stringResource(R.string.companies_empty))
+            if (clients.isEmpty()) {
+                EmptyState(text = stringResource(R.string.clients_empty))
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
-                    items(companies, key = { it.id }) { company ->
+                    items(clients, key = { it.id }) { client ->
                         EntityListItem(
                             icon = Icons.Filled.Business,
-                            title = company.name,
+                            title = client.name,
                             subtitle = listOfNotNull(
-                                company.hourlyRate?.let { stringResource(R.string.rate_per_hour, formatRateInput(it)) },
-                                company.abn?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.abn_value, it) },
-                                company.phone?.takeIf { it.isNotBlank() },
-                                company.email?.takeIf { it.isNotBlank() }
+                                client.hourlyRate?.let { stringResource(R.string.rate_per_hour, formatRateInput(it)) },
+                                client.abn?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.abn_value, it) },
+                                client.phone?.takeIf { it.isNotBlank() },
+                                client.email?.takeIf { it.isNotBlank() }
                             ).joinToString("  •  ").ifBlank { null },
-                            onEdit = if (canManage) { { viewModel.startEditingCompany(company) } } else null,
-                            onDelete = if (canManage) { { viewModel.deleteCompany(company) } } else null,
-                            onClick = { sheetCompany = company }
+                            onEdit = if (canManage) { { viewModel.startEditingClient(client) } } else null,
+                            onDelete = if (canManage) { { viewModel.deleteClient(client) } } else null,
+                            onClick = { sheetClient = client }
                         )
                     }
                 }
@@ -3468,8 +3468,8 @@ fun CompaniesScreen(
 }
 
 @Composable
-fun EditCompanyDialog(
-    state: CompanyEditUiState,
+fun EditClientDialog(
+    state: ClientEditUiState,
     onNameChanged: (String) -> Unit,
     onAbnChanged: (String) -> Unit,
     onPhoneChanged: (String) -> Unit,
@@ -3487,13 +3487,13 @@ fun EditCompanyDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = { Icon(Icons.Filled.Business, contentDescription = null) },
-        title = { Text(stringResource(R.string.edit_company)) },
+        title = { Text(stringResource(R.string.edit_client)) },
         text = {
             Column {
                 OutlinedTextField(
                     value = state.name,
                     onValueChange = onNameChanged,
-                    label = { Text(stringResource(R.string.company_name)) },
+                    label = { Text(stringResource(R.string.client_name)) },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     keyboardActions = nextField,
                     singleLine = true,
@@ -3504,7 +3504,7 @@ fun EditCompanyDialog(
                 OutlinedTextField(
                     value = state.abn,
                     onValueChange = onAbnChanged,
-                    label = { Text(stringResource(R.string.company_abn)) },
+                    label = { Text(stringResource(R.string.client_abn)) },
                     isError = !Validators.abnOk(state.abn),
                     supportingText = if (!Validators.abnOk(state.abn)) {
                         { Text(stringResource(R.string.invalid_abn)) }
@@ -3549,7 +3549,7 @@ fun EditCompanyDialog(
                 OutlinedTextField(
                     value = state.hourlyRate,
                     onValueChange = onHourlyRateChanged,
-                    label = { Text(stringResource(R.string.company_hourly_rate)) },
+                    label = { Text(stringResource(R.string.client_hourly_rate)) },
                     isError = !Validators.amountOk(state.hourlyRate),
                     supportingText = if (!Validators.amountOk(state.hourlyRate)) {
                         { Text(stringResource(R.string.enter_valid_amount)) }
@@ -4201,14 +4201,14 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
 fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val sessions by viewModel.completedSessions.collectAsState()
-    val companies by viewModel.companies.collectAsState()
+    val clients by viewModel.clients.collectAsState()
     val sites by viewModel.sites.collectAsState()
     val jobTypes by viewModel.jobTypes.collectAsState()
     val recentCombos by viewModel.recentCombos.collectAsState()
     var editingSession by remember { mutableStateOf<TrackingSession?>(null) }
     var deletingSession by remember { mutableStateOf<TrackingSession?>(null) }
     var showAddSessionDialog by remember { mutableStateOf(false) }
-    var companyDropdownExpanded by remember { mutableStateOf(false) }
+    var clientDropdownExpanded by remember { mutableStateOf(false) }
     var siteDropdownExpanded by remember { mutableStateOf(false) }
     var jobTypeDropdownExpanded by remember { mutableStateOf(false) }
     var hasLocationPermission by remember { mutableStateOf(false) }
@@ -4241,7 +4241,7 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
     editingSession?.let { session ->
         EditSessionDialog(
             session = session,
-            companyRate = companies.firstOrNull { it.name == session.companyName }?.hourlyRate,
+            clientRate = clients.firstOrNull { it.name == session.clientName }?.hourlyRate,
             onDismiss = { editingSession = null },
             onConfirm = { newDurationMillis, rate ->
                 viewModel.updateSession(session, newDurationMillis, rate)
@@ -4263,15 +4263,15 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
 
     if (showAddSessionDialog) {
         AddSessionDialog(
-            companies = companies,
+            clients = clients,
             sites = sites,
             jobTypes = jobTypes,
-            initialCompany = uiState.selectedCompany,
+            initialClient = uiState.selectedClient,
             initialSite = uiState.selectedSite,
             initialJobType = uiState.selectedJobType,
             onDismiss = { showAddSessionDialog = false },
-            onConfirm = { company, site, jobType, startMillis, stopMillis, rate ->
-                viewModel.addManualSession(company, site, jobType, startMillis, stopMillis, rate)
+            onConfirm = { client, site, jobType, startMillis, stopMillis, rate ->
+                viewModel.addManualSession(client, site, jobType, startMillis, stopMillis, rate)
                 showAddSessionDialog = false
             }
         )
@@ -4290,7 +4290,7 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
             }
 
             val missing = listOfNotNull(
-                stringResource(R.string.missing_companies).takeIf { companies.isEmpty() },
+                stringResource(R.string.missing_clients).takeIf { clients.isEmpty() },
                 stringResource(R.string.missing_sites).takeIf { sites.isEmpty() },
                 stringResource(R.string.missing_job_types).takeIf { jobTypes.isEmpty() }
             )
@@ -4313,29 +4313,29 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
                         RecentCombosRow(
                             combos = recentCombos,
                             selected = uiState.let { st -> recentCombos.firstOrNull {
-                                it.company.id == st.selectedCompany?.id && it.site.id == st.selectedSite?.id && it.jobType.id == st.selectedJobType?.id
+                                it.client.id == st.selectedClient?.id && it.site.id == st.selectedSite?.id && it.jobType.id == st.selectedJobType?.id
                             } },
                             onSelect = { viewModel.selectCombo(it) }
                         )
                         Spacer(Modifier.height(12.dp))
                     }
 
-                    if (companies.isNotEmpty()) {
+                    if (clients.isNotEmpty()) {
                         TrackerDropdown(
-                            label = stringResource(R.string.company),
+                            label = stringResource(R.string.client),
                             icon = Icons.Filled.Business,
-                            value = uiState.selectedCompany?.name ?: stringResource(R.string.select_company),
-                            expanded = companyDropdownExpanded,
+                            value = uiState.selectedClient?.name ?: stringResource(R.string.select_client),
+                            expanded = clientDropdownExpanded,
                             enabled = !uiState.isSessionActive,
-                            onExpandedChange = { companyDropdownExpanded = it && !uiState.isSessionActive },
-                            onDismiss = { companyDropdownExpanded = false }
+                            onExpandedChange = { clientDropdownExpanded = it && !uiState.isSessionActive },
+                            onDismiss = { clientDropdownExpanded = false }
                         ) {
-                            companies.forEach { company ->
+                            clients.forEach { client ->
                                 DropdownMenuItem(
-                                    text = { Text(company.name) },
+                                    text = { Text(client.name) },
                                     onClick = {
-                                        viewModel.selectCompany(company)
-                                        companyDropdownExpanded = false
+                                        viewModel.selectClient(client)
+                                        clientDropdownExpanded = false
                                     }
                                 )
                             }
@@ -4397,7 +4397,7 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
 
             Spacer(Modifier.height(16.dp))
 
-            val canStart = hasLocationPermission && uiState.selectedCompany != null &&
+            val canStart = hasLocationPermission && uiState.selectedClient != null &&
                 uiState.selectedSite != null && uiState.selectedJobType != null &&
                 !uiState.isSessionActive && !uiState.isProcessing
             val canStop = uiState.isSessionActive && !uiState.isProcessing
@@ -4446,7 +4446,7 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
             Spacer(Modifier.height(10.dp))
             OutlinedButton(
                 onClick = { showAddSessionDialog = true },
-                enabled = companies.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
+                enabled = clients.isNotEmpty() && sites.isNotEmpty() && jobTypes.isNotEmpty(),
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth().height(48.dp)
             ) {
@@ -4492,7 +4492,7 @@ fun TrackerScreen(onBack: () -> Unit, viewModel: LocationTrackerViewModel = view
     }
 }
 
-/** One-tap chips with the last few company/site/job type combinations. */
+/** One-tap chips with the last few client/site/job type combinations. */
 @Composable
 private fun RecentCombosRow(combos: List<SessionCombo>, selected: SessionCombo?, onSelect: (SessionCombo) -> Unit) {
     Column {
@@ -4515,7 +4515,7 @@ private fun RecentCombosRow(combos: List<SessionCombo>, selected: SessionCombo?,
                         Column {
                             Text(combo.site.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
                             Text(
-                                "${combo.company.name} · ${combo.jobType.name}",
+                                "${combo.client.name} · ${combo.jobType.name}",
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1
                             )
@@ -4561,14 +4561,14 @@ private fun DayHeader(date: LocalDate, totalMillis: Long) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddSessionDialog(
-    companies: List<Company>,
+    clients: List<Client>,
     sites: List<Site>,
     jobTypes: List<JobType>,
-    initialCompany: Company?,
+    initialClient: Client?,
     initialSite: Site?,
     initialJobType: JobType?,
     onDismiss: () -> Unit,
-    onConfirm: (company: Company, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long, hourlyRate: Double?) -> Unit,
+    onConfirm: (client: Client, site: Site, jobType: JobType, startMillis: Long, stopMillis: Long, hourlyRate: Double?) -> Unit,
     initialDate: LocalDate = LocalDate.now()
 ) {
     val context = LocalContext.current
@@ -4577,7 +4577,7 @@ fun AddSessionDialog(
     val focusManager = LocalFocusManager.current
     val nextField = nextFieldActions(focusManager)
 
-    var company by remember { mutableStateOf(initialCompany ?: companies.singleOrNull()) }
+    var client by remember { mutableStateOf(initialClient ?: clients.singleOrNull()) }
     var rateText by remember { mutableStateOf("") }
     var site by remember { mutableStateOf(initialSite ?: sites.singleOrNull()) }
     var jobType by remember { mutableStateOf(initialJobType ?: jobTypes.singleOrNull()) }
@@ -4587,7 +4587,7 @@ fun AddSessionDialog(
     // three fields stay consistent whichever one the user edits (and shifts can cross midnight).
     var hoursText by remember { mutableStateOf("8") }
     var minutesText by remember { mutableStateOf("30") }
-    var companyExpanded by remember { mutableStateOf(false) }
+    var clientExpanded by remember { mutableStateOf(false) }
     var siteExpanded by remember { mutableStateOf(false) }
     var jobTypeExpanded by remember { mutableStateOf(false) }
 
@@ -4596,7 +4596,7 @@ fun AddSessionDialog(
     val zone = ZoneId.systemDefault()
     val startMillis = date.atTime(startTime).atZone(zone).toInstant().toEpochMilli()
     val stopMillis = startMillis + TimeUnit.MINUTES.toMillis(durationMinutes)
-    val canSave = company != null && site != null && jobType != null && durationMinutes > 0 && Validators.amountOk(rateText)
+    val canSave = client != null && site != null && jobType != null && durationMinutes > 0 && Validators.amountOk(rateText)
 
     // Minutes from [from] to [to] on the clock; a "to" at or before "from" is read as the next day.
     fun minutesBetween(from: LocalTime, to: LocalTime): Long {
@@ -4615,16 +4615,16 @@ fun AddSessionDialog(
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 TrackerDropdown(
-                    label = stringResource(R.string.company),
+                    label = stringResource(R.string.client),
                     icon = Icons.Filled.Business,
-                    value = company?.name ?: stringResource(R.string.select_company),
-                    expanded = companyExpanded,
+                    value = client?.name ?: stringResource(R.string.select_client),
+                    expanded = clientExpanded,
                     enabled = true,
-                    onExpandedChange = { companyExpanded = it },
-                    onDismiss = { companyExpanded = false }
+                    onExpandedChange = { clientExpanded = it },
+                    onDismiss = { clientExpanded = false }
                 ) {
-                    companies.forEach { option ->
-                        DropdownMenuItem(text = { Text(option.name) }, onClick = { company = option; companyExpanded = false })
+                    clients.forEach { option ->
+                        DropdownMenuItem(text = { Text(option.name) }, onClick = { client = option; clientExpanded = false })
                     }
                 }
                 Spacer(Modifier.height(10.dp))
@@ -4750,12 +4750,12 @@ fun AddSessionDialog(
                 }
 
                 Spacer(Modifier.height(14.dp))
-                SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = company?.hourlyRate)
+                SessionRateField(value = rateText, onValueChange = { rateText = it }, clientRate = client?.hourlyRate)
             }
         },
         confirmButton = {
             TextButton(
-                onClick = { onConfirm(company!!, site!!, jobType!!, startMillis, stopMillis, Validators.parseAmount(rateText)) },
+                onClick = { onConfirm(client!!, site!!, jobType!!, startMillis, stopMillis, Validators.parseAmount(rateText)) },
                 enabled = canSave
             ) {
                 Text(stringResource(R.string.add))
@@ -4833,9 +4833,9 @@ fun SessionRow(session: TrackingSession, onEditClick: () -> Unit, onDeleteClick:
     }
 }
 
-/** Hourly-rate override input shared by the add/edit session dialogs; blank means "use the company default". */
+/** Hourly-rate override input shared by the add/edit session dialogs; blank means "use the client default". */
 @Composable
-internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, companyRate: Double?) {
+internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, clientRate: Double?) {
     val valid = Validators.amountOk(value)
     val focusManager = LocalFocusManager.current
     OutlinedTextField(
@@ -4848,7 +4848,7 @@ internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, co
             Text(
                 when {
                     !valid -> stringResource(R.string.enter_valid_amount)
-                    companyRate != null -> stringResource(R.string.session_rate_default_hint, formatRateInput(companyRate))
+                    clientRate != null -> stringResource(R.string.session_rate_default_hint, formatRateInput(clientRate))
                     else -> stringResource(R.string.session_rate_no_default)
                 }
             )
@@ -4865,7 +4865,7 @@ internal fun SessionRateField(value: String, onValueChange: (String) -> Unit, co
 @Composable
 fun EditSessionDialog(
     session: TrackingSession,
-    companyRate: Double?,
+    clientRate: Double?,
     onDismiss: () -> Unit,
     onConfirm: (durationMillis: Long, hourlyRate: Double?) -> Unit
 ) {
@@ -4913,7 +4913,7 @@ fun EditSessionDialog(
                     )
                 }
                 Spacer(Modifier.height(14.dp))
-                SessionRateField(value = rateText, onValueChange = { rateText = it }, companyRate = companyRate)
+                SessionRateField(value = rateText, onValueChange = { rateText = it }, clientRate = clientRate)
             }
         },
         confirmButton = {
@@ -4978,8 +4978,8 @@ fun SessionSummaryDialog(session: TrackingSession, onDismiss: () -> Unit) {
                 if (!session.siteLabel.isNullOrBlank()) {
                     Text(stringResource(R.string.session_site, session.siteLabel))
                 }
-                if (!session.companyName.isNullOrBlank()) {
-                    Text(stringResource(R.string.session_company, session.companyName))
+                if (!session.clientName.isNullOrBlank()) {
+                    Text(stringResource(R.string.session_client, session.clientName))
                 }
                 if (!session.jobTypeLabel.isNullOrBlank()) {
                     Text(stringResource(R.string.session_job_type, session.jobTypeLabel))

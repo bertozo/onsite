@@ -37,7 +37,7 @@ import java.util.UUID
 data class InvoiceDto(
     val id: String,
     val number: String,
-    val companyName: String,
+    val clientName: String,
     val periodStartEpochDay: Long,
     val periodEndEpochDay: Long,
     val issueDateEpochDay: Long,
@@ -57,7 +57,7 @@ data class InvoiceDto(
 data class InvoiceRequest(
     val id: String,
     val number: String,
-    val companyName: String,
+    val clientName: String,
     val periodStartEpochDay: Long,
     val periodEndEpochDay: Long,
     val issueDateEpochDay: Long,
@@ -75,7 +75,7 @@ data class InvoiceRequest(
 private fun ResultRow.toDto() = InvoiceDto(
     id = this[Invoices.id].toString(),
     number = this[Invoices.number],
-    companyName = this[Invoices.companyName],
+    clientName = this[Invoices.clientName],
     periodStartEpochDay = this[Invoices.periodStartEpochDay],
     periodEndEpochDay = this[Invoices.periodEndEpochDay],
     issueDateEpochDay = this[Invoices.issueDateEpochDay],
@@ -106,7 +106,7 @@ class InvoicesRepository {
             it[Invoices.id] = id
             it[Invoices.accountId] = accountId
             it[number] = req.number
-            it[companyName] = req.companyName
+            it[clientName] = req.clientName
             it[periodStartEpochDay] = req.periodStartEpochDay
             it[periodEndEpochDay] = req.periodEndEpochDay
             it[issueDateEpochDay] = req.issueDateEpochDay
@@ -127,7 +127,7 @@ class InvoicesRepository {
     fun update(accountId: UUID, id: UUID, req: InvoiceRequest): InvoiceDto? = transaction {
         val updated = Invoices.update({ (Invoices.id eq id) and (Invoices.accountId eq accountId) }) {
             it[number] = req.number
-            it[companyName] = req.companyName
+            it[clientName] = req.clientName
             it[periodStartEpochDay] = req.periodStartEpochDay
             it[periodEndEpochDay] = req.periodEndEpochDay
             it[issueDateEpochDay] = req.issueDateEpochDay

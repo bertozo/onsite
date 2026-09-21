@@ -23,7 +23,7 @@ interface InvoiceDao {
     @Query("SELECT * FROM invoices WHERE id = :id")
     suspend fun getById(id: Long): Invoice?
 
-    /** Invoices keep the client by name, so a company rename must be propagated like for sessions. */
-    @Query("UPDATE invoices SET companyName = :newName WHERE companyName = :oldName")
-    suspend fun renameCompany(oldName: String, newName: String)
+    /** Invoices keep the client by name, so a client rename must be propagated like for sessions. */
+    @Query("UPDATE invoices SET clientName = :newName WHERE clientName = :oldName")
+    suspend fun renameClient(oldName: String, newName: String)
 }

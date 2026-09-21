@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.data.AppDatabase
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-data class CompanyFormUiState(
+data class ClientFormUiState(
     val name: String = "",
     val abn: String = "",
     val phone: String = "",
@@ -21,8 +21,8 @@ data class CompanyFormUiState(
     val hourlyRate: String = ""
 )
 
-data class CompanyEditUiState(
-    val original: Company,
+data class ClientEditUiState(
+    val original: Client,
     val name: String,
     val abn: String,
     val phone: String,
@@ -30,21 +30,21 @@ data class CompanyEditUiState(
     val hourlyRate: String
 )
 
-class CompanyViewModel(application: Application) : AndroidViewModel(application) {
+class ClientViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val dao = AppDatabase.getInstance(application).companyDao()
+    private val dao = AppDatabase.getInstance(application).clientDao()
     private val sessionDao = AppDatabase.getInstance(application).trackingSessionDao()
     private val plannedJobDao = AppDatabase.getInstance(application).plannedJobDao()
     private val invoiceDao = AppDatabase.getInstance(application).invoiceDao()
 
-    private val _uiState = MutableStateFlow(CompanyFormUiState())
-    val uiState: StateFlow<CompanyFormUiState> = _uiState
+    private val _uiState = MutableStateFlow(ClientFormUiState())
+    val uiState: StateFlow<ClientFormUiState> = _uiState
 
-    val companies: StateFlow<List<Company>> = dao.getAll()
+    val clients: StateFlow<List<Client>> = dao.getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _editState = MutableStateFlow<CompanyEditUiState?>(null)
-    val editState: StateFlow<CompanyEditUiState?> = _editState
+    private val _editState = MutableStateFlow<ClientEditUiState?>(null)
+    val editState: StateFlow<ClientEditUiState?> = _editState
 
     fun onNameChanged(value: String) = _uiState.update { it.copy(name = value) }
     fun onAbnChanged(value: String) = _uiState.update { it.copy(abn = value) }
@@ -52,13 +52,13 @@ class CompanyViewModel(application: Application) : AndroidViewModel(application)
     fun onEmailChanged(value: String) = _uiState.update { it.copy(email = value) }
     fun onHourlyRateChanged(value: String) = _uiState.update { it.copy(hourlyRate = value) }
 
-    fun saveCompany() {
+    fun saveClient() {
         val state = _uiState.value
-        if (state.name.isBlank() || !isCompanyInputValid(state.abn, state.phone, state.email, state.hourlyRate)) return
+        if (state.name.isBlank() || !isClientInputValid(state.abn, state.phone, state.email, state.hourlyRate)) return
 
         viewModelScope.launch {
             dao.insert(
-                Company(
+                Client(
                     name = state.name.trim(),
                     abn = state.abn.trim().ifBlank { null },
                     phone = state.phone.trim().ifBlank { null },
@@ -67,22 +67,22 @@ class CompanyViewModel(application: Application) : AndroidViewModel(application)
                     hourlyRate = Validators.parseAmount(state.hourlyRate)
                 )
             )
-            _uiState.update { CompanyFormUiState() }
+            _uiState.update { ClientFormUiState() }
         }
     }
 
-    fun deleteCompany(company: Company) {
-        viewModelScope.launch { dao.delete(company) }
+    fun deleteClient(client: Client) {
+        viewModelScope.launch { dao.delete(client) }
     }
 
-    fun startEditingCompany(company: Company) {
-        _editState.value = CompanyEditUiState(
-            original = company,
-            name = company.name,
-            abn = company.abn.orEmpty(),
-            phone = company.phone.orEmpty(),
-            email = company.email.orEmpty(),
-            hourlyRate = company.hourlyRate?.let { formatRateInput(it) }.orEmpty()
+    fun startEditingClient(client: Client) {
+        _editState.value = ClientEditUiState(
+            original = client,
+            name = client.name,
+            abn = client.abn.orEmpty(),
+            phone = client.phone.orEmpty(),
+            email = client.email.orEmpty(),
+            hourlyRate = client.hourlyRate?.let { formatRateInput(it) }.orEmpty()
         )
     }
 
@@ -92,13 +92,13 @@ class CompanyViewModel(application: Application) : AndroidViewModel(application)
     fun onEditEmailChanged(value: String) = _editState.update { it?.copy(email = value) }
     fun onEditHourlyRateChanged(value: String) = _editState.update { it?.copy(hourlyRate = value) }
 
-    fun cancelEditingCompany() {
+    fun cancelEditingClient() {
         _editState.value = null
     }
 
-    fun saveEditedCompany() {
+    fun saveEditedClient() {
         val state = _editState.value ?: return
-        if (state.name.isBlank() || !isCompanyInputValid(state.abn, state.phone, state.email, state.hourlyRate)) return
+        if (state.name.isBlank() || !isClientInputValid(state.abn, state.phone, state.email, state.hourlyRate)) return
 
         viewModelScope.launch {
             val newName = state.name.trim()
@@ -112,15 +112,15 @@ class CompanyViewModel(application: Application) : AndroidViewModel(application)
                 )
             )
             if (newName != state.original.name) {
-                sessionDao.renameCompany(oldName = state.original.name, newName = newName)
-                plannedJobDao.renameCompany(oldName = state.original.name, newName = newName)
-                invoiceDao.renameCompany(oldName = state.original.name, newName = newName)
+                sessionDao.renameClient(oldName = state.original.name, newName = newName)
+                plannedJobDao.renameClient(oldName = state.original.name, newName = newName)
+                invoiceDao.renameClient(oldName = state.original.name, newName = newName)
             }
             _editState.value = null
         }
     }
 
-    private fun isCompanyInputValid(abn: String, phone: String, email: String, hourlyRate: String) =
+    private fun isClientInputValid(abn: String, phone: String, email: String, hourlyRate: String) =
         Validators.abnOk(abn) && Validators.phoneOk(phone) && Validators.emailOk(email) && Validators.amountOk(hourlyRate)
 }
 

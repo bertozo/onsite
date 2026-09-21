@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { backendApi } from "../lib/backendApi";
-import type { CompanyRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
-import { buildCsv, periodRange, summarize, totalsByCompany, totalsByJobType, totalsBySite, weeklyTotals, type ReportPeriod } from "../lib/reportLogic";
+import type { ClientRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
+import { buildCsv, periodRange, summarize, totalsByClient, totalsByJobType, totalsBySite, weeklyTotals, type ReportPeriod } from "../lib/reportLogic";
 import { loadReportColumns } from "../lib/columnPrefs";
 import { formatHours, formatMoney } from "../lib/format";
 import { Card, PageHeader, Select, Spinner } from "../components/ui";
@@ -17,19 +17,19 @@ const PERIOD_LABELS: Record<ReportPeriod, string> = {
 
 export function ReportsPage() {
   const [sessions, setSessions] = useState<TrackingSessionRequest[] | null>(null);
-  const [companies, setCompanies] = useState<CompanyRequest[]>([]);
+  const [clients, setClients] = useState<ClientRequest[]>([]);
   const [sites, setSites] = useState<SiteRequest[]>([]);
   const [period, setPeriod] = useState<ReportPeriod>("THIS_WEEK");
-  const [companyFilter, setCompanyFilter] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
   const [unbilledOnly, setUnbilledOnly] = useState(false);
 
   useEffect(() => {
     backendApi.listTrackingSessions().then(setSessions).catch(() => setSessions([]));
-    backendApi.listCompanies().then(setCompanies).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(() => undefined);
     backendApi.listSites().then(setSites).catch(() => undefined);
   }, []);
 
-  const ratesByCompany = useMemo(() => new Map(companies.map((c) => [c.name, c.hourlyRate])), [companies]);
+  const ratesByClient = useMemo(() => new Map(clients.map((c) => [c.name, c.hourlyRate])), [clients]);
   const sitesByLabel = useMemo(() => new Map(sites.map((s) => [s.label, s])), [sites]);
 
   const range = periodRange(period);
@@ -37,20 +37,20 @@ export function ReportsPage() {
     if (!sessions) return [];
     return sessions.filter((s) => {
       if (range && (s.startTimestampMillis < range[0].getTime() || s.startTimestampMillis >= range[1].getTime() + 86_400_000)) return false;
-      if (companyFilter && s.companyName !== companyFilter) return false;
+      if (clientFilter && s.clientName !== clientFilter) return false;
       if (unbilledOnly && s.invoiceId != null) return false;
       return true;
     });
-  }, [sessions, range, companyFilter, unbilledOnly]);
+  }, [sessions, range, clientFilter, unbilledOnly]);
 
   if (!sessions) return <Spinner className="h-6 w-6 text-violet-600" />;
 
-  const summary = summarize(filtered, ratesByCompany);
+  const summary = summarize(filtered, ratesByClient);
   const weeks = range ? weeklyTotals(filtered, range[0], range[1]) : [];
   const maxWeekMillis = Math.max(1, ...weeks.map((w) => w.millis));
 
   function downloadCsv() {
-    const csv = buildCsv(filtered, loadReportColumns(), sitesByLabel, ratesByCompany);
+    const csv = buildCsv(filtered, loadReportColumns(), sitesByLabel, ratesByClient);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -72,9 +72,9 @@ export function ReportsPage() {
             </option>
           ))}
         </Select>
-        <Select value={companyFilter} onChange={(e) => setCompanyFilter(e.target.value)} className="w-48">
+        <Select value={clientFilter} onChange={(e) => setClientFilter(e.target.value)} className="w-48">
           <option value="">Todos os clientes</option>
-          {companies.map((c) => (
+          {clients.map((c) => (
             <option key={c.id} value={c.name}>
               {c.name}
             </option>
@@ -121,7 +121,7 @@ export function ReportsPage() {
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <BreakdownCard title="Por local" totals={totalsBySite(filtered)} />
-        <BreakdownCard title="Por cliente" totals={totalsByCompany(filtered)} />
+        <BreakdownCard title="Por cliente" totals={totalsByClient(filtered)} />
         <BreakdownCard title="Por serviço" totals={totalsByJobType(filtered)} />
       </div>
     </div>

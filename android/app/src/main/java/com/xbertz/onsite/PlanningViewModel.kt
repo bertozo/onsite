@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.data.AppDatabase
-import com.xbertz.onsite.data.Company
+import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
@@ -55,7 +55,7 @@ class PlanningViewModel(application: Application) : AndroidViewModel(application
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), PlanningUiState(navigator.state.value))
 
     // Pick lists for the job dialog; the tracker's ViewModel exposes the same flows but is scoped to its own screen.
-    val companies: StateFlow<List<Company>> = db.companyDao().getAll()
+    val clients: StateFlow<List<Client>> = db.clientDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val sites: StateFlow<List<Site>> = db.siteDao().getAll()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

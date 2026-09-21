@@ -7,7 +7,7 @@ import java.time.LocalTime
 
 /**
  * A job scheduled for a day on the planning calendar. Like [TrackingSession] it keeps the
- * company/site/job type as text so the plan reads the same even if those records change.
+ * client/site/job type as text so the plan reads the same even if those records change.
  */
 @Entity(tableName = "planned_jobs")
 data class PlannedJob(
@@ -15,7 +15,7 @@ data class PlannedJob(
     val dateEpochDay: Long,
     val startMinute: Int,
     val endMinute: Int?,
-    val companyName: String?,
+    val clientName: String?,
     val siteLabel: String?,
     val jobTypeLabel: String?,
     val notes: String?,
