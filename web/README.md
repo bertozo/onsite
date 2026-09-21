@@ -20,9 +20,10 @@ management.
 - `src/lib/sessionStore.ts` — the signed-in session in `localStorage` (there is no
   browser equivalent of Android's `EncryptedSharedPreferences`).
 - `src/lib/profileStore.ts` — the "from" details printed on generated invoices
-  (business name/ABN/bank details). Kept in `localStorage` only, per browser, exactly like
-  Android's `Profile` table: neither is ever synced to the backend (there is no
-  `/v1/me/profile` route).
+  (business name/role/ABN/contact/BSB/account). One row per user on the backend
+  (`GET/PUT /v1/me/profile`), reconciled by last-write-wins on `updatedAtMillis` (the
+  client's own edit time) so it matches Android's `Profile`; `localStorage` is only a
+  per-browser cache. Android's profile photo is a local file and is not synced.
 - `src/context/AuthContext.tsx` — the sign-in/sign-up/password-reset state machine, mirroring
   Android's `AuthViewModel` minus the local-sync steps (this app has no offline cache to push
   or wipe, so switching accounts is just changing which `X-Account-Id` is sent).

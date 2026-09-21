@@ -5,6 +5,7 @@ import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.Invoice
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.PlannedJob
+import com.xbertz.onsite.data.Profile
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.SyncDao
 import com.xbertz.onsite.data.SyncMapping
@@ -48,7 +49,55 @@ suspend fun runSync(db: AppDatabase, token: String) {
     pullInvoices(db, sync, token)
     pullSessions(db, sync, token)
     pullPlannedJobs(db, sync, token)
+
+    syncProfile(db, token)
 }
+
+/**
+ * The profile is one row per user (not per account, so it survives [wipeLocalDomainData]) and
+ * has no [SyncMapping]: it's reconciled by last-write-wins on [Profile.updatedAtMillis], the
+ * device's own edit time. A row saved before sync existed has updatedAtMillis 0 and only gets
+ * uploaded if the server has nothing yet, so a fresh web profile isn't clobbered by an old
+ * phone one. photoPath is local only: the photo is a file on this device.
+ */
+private suspend fun syncProfile(db: AppDatabase, token: String) {
+    val dao = db.profileDao()
+    val local = dao.getOnce()
+    val remote = BackendApi.getProfile(token)
+    when {
+        local == null && remote == null -> return
+        remote == null || (local != null && local.updatedAtMillis > remote.updatedAtMillis) -> {
+            val upload = local!!.copy(updatedAtMillis = local.updatedAtMillis.takeIf { it > 0 } ?: System.currentTimeMillis())
+            val winner = BackendApi.putProfile(token, upload.toDto())
+            dao.upsert(winner.toProfile(photoPath = local.photoPath))
+        }
+        local == null || remote.updatedAtMillis > local.updatedAtMillis ->
+            dao.upsert(remote.toProfile(photoPath = local?.photoPath))
+    }
+}
+
+private fun Profile.toDto() = ProfileDto(
+    name = name,
+    role = role,
+    phone = phone,
+    email = email,
+    abn = abn,
+    bankBsb = bankBsb,
+    bankAccount = bankAccount,
+    updatedAtMillis = updatedAtMillis,
+)
+
+private fun ProfileDto.toProfile(photoPath: String?) = Profile(
+    name = name,
+    role = role,
+    phone = phone,
+    email = email,
+    abn = abn,
+    photoPath = photoPath,
+    bankBsb = bankBsb,
+    bankAccount = bankAccount,
+    updatedAtMillis = updatedAtMillis,
+)
 
 /**
  * Switching which account the app acts as (see `AuthViewModel.switchAccount`) means Room can

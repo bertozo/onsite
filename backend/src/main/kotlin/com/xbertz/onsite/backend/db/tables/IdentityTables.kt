@@ -29,6 +29,20 @@ object Users : Table("users") {
     override val primaryKey = PrimaryKey(id)
 }
 
+object UserProfiles : Table("user_profiles") {
+    val userId = uuid("user_id").references(Users.id)
+    val name = text("name")
+    val role = text("role").nullable()
+    val phone = text("phone").nullable()
+    val email = text("email").nullable()
+    val abn = text("abn").nullable()
+    val bankBsb = text("bank_bsb").nullable()
+    val bankAccount = text("bank_account").nullable()
+    val updatedAtMillis = long("updated_at_millis")
+
+    override val primaryKey = PrimaryKey(userId)
+}
+
 object Memberships : Table("memberships") {
     val id = uuid("id")
     val userId = uuid("user_id").references(Users.id)

@@ -86,7 +86,8 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun saveProfile() {
+    /** [onSaved] runs once the row is written - the caller uses it to push the profile to the backend. */
+    fun saveProfile(onSaved: () -> Unit = {}) {
         val state = _uiState.value
         if (state.name.isBlank() || !state.isValid) return
 
@@ -100,10 +101,12 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     abn = state.abn.trim().ifBlank { null },
                     photoPath = state.photoPath,
                     bankBsb = state.bankBsb.trim().ifBlank { null },
-                    bankAccount = state.bankAccount.trim().ifBlank { null }
+                    bankAccount = state.bankAccount.trim().ifBlank { null },
+                    updatedAtMillis = System.currentTimeMillis()
                 )
             )
             _uiState.update { it.copy(isSaved = true) }
+            onSaved()
         }
     }
 }

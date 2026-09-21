@@ -303,7 +303,7 @@ private fun SignedInAppRoot(
         )
         Screen.SITES -> SitesScreen(onBack = { screen = Screen.MENU }, canManage = authState.isOwner)
         Screen.JOB_TYPES -> JobTypesScreen(onBack = { screen = Screen.MENU }, canManage = authState.isOwner)
-        Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU })
+        Screen.PROFILE -> ProfileScreen(onBack = { screen = Screen.MENU }, onSaved = authViewModel::syncNow)
         Screen.SETTINGS -> SettingsScreen(
             onBack = { screen = Screen.MENU },
             viewModel = settingsViewModel,
@@ -3977,7 +3977,7 @@ fun rememberBitmapFromFile(path: String?): ImageBitmap? {
 }
 
 @Composable
-fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel()) {
+fun ProfileScreen(onBack: () -> Unit, onSaved: () -> Unit, viewModel: ProfileViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val photoBitmap = rememberBitmapFromFile(uiState.photoPath)
     val focusManager = LocalFocusManager.current
@@ -4161,7 +4161,7 @@ fun ProfileScreen(onBack: () -> Unit, viewModel: ProfileViewModel = viewModel())
             Spacer(Modifier.height(20.dp))
 
             Button(
-                onClick = { viewModel.saveProfile() },
+                onClick = { viewModel.saveProfile(onSaved) },
                 enabled = uiState.name.isNotBlank() && uiState.isValid,
                 shape = MaterialTheme.shapes.medium,
                 modifier = Modifier.fillMaxWidth().height(48.dp)

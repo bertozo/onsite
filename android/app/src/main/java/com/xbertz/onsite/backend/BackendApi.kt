@@ -11,6 +11,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.put
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
@@ -76,6 +77,19 @@ data class ConnectionDto(
     val workerClientId: String,
     val workerClientName: String,
     val status: String,
+)
+
+/** The invoice-header details of the signed-in user; mirrors the backend's ProfileDto (no photo). */
+@Serializable
+data class ProfileDto(
+    val name: String,
+    val role: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val abn: String? = null,
+    val bankBsb: String? = null,
+    val bankAccount: String? = null,
+    val updatedAtMillis: Long,
 )
 
 @Serializable
@@ -239,6 +253,16 @@ object BackendApi {
     /** OWNER-only: every member of the active account, for the "assign to" picker. */
     suspend fun listAccountMembers(token: String): List<MemberDto> =
         http.get("$BASE_URL/v1/me/account-members") { bearerAuth(token) }.body()
+
+    /** Null until the user has saved a profile on any device. */
+    suspend fun getProfile(token: String): ProfileDto? {
+        val response = http.get("$BASE_URL/v1/me/profile") { bearerAuth(token) }
+        return if (response.status == HttpStatusCode.NotFound) null else response.body()
+    }
+
+    /** Returns whichever version won last-write-wins server side (see IdentityRepository.saveProfile). */
+    suspend fun putProfile(token: String, req: ProfileDto): ProfileDto =
+        http.put("$BASE_URL/v1/me/profile") { bearerAuth(token); jsonBody(req) }.body()
 
     /** Employer schedules a job straight onto the connected worker's own calendar. */
     suspend fun createConnectionPlannedJob(token: String, connectionId: String, req: ConnectionPlannedJobRequest) {

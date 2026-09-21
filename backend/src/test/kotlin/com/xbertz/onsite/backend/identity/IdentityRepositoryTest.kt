@@ -114,4 +114,25 @@ class IdentityRepositoryTest {
         val secondUserRow = transaction { Users.selectAll().where { Users.id eq secondUserId }.singleOrNull() }
         assertEquals(null, secondUserRow)
     }
+
+    @Test
+    fun `profile save is last-write-wins on the client's edit time`() {
+        val userId = UUID.randomUUID()
+        createdUserIds += userId
+        repository.bootstrap(userId, uniqueEmail())
+        assertEquals(null, repository.findProfile(userId))
+
+        val phone = ProfileDto(name = "From phone", abn = "11111111111", updatedAtMillis = 2_000)
+        assertEquals(phone, repository.saveProfile(userId, phone))
+
+        // An older edit arriving later (a device that synced late) must not clobber the newer one,
+        // and the caller gets the winning version back.
+        val staleWeb = ProfileDto(name = "From web", updatedAtMillis = 1_000)
+        assertEquals(phone, repository.saveProfile(userId, staleWeb))
+        assertEquals("From phone", repository.findProfile(userId)?.name)
+
+        val newerWeb = ProfileDto(name = "From web again", bankBsb = "062-000", updatedAtMillis = 3_000)
+        assertEquals(newerWeb, repository.saveProfile(userId, newerWeb))
+        assertEquals(newerWeb, repository.findProfile(userId))
+    }
 }

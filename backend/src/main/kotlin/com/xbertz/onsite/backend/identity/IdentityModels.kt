@@ -18,6 +18,19 @@ data class MeResponse(
     val memberships: List<AccountMembershipDto>,
 )
 
+/** The invoice-header details of one user; see V6__user_profiles.sql for updatedAtMillis' role. */
+@Serializable
+data class ProfileDto(
+    val name: String,
+    val role: String? = null,
+    val phone: String? = null,
+    val email: String? = null,
+    val abn: String? = null,
+    val bankBsb: String? = null,
+    val bankAccount: String? = null,
+    val updatedAtMillis: Long,
+)
+
 @Serializable
 data class MemberDto(
     val userId: String,

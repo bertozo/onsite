@@ -54,6 +54,18 @@ export interface MemberDto {
   role: Role;
 }
 
+/** The signed-in user's invoice-header details; updatedAtMillis is the client's own edit time (last-write-wins). */
+export interface ProfileDto {
+  name: string;
+  role: string | null;
+  phone: string | null;
+  email: string | null;
+  abn: string | null;
+  bankBsb: string | null;
+  bankAccount: string | null;
+  updatedAtMillis: number;
+}
+
 export interface ConnectionPlannedJobRequest {
   id: string;
   dateEpochDay: number;

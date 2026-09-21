@@ -3,7 +3,7 @@ import { backendApi } from "../lib/backendApi";
 import type { ClientRequest, InvoiceRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
 import { buildInvoiceLines, invoiceTotalAmount, invoiceTotalHours, lineAmount, lineHours, type InvoiceLine } from "../lib/invoiceLogic";
 import { epochDayToLabel, formatMoney, millisToLocalEpochDay, millisToTimeInput, todayEpochDay } from "../lib/format";
-import { loadProfile, saveProfile, type BusinessProfile } from "../lib/profileStore";
+import { loadProfile, saveProfile, syncProfile, type BusinessProfile } from "../lib/profileStore";
 import { loadReportColumns } from "../lib/columnPrefs";
 import type { ReportColumn } from "../lib/reportLogic";
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from "../components/ui";
@@ -337,6 +337,9 @@ function InvoiceDetailModal({
 }) {
   const [profile, setProfile] = useState<BusinessProfile>(loadProfile());
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    syncProfile().then(setProfile);
+  }, []);
   const invoiceSessions = sessions.filter((s) => s.invoiceId === invoice.id);
   const lines = buildInvoiceLines(invoiceSessions, sitesByLabel, invoice.hourlyRate ?? null);
   const columns = loadReportColumns();
@@ -386,6 +389,7 @@ function InvoiceDetailModal({
         <div className="mb-6 flex justify-between">
           <div>
             <p className="text-lg font-semibold">{profile.name || "Sua empresa"}</p>
+            {profile.role && <p className="text-xs text-slate-500">{profile.role}</p>}
             {profile.abn && <p className="text-xs text-slate-500">ABN: {profile.abn}</p>}
             {profile.phone && <p className="text-xs text-slate-500">{profile.phone}</p>}
             {profile.email && <p className="text-xs text-slate-500">{profile.email}</p>}
@@ -454,10 +458,11 @@ function InvoiceDetailModal({
           </div>
         </div>
 
-        {profile.bankDetails && (
+        {(profile.bankBsb || profile.bankAccount) && (
           <div className="mt-4 border-t border-dashed border-slate-200 pt-3 text-xs text-slate-500">
             <p className="font-medium text-slate-600">Dados para pagamento</p>
-            <p className="whitespace-pre-wrap">{profile.bankDetails}</p>
+            {profile.bankBsb && <p>BSB: {profile.bankBsb}</p>}
+            {profile.bankAccount && <p>Conta: {profile.bankAccount}</p>}
           </div>
         )}
       </div>
@@ -481,11 +486,13 @@ function ProfileEditorHint({ profile, onSaved }: { profile: BusinessProfile; onS
     <div className="mt-3 space-y-2 rounded-lg border border-slate-200 p-3 print:hidden">
       <div className="grid grid-cols-2 gap-2">
         <Input placeholder="Nome da empresa" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <Input placeholder="Cargo" value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />
         <Input placeholder="ABN" value={draft.abn} onChange={(e) => setDraft({ ...draft, abn: e.target.value })} />
         <Input placeholder="Telefone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
         <Input placeholder="E-mail" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+        <Input placeholder="BSB" value={draft.bankBsb} onChange={(e) => setDraft({ ...draft, bankBsb: e.target.value })} />
+        <Input placeholder="Número da conta" value={draft.bankAccount} onChange={(e) => setDraft({ ...draft, bankAccount: e.target.value })} />
       </div>
-      <Textarea placeholder="Dados bancários / forma de pagamento" rows={2} value={draft.bankDetails} onChange={(e) => setDraft({ ...draft, bankDetails: e.target.value })} />
       <div className="flex justify-end gap-2">
         <Button
           variant="secondary"
@@ -498,8 +505,7 @@ function ProfileEditorHint({ profile, onSaved }: { profile: BusinessProfile; onS
         </Button>
         <Button
           onClick={() => {
-            saveProfile(draft);
-            onSaved(draft);
+            saveProfile(draft).then(onSaved);
             setEditing(false);
           }}
         >

@@ -2,12 +2,14 @@ package com.xbertz.onsite.backend.identity
 
 import com.xbertz.onsite.backend.db.tables.Accounts
 import com.xbertz.onsite.backend.db.tables.Memberships
+import com.xbertz.onsite.backend.db.tables.UserProfiles
 import com.xbertz.onsite.backend.db.tables.Users
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.statements.UpdateBuilder
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
@@ -102,6 +104,53 @@ class IdentityRepository {
                 )
             }
     }
+
+    fun findProfile(userId: UUID): ProfileDto? = transaction {
+        UserProfiles.selectAll().where { UserProfiles.userId eq userId }.singleOrNull()?.toProfileDto()
+    }
+
+    /**
+     * Last-write-wins on the client's own edit time: a stale save (an older updatedAtMillis
+     * than what's stored, e.g. a phone that synced late) is answered with the current row
+     * instead of overwriting it, so the caller always gets back whichever version won.
+     */
+    fun saveProfile(userId: UUID, incoming: ProfileDto): ProfileDto = transaction {
+        val existing = UserProfiles.selectAll().where { UserProfiles.userId eq userId }.singleOrNull()
+        if (existing != null && existing[UserProfiles.updatedAtMillis] > incoming.updatedAtMillis) {
+            return@transaction existing.toProfileDto()
+        }
+        if (existing == null) {
+            UserProfiles.insert {
+                it[UserProfiles.userId] = userId
+                fill(it, incoming)
+            }
+        } else {
+            UserProfiles.update({ UserProfiles.userId eq userId }) { fill(it, incoming) }
+        }
+        incoming
+    }
+
+    private fun fill(statement: UpdateBuilder<*>, dto: ProfileDto) {
+        statement[UserProfiles.name] = dto.name
+        statement[UserProfiles.role] = dto.role
+        statement[UserProfiles.phone] = dto.phone
+        statement[UserProfiles.email] = dto.email
+        statement[UserProfiles.abn] = dto.abn
+        statement[UserProfiles.bankBsb] = dto.bankBsb
+        statement[UserProfiles.bankAccount] = dto.bankAccount
+        statement[UserProfiles.updatedAtMillis] = dto.updatedAtMillis
+    }
+
+    private fun ResultRow.toProfileDto() = ProfileDto(
+        name = this[UserProfiles.name],
+        role = this[UserProfiles.role],
+        phone = this[UserProfiles.phone],
+        email = this[UserProfiles.email],
+        abn = this[UserProfiles.abn],
+        bankBsb = this[UserProfiles.bankBsb],
+        bankAccount = this[UserProfiles.bankAccount],
+        updatedAtMillis = this[UserProfiles.updatedAtMillis],
+    )
 
     private fun loadMe(userId: UUID): MeResponse {
         val user = Users.selectAll().where { Users.id eq userId }.single()

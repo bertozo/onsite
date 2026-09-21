@@ -93,6 +93,35 @@ paths:
         "404":
           description: No `users` row yet - call `/v1/me/bootstrap` first.
 
+  /v1/me/profile:
+    get:
+      tags: [Identity]
+      summary: Get the caller's invoice-header profile
+      description: Per user, not per account - ignores X-Account-Id. Both apps reconcile against this row by last-write-wins on updatedAtMillis.
+      responses:
+        "200":
+          description: The stored profile.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfileDto" }
+        "404":
+          description: No profile saved on any device yet.
+    put:
+      tags: [Identity]
+      summary: Save the caller's invoice-header profile
+      description: Last-write-wins on the client's own updatedAtMillis - a save older than what is stored is ignored and the current row is returned instead.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProfileDto" }
+      responses:
+        "200":
+          description: Whichever version won.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProfileDto" }
+
   /v1/me/account-members:
     get:
       tags: [Identity]
@@ -714,6 +743,19 @@ components:
         memberships:
           type: array
           items: { $ref: "#/components/schemas/AccountMembershipDto" }
+
+    ProfileDto:
+      type: object
+      required: [name, updatedAtMillis]
+      properties:
+        name: { type: string }
+        role: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        abn: { type: string, nullable: true }
+        bankBsb: { type: string, nullable: true }
+        bankAccount: { type: string, nullable: true }
+        updatedAtMillis: { type: integer, format: int64, description: The client's own edit time (epoch millis), used for last-write-wins. }
 
     MemberDto:
       type: object

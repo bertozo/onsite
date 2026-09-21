@@ -16,6 +16,7 @@ import type {
   JobTypeRequest,
   MeResponse,
   MemberDto,
+  ProfileDto,
   PlannedJobRequest,
   SiteRequest,
   TrackingSessionRequest,
@@ -95,6 +96,14 @@ export const backendApi = {
   listEmployerConnections: () => request<ConnectionDto[]>("GET", "/v1/connections"),
   revokeConnection: (connectionId: string) => request<void>("DELETE", `/v1/connections/${connectionId}`),
   listAccountMembers: () => request<MemberDto[]>("GET", "/v1/me/account-members"),
+  /** Null until the user has saved a profile on any device. */
+  getProfile: () =>
+    request<ProfileDto>("GET", "/v1/me/profile").catch((e) => {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }),
+  /** Returns whichever version won last-write-wins server side. */
+  putProfile: (profile: ProfileDto) => request<ProfileDto>("PUT", "/v1/me/profile", profile),
   createConnectionPlannedJob: (connectionId: string, req: ConnectionPlannedJobRequest) =>
     request<void>("POST", `/v1/connections/${connectionId}/planned-jobs`, req),
   listConnectionSessions: (connectionId: string) =>

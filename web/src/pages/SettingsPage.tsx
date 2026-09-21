@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { backendApi, ApiError } from "../lib/backendApi";
 import { useAuth } from "../context/AuthContext";
 import type { ClientRequest, ConnectionDto, ConnectionInviteDto, ConnectionSessionDto, InviteDto, MemberDto } from "../lib/types";
-import { loadProfile, saveProfile, type BusinessProfile } from "../lib/profileStore";
+import { loadProfile, saveProfile, syncProfile, type BusinessProfile } from "../lib/profileStore";
 import { loadReportColumns, saveReportColumns } from "../lib/columnPrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
 import { epochDayToIsoDate, formatDateTime, isoDateToEpochDay, timeInputToMinuteOfDay, todayEpochDay } from "../lib/format";
@@ -41,11 +41,18 @@ function BusinessProfileCard() {
   const [profile, setProfile] = useState<BusinessProfile>(loadProfile());
   const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    syncProfile().then(setProfile);
+  }, []);
+
   return (
-    <SectionCard title="Minha empresa" subtitle="Aparece no cabeçalho das faturas geradas neste navegador">
+    <SectionCard title="Minha empresa" subtitle="Aparece no cabeçalho das faturas, aqui e no celular">
       <div className="grid grid-cols-2 gap-3">
         <Field label="Nome da empresa">
           <Input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} />
+        </Field>
+        <Field label="Cargo">
+          <Input value={profile.role} onChange={(e) => setProfile({ ...profile, role: e.target.value })} />
         </Field>
         <Field label="ABN">
           <Input value={profile.abn} onChange={(e) => setProfile({ ...profile, abn: e.target.value })} />
@@ -56,16 +63,21 @@ function BusinessProfileCard() {
         <Field label="E-mail">
           <Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
         </Field>
+        <Field label="BSB">
+          <Input value={profile.bankBsb} onChange={(e) => setProfile({ ...profile, bankBsb: e.target.value })} />
+        </Field>
+        <Field label="Número da conta">
+          <Input value={profile.bankAccount} onChange={(e) => setProfile({ ...profile, bankAccount: e.target.value })} />
+        </Field>
       </div>
-      <Field label="Dados bancários (impresso na fatura)">
-        <Input value={profile.bankDetails} onChange={(e) => setProfile({ ...profile, bankDetails: e.target.value })} />
-      </Field>
       <div className="mt-3 flex items-center gap-3">
         <Button
           onClick={() => {
-            saveProfile(profile);
-            setSaved(true);
-            setTimeout(() => setSaved(false), 2000);
+            saveProfile(profile).then((winner) => {
+              setProfile(winner);
+              setSaved(true);
+              setTimeout(() => setSaved(false), 2000);
+            });
           }}
         >
           Salvar
