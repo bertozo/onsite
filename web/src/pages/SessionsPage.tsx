@@ -3,6 +3,7 @@ import { backendApi, ApiError } from "../lib/backendApi";
 import { useCrud } from "../lib/useCrud";
 import type { ClientRequest, JobTypeRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
 import { combineLocalDateTime, formatHours, formatMoney, millisToDateInput, millisToTimeInput } from "../lib/format";
+import { amountOk, parseAmount, VALIDATION_MESSAGES } from "../lib/validators";
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner } from "../components/ui";
 
 const sessionApi = {
@@ -175,6 +176,7 @@ function SessionFormModal({
   const [startTime, setStartTime] = useState(initial ? millisToTimeInput(initial.startTimestampMillis) : "08:00");
   const [endTime, setEndTime] = useState(initial?.stopTimestampMillis != null ? millisToTimeInput(initial.stopTimestampMillis) : "16:00");
   const [hourlyRate, setHourlyRate] = useState(initial?.hourlyRate?.toString() ?? "");
+  const rateError = amountOk(hourlyRate) ? undefined : VALIDATION_MESSAGES.amount;
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -206,7 +208,7 @@ function SessionFormModal({
             stopTimestampMillis: stop,
             stopLatitude: selectedSite?.latitude ?? 0,
             stopLongitude: selectedSite?.longitude ?? 0,
-            hourlyRate: hourlyRate ? Number(hourlyRate) : null,
+            hourlyRate: hourlyRate.trim() ? parseAmount(hourlyRate) : null,
             invoiceId: initial?.invoiceId ?? null,
           });
           setSaving(false);
@@ -253,8 +255,12 @@ function SessionFormModal({
             <Input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} required />
           </Field>
         </div>
-        <Field label="Valor/h (substitui o do cliente)" hint={selectedClient?.hourlyRate != null ? `Padrão do cliente: $${selectedClient.hourlyRate.toFixed(2)}` : undefined}>
-          <Input type="number" step="0.01" min="0" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+        <Field
+          label="Valor/h (substitui o do cliente)"
+          hint={selectedClient?.hourlyRate != null ? `Padrão do cliente: ${selectedClient.hourlyRate.toFixed(2)}` : undefined}
+          error={rateError}
+        >
+          <Input inputMode="decimal" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} invalid={!!rateError} />
         </Field>
 
         {formError && <ErrorBanner message={formError} />}
@@ -264,7 +270,7 @@ function SessionFormModal({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || !!rateError}>
             {saving && <Spinner className="h-4 w-4" />}
             Salvar
           </Button>

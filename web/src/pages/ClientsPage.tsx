@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCrud } from "../lib/useCrud";
 import type { ClientRequest } from "../lib/types";
 import { Button, Card, ConfirmDialog, EmptyState, Field, Input, Modal, PageHeader, Spinner } from "../components/ui";
+import { clientErrors, hasErrors, parseAmount } from "../lib/validators";
 
 const api = {
   list: backendApi.listClients,
@@ -114,6 +115,8 @@ function ClientFormModal({
   const [email, setEmail] = useState(initial?.email ?? "");
   const [hourlyRate, setHourlyRate] = useState(initial?.hourlyRate?.toString() ?? "");
   const [saving, setSaving] = useState(false);
+  const errors = clientErrors({ abn, phone, email, hourlyRate });
+  const canSave = name.trim() !== "" && !hasErrors(errors);
 
   return (
     <Modal title={initial ? "Editar cliente" : "Novo cliente"} onClose={onClose}>
@@ -121,6 +124,7 @@ function ClientFormModal({
         className="space-y-3"
         onSubmit={async (e) => {
           e.preventDefault();
+          if (!canSave) return;
           setSaving(true);
           await onSave({
             id: initial?.id ?? crypto.randomUUID(),
@@ -128,7 +132,7 @@ function ClientFormModal({
             abn: abn.trim() || null,
             phone: phone.trim() || null,
             email: email.trim() || null,
-            hourlyRate: hourlyRate ? Number(hourlyRate) : null,
+            hourlyRate: hourlyRate.trim() ? parseAmount(hourlyRate) : null,
             createdAtMillis: initial?.createdAtMillis ?? Date.now(),
           });
           setSaving(false);
@@ -137,23 +141,23 @@ function ClientFormModal({
         <Field label="Nome">
           <Input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
         </Field>
-        <Field label="ABN">
-          <Input value={abn} onChange={(e) => setAbn(e.target.value)} />
+        <Field label="ABN" error={errors.abn}>
+          <Input value={abn} onChange={(e) => setAbn(e.target.value)} invalid={!!errors.abn} />
         </Field>
-        <Field label="Telefone">
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+        <Field label="Telefone" error={errors.phone}>
+          <Input value={phone} onChange={(e) => setPhone(e.target.value)} invalid={!!errors.phone} />
         </Field>
-        <Field label="E-mail">
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label="E-mail" error={errors.email}>
+          <Input value={email} onChange={(e) => setEmail(e.target.value)} invalid={!!errors.email} />
         </Field>
-        <Field label="Valor/h padrão (AUD)">
-          <Input type="number" step="0.01" min="0" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+        <Field label="Valor/h padrão (AUD)" error={errors.hourlyRate}>
+          <Input inputMode="decimal" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} invalid={!!errors.hourlyRate} />
         </Field>
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving || !canSave}>
             {saving && <Spinner className="h-4 w-4" />}
             Salvar
           </Button>

@@ -4,6 +4,7 @@ import type { ClientRequest, InvoiceRequest, SiteRequest, TrackingSessionRequest
 import { buildInvoiceLines, invoiceTotalAmount, invoiceTotalHours, lineAmount, lineHours, type InvoiceLine } from "../lib/invoiceLogic";
 import { epochDayToLabel, formatMoney, millisToLocalEpochDay, millisToTimeInput, todayEpochDay } from "../lib/format";
 import { loadProfile, saveProfile, syncProfile, type BusinessProfile } from "../lib/profileStore";
+import { amountOk, hasErrors, parseAmount, profileErrors, VALIDATION_MESSAGES } from "../lib/validators";
 import { loadReportColumns } from "../lib/columnPrefs";
 import type { ReportColumn } from "../lib/reportLogic";
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from "../components/ui";
@@ -167,7 +168,8 @@ function NewInvoiceModal({
     () => sessions.filter((s) => s.clientName === client?.name && s.stopTimestampMillis != null && s.invoiceId == null),
     [sessions, client],
   );
-  const rate = hourlyRate ? Number(hourlyRate) : null;
+  const rateError = amountOk(hourlyRate) ? undefined : VALIDATION_MESSAGES.amount;
+  const rate = hourlyRate.trim() && !rateError ? parseAmount(hourlyRate) : null;
   const baseLines = useMemo(() => buildInvoiceLines(unbilled, sitesByLabel, rate), [unbilled, sitesByLabel, rate]);
 
   /**
@@ -255,8 +257,8 @@ function NewInvoiceModal({
             <Input value={number} onChange={(e) => setNumber(e.target.value)} />
           </Field>
         </div>
-        <Field label="Valor/h padrão" hint="Sessões com valor próprio mantêm seu valor individual">
-          <Input type="number" step="0.01" min="0" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} />
+        <Field label="Valor/h padrão" hint="Sessões com valor próprio mantêm seu valor individual" error={rateError}>
+          <Input inputMode="decimal" value={hourlyRate} onChange={(e) => setHourlyRate(e.target.value)} invalid={!!rateError} />
         </Field>
         <Field label="Observações">
           <Textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
@@ -310,7 +312,7 @@ function NewInvoiceModal({
           <Button variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button onClick={handleCreate} disabled={saving || lines.length === 0}>
+          <Button onClick={handleCreate} disabled={saving || lines.length === 0 || !!rateError}>
             {saving && <Spinner className="h-4 w-4" />}
             Gerar fatura
           </Button>
@@ -475,6 +477,8 @@ function InvoiceDetailModal({
 function ProfileEditorHint({ profile, onSaved }: { profile: BusinessProfile; onSaved: (p: BusinessProfile) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(profile);
+  const errors = profileErrors(draft);
+  const canSave = draft.name.trim() !== "" && !hasErrors(errors);
   if (!editing) {
     return (
       <button onClick={() => setEditing(true)} className="mt-3 text-xs text-violet-600 hover:underline print:hidden">
@@ -487,12 +491,13 @@ function ProfileEditorHint({ profile, onSaved }: { profile: BusinessProfile; onS
       <div className="grid grid-cols-2 gap-2">
         <Input placeholder="Nome da empresa" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         <Input placeholder="Cargo" value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />
-        <Input placeholder="ABN" value={draft.abn} onChange={(e) => setDraft({ ...draft, abn: e.target.value })} />
-        <Input placeholder="Telefone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} />
-        <Input placeholder="E-mail" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
-        <Input placeholder="BSB" value={draft.bankBsb} onChange={(e) => setDraft({ ...draft, bankBsb: e.target.value })} />
-        <Input placeholder="Número da conta" value={draft.bankAccount} onChange={(e) => setDraft({ ...draft, bankAccount: e.target.value })} />
+        <Input placeholder="ABN" value={draft.abn} onChange={(e) => setDraft({ ...draft, abn: e.target.value })} invalid={!!errors.abn} />
+        <Input placeholder="Telefone" value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} invalid={!!errors.phone} />
+        <Input placeholder="E-mail" value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} invalid={!!errors.email} />
+        <Input placeholder="BSB" value={draft.bankBsb} onChange={(e) => setDraft({ ...draft, bankBsb: e.target.value })} invalid={!!errors.bsb} />
+        <Input placeholder="Número da conta" value={draft.bankAccount} onChange={(e) => setDraft({ ...draft, bankAccount: e.target.value })} invalid={!!errors.accountNumber} />
       </div>
+      {hasErrors(errors) && <p className="text-xs text-red-600">{Object.values(errors)[0]}</p>}
       <div className="flex justify-end gap-2">
         <Button
           variant="secondary"
@@ -504,6 +509,7 @@ function ProfileEditorHint({ profile, onSaved }: { profile: BusinessProfile; onS
           Cancelar
         </Button>
         <Button
+          disabled={!canSave}
           onClick={() => {
             saveProfile(draft).then(onSaved);
             setEditing(false);

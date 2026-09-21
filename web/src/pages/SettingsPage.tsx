@@ -3,6 +3,7 @@ import { backendApi, ApiError } from "../lib/backendApi";
 import { useAuth } from "../context/AuthContext";
 import type { ClientRequest, ConnectionDto, ConnectionInviteDto, ConnectionSessionDto, InviteDto, MemberDto } from "../lib/types";
 import { loadProfile, saveProfile, syncProfile, type BusinessProfile } from "../lib/profileStore";
+import { hasErrors, profileErrors } from "../lib/validators";
 import { loadReportColumns, saveReportColumns } from "../lib/columnPrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
 import { epochDayToIsoDate, formatDateTime, isoDateToEpochDay, timeInputToMinuteOfDay, todayEpochDay } from "../lib/format";
@@ -44,6 +45,8 @@ function BusinessProfileCard() {
   useEffect(() => {
     syncProfile().then(setProfile);
   }, []);
+  const errors = profileErrors(profile);
+  const canSave = profile.name.trim() !== "" && !hasErrors(errors);
 
   return (
     <SectionCard title="Minha empresa" subtitle="Aparece no cabeçalho das faturas, aqui e no celular">
@@ -54,24 +57,25 @@ function BusinessProfileCard() {
         <Field label="Cargo">
           <Input value={profile.role} onChange={(e) => setProfile({ ...profile, role: e.target.value })} />
         </Field>
-        <Field label="ABN">
-          <Input value={profile.abn} onChange={(e) => setProfile({ ...profile, abn: e.target.value })} />
+        <Field label="ABN" error={errors.abn}>
+          <Input value={profile.abn} onChange={(e) => setProfile({ ...profile, abn: e.target.value })} invalid={!!errors.abn} />
         </Field>
-        <Field label="Telefone">
-          <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
+        <Field label="Telefone" error={errors.phone}>
+          <Input value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} invalid={!!errors.phone} />
         </Field>
-        <Field label="E-mail">
-          <Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
+        <Field label="E-mail" error={errors.email}>
+          <Input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} invalid={!!errors.email} />
         </Field>
-        <Field label="BSB">
-          <Input value={profile.bankBsb} onChange={(e) => setProfile({ ...profile, bankBsb: e.target.value })} />
+        <Field label="BSB" error={errors.bsb}>
+          <Input value={profile.bankBsb} onChange={(e) => setProfile({ ...profile, bankBsb: e.target.value })} invalid={!!errors.bsb} />
         </Field>
-        <Field label="Número da conta">
-          <Input value={profile.bankAccount} onChange={(e) => setProfile({ ...profile, bankAccount: e.target.value })} />
+        <Field label="Número da conta" error={errors.accountNumber}>
+          <Input value={profile.bankAccount} onChange={(e) => setProfile({ ...profile, bankAccount: e.target.value })} invalid={!!errors.accountNumber} />
         </Field>
       </div>
       <div className="mt-3 flex items-center gap-3">
         <Button
+          disabled={!canSave}
           onClick={() => {
             saveProfile(profile).then((winner) => {
               setProfile(winner);
