@@ -1,0 +1,24 @@
+@startuml OnSite_Architecture
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+title OnSite Architecture - Container Diagram
+
+Container(android, "Android App", "Kotlin, Jetpack Compose", "Field client - GPS/timer tracking, offline-first (Room DB + sync queue)")
+Container(web, "Web App", "React, TypeScript, Vite", "Desktop management client - clients, invoices, planning. No offline cache")
+
+System_Ext(supabase, "Supabase Auth", "GoTrue (managed, external) - identity provider, issues JWTs")
+
+System_Boundary(infra, "Self-hosted (Docker Compose)") {
+    Container(backend, "Backend API", "Kotlin, Ktor (modular monolith)", "REST API for domain data. Verifies Supabase JWTs; never sees a password")
+    ContainerDb(db, "PostgreSQL", "Flyway migrations", "Accounts, memberships, domain data")
+}
+
+Rel(android, backend, "REST/HTTPS", "Bearer JWT + X-Account-Id")
+Rel(web, backend, "REST/HTTPS", "Bearer JWT + X-Account-Id")
+Rel(android, supabase, "REST/HTTPS", "sign-in/up, refresh")
+Rel(web, supabase, "REST/HTTPS", "sign-in/up, refresh")
+Rel(backend, db, "JDBC")
+Rel_Back(backend, supabase, "verifies JWT", "shared secret, no runtime call")
+
+@enduml
