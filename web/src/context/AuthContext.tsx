@@ -3,6 +3,7 @@ import { backendApi, setActiveAccountId as setApiActiveAccountId } from "../lib/
 import { mapAuthError } from "../lib/authError";
 import * as sessionStore from "../lib/sessionStore";
 import * as supabaseAuth from "../lib/supabaseAuth";
+import { SupabaseAuthError } from "../lib/supabaseAuth";
 import type { AccountMembershipDto, MeResponse } from "../lib/types";
 
 export type AuthState =
@@ -170,6 +171,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const openPasswordReset = useCallback(() => setPasswordReset({ step: "email" }), []);
   const dismissPasswordReset = useCallback(() => setPasswordReset({ step: "hidden" }), []);
 
+  // Moves on to the code step regardless of whether the email is registered, so this can't be
+  // used to probe accounts - except when Supabase rejects the request for being rate limited,
+  // which reveals nothing about the account and, left silent, sends the user to type in a code
+  // from an email that was never actually sent (requesting a new code invalidates whatever
+  // token they were already holding).
   const sendPasswordResetCode = useCallback(async (email: string) => {
     const trimmed = email.trim();
     if (!trimmed.includes("@")) {
@@ -177,7 +183,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     setPasswordReset({ step: "email", loading: true });
-    await supabaseAuth.recover(trimmed).catch(() => undefined);
+    try {
+      await supabaseAuth.recover(trimmed);
+    } catch (e) {
+      if (e instanceof SupabaseAuthError && e.code === "over_email_send_rate_limit") {
+        setPasswordReset({ step: "email", error: mapAuthError(e) });
+        return;
+      }
+    }
     setPasswordReset({ step: "code", email: trimmed });
   }, []);
 

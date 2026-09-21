@@ -198,7 +198,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
         _passwordReset.value = PasswordResetUiState.EnteringEmail(loading = true)
         viewModelScope.launch {
-            runCatching { SupabaseAuth.recover(trimmed) }
+            val error = runCatching { SupabaseAuth.recover(trimmed) }.exceptionOrNull() as? SupabaseAuthException
+            if (error?.code == "over_email_send_rate_limit") {
+                _passwordReset.value = PasswordResetUiState.EnteringEmail(error = mapAuthError(error))
+                return@launch
+            }
             _passwordReset.value = PasswordResetUiState.EnteringCode(email = trimmed)
         }
     }
@@ -239,6 +243,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun completeLogin(token: String) {
+        "over_email_send_rate_limit" -> UiMessage(R.string.reset_password_error_rate_limited)
         val me = BackendApi.bootstrap(token)
         val personalAccount = me.memberships.mine(me.email)
         sessionStore.save(token, me.email, personalAccount.accountId)

@@ -319,6 +319,7 @@
     <string name="reset_password_confirm_button">Restablecer contraseña</string>
     <string name="reset_password_error_code_required">Introduce el código que recibiste por correo.</string>
     <string name="reset_password_error_invalid_code">Ese código es incorrecto o ha expirado.</string>
+    <string name="reset_password_error_rate_limited">Ya solicitaste un código hace poco. Espera un minuto antes de volver a intentarlo.</string>
     <string name="signup_confirmation_sent">Confirma tu cuenta con el correo que te enviamos y luego inicia sesión.</string>
     <string name="login_error_invalid_email">Introduce un correo válido.</string>
     <string name="login_error_password_required">Introduce tu contraseña.</string>

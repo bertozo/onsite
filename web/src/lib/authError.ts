@@ -16,6 +16,8 @@ export function mapAuthError(e: unknown, fallback = "Não foi possível entrar. 
     case "otp_expired":
     case "otp_disabled":
       return "Código inválido ou expirado.";
+    case "over_email_send_rate_limit":
+      return "Você já pediu um código recentemente. Aguarde um minuto antes de tentar de novo.";
     default:
       return fallback;
   }

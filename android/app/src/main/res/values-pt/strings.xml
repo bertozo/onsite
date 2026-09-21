@@ -319,6 +319,7 @@
     <string name="reset_password_confirm_button">Redefinir senha</string>
     <string name="reset_password_error_code_required">Informe o código recebido por e-mail.</string>
     <string name="reset_password_error_invalid_code">Esse código está incorreto ou expirou.</string>
+    <string name="reset_password_error_rate_limited">Você já pediu um código recentemente. Aguarde um minuto antes de tentar de novo.</string>
     <string name="signup_confirmation_sent">Confirme sua conta pelo e-mail que enviamos e depois faça login.</string>
     <string name="login_error_invalid_email">Informe um e-mail válido.</string>
     <string name="login_error_password_required">Informe sua senha.</string>
