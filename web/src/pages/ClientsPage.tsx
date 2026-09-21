@@ -23,7 +23,7 @@ export function ClientsPage() {
     <div>
       <PageHeader
         title="Clientes"
-        subtitle="Empresas para quem você trabalha"
+        subtitle="Para quem você trabalha"
         action={canManage && <Button onClick={() => setEditing("new")}>+ Novo cliente</Button>}
       />
 
