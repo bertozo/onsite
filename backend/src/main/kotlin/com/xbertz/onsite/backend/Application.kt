@@ -23,6 +23,7 @@ import com.xbertz.onsite.backend.identity.InviteRepository
 import com.xbertz.onsite.backend.identity.identityRoutes
 import com.xbertz.onsite.backend.identity.inviteRoutes
 import com.xbertz.onsite.backend.plugins.configureStatusPages
+import io.ktor.http.HttpMethod
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -53,6 +54,8 @@ fun Application.module(config: AppConfig) {
 
     install(CORS) {
         anyHost() // tightened once the web app's real origin is known (Phase 6)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
         allowHeader("Authorization")
         allowHeader("Content-Type")
         allowHeader("X-Account-Id")
