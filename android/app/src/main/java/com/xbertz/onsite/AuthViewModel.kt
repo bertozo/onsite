@@ -18,6 +18,7 @@ import com.xbertz.onsite.backend.SupabaseAuthResult
 import com.xbertz.onsite.backend.runSync
 import com.xbertz.onsite.backend.wipeLocalDomainData
 import com.xbertz.onsite.data.AppDatabase
+import com.xbertz.onsite.reminders.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -102,6 +103,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 loadConnections()
             }
         }
+    }
+
+    /** A pull can add, move or remove planned jobs, so the reminder alarms are re-armed after every sync. */
+    private suspend fun syncAndReschedule(token: String) {
+        runCatching { runSync(db, token) }
+        runCatching { ReminderScheduler.reschedule(getApplication()) }
     }
 
     private suspend fun refreshMe(token: String, email: String) {
@@ -254,7 +261,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         BackendApi.activeAccountId = null
 
         _state.value = AuthUiState.SyncingData
-        runCatching { runSync(db, token) }
+        syncAndReschedule(token)
 
         _state.value = AuthUiState.LoggedIn(
             me.email, personalAccount.accountId, personalAccount.accountName, personalAccount.role, me.memberships
@@ -269,7 +276,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val token = sessionStore.token ?: return
         if (_state.value !is AuthUiState.LoggedIn) return
         viewModelScope.launch {
-            runCatching { runSync(db, token) }
+            syncAndReschedule(token)
         }
     }
 
@@ -286,11 +293,11 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
         _state.value = AuthUiState.SyncingData
         viewModelScope.launch {
-            runCatching { runSync(db, token) }
+            syncAndReschedule(token)
             wipeLocalDomainData(db)
             BackendApi.activeAccountId = accountId
             sessionStore.setActiveAccount(accountId)
-            runCatching { runSync(db, token) }
+            syncAndReschedule(token)
             _state.value = AuthUiState.LoggedIn(
                 current.email, target.accountId, target.accountName, target.role, current.memberships
             )

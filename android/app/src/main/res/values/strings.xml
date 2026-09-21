@@ -53,6 +53,22 @@
     <string name="language_english">English</string>
     <string name="language_portuguese">Português</string>
     <string name="language_spanish">Español</string>
+    <!-- Planning reminders -->
+    <string name="reminders_section">Reminders</string>
+    <string name="reminder_start_setting">Remind me to clock in</string>
+    <string name="reminder_start_setting_subtitle">At the start time of each planned job</string>
+    <string name="reminder_end_setting">Remind me to clock out</string>
+    <string name="reminder_end_setting_subtitle">At the planned end time, or 8 hours after the start when none is set</string>
+    <string name="reminder_exact_alarm_title">Allow exact alarms</string>
+    <string name="reminder_exact_alarm_subtitle">Without this the system may delay a reminder by a few minutes</string>
+    <string name="reminder_notifications_blocked_title">Allow notifications</string>
+    <string name="reminder_notifications_blocked_subtitle">Reminders are notifications; the app is not allowed to show them yet</string>
+    <string name="reminder_channel">Planning reminders</string>
+    <string name="reminder_start_title">Time to clock in</string>
+    <string name="reminder_start_text">%1$s · planned for %2$s</string>
+    <string name="reminder_end_title">Time to clock out</string>
+    <string name="reminder_end_text_running">Your session at %1$s is still running</string>
+    <string name="reminder_end_text_idle">%1$s · planned until %2$s. Log your hours if you worked.</string>
 
     <!-- Reports / invoice -->
     <string name="reports_empty">No entries in the selected period.</string>

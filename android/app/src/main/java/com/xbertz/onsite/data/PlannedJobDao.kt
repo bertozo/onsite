@@ -27,6 +27,9 @@ interface PlannedJobDao {
     @Query("SELECT * FROM planned_jobs ORDER BY dateEpochDay ASC, startMinute ASC, id ASC")
     fun getAll(): Flow<List<PlannedJob>>
 
+    @Query("SELECT * FROM planned_jobs WHERE id = :id")
+    suspend fun getById(id: Long): PlannedJob?
+
     /** Same as [TrackingSessionDao.renameClient]: plans store the client by name. */
     @Query("UPDATE planned_jobs SET clientName = :newName WHERE clientName = :oldName")
     suspend fun renameClient(oldName: String, newName: String)

@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Ongoing "session in progress" notification with a live chronometer (runtime permission on API 33+). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Planning reminders (reminders/ReminderScheduler.kt): exact alarms at a planned job's start/end
+         (user-granted on API 31+, windowed to 10 min otherwise) and re-arming them after a reboot. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <!-- Only below Android 10, where saving to the gallery through MediaStore still needs it. -->
     <uses-permission
@@ -32,6 +36,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".reminders.ReminderReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".reminders.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+            </intent-filter>
+        </receiver>
 
         <provider
             android:name="androidx.core.content.FileProvider"

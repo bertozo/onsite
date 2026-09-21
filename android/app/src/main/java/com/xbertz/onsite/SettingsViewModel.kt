@@ -3,6 +3,7 @@ package com.xbertz.onsite
 import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
+import com.xbertz.onsite.reminders.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -21,6 +22,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     private val _language = MutableStateFlow(LocaleManager.current(application))
     val language: StateFlow<AppLanguage> = _language
 
+    private val _remindStart = MutableStateFlow(ReminderScheduler.isStartEnabled(application))
+    val remindStart: StateFlow<Boolean> = _remindStart
+
+    private val _remindEnd = MutableStateFlow(ReminderScheduler.isEndEnabled(application))
+    val remindEnd: StateFlow<Boolean> = _remindEnd
+
     fun setThemeMode(mode: ThemeMode) {
         prefs.edit().putString(KEY_THEME, mode.name).apply()
         _themeMode.value = mode
@@ -30,6 +37,16 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setLanguage(language: AppLanguage) {
         LocaleManager.save(getApplication(), language)
         _language.value = language
+    }
+
+    fun setRemindStart(enabled: Boolean) {
+        ReminderScheduler.setStartEnabled(getApplication(), enabled)
+        _remindStart.value = enabled
+    }
+
+    fun setRemindEnd(enabled: Boolean) {
+        ReminderScheduler.setEndEnabled(getApplication(), enabled)
+        _remindEnd.value = enabled
     }
 
     private companion object {

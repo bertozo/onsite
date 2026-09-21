@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.data.AppDatabase
+import com.xbertz.onsite.reminders.ReminderScheduler
 import com.xbertz.onsite.data.Client
 import com.xbertz.onsite.data.JobType
 import com.xbertz.onsite.data.PlannedJob
@@ -75,20 +76,24 @@ class PlanningViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             if (job.id != 0L) {
                 dao.update(job)
-                return@launch
-            }
-            dao.insert(job)
-            if (repeatUntil != null) {
-                var next = job.date.plusDays(1)
-                while (!next.isAfter(repeatUntil)) {
-                    dao.insert(job.copy(id = 0L, dateEpochDay = next.toEpochDay()))
-                    next = next.plusDays(1)
+            } else {
+                dao.insert(job)
+                if (repeatUntil != null) {
+                    var next = job.date.plusDays(1)
+                    while (!next.isAfter(repeatUntil)) {
+                        dao.insert(job.copy(id = 0L, dateEpochDay = next.toEpochDay()))
+                        next = next.plusDays(1)
+                    }
                 }
             }
+            ReminderScheduler.reschedule(getApplication())
         }
     }
 
     fun deleteJob(job: PlannedJob) {
-        viewModelScope.launch { dao.delete(job) }
+        viewModelScope.launch {
+            dao.delete(job)
+            ReminderScheduler.reschedule(getApplication())
+        }
     }
 }

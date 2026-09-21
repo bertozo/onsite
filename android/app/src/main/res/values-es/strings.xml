@@ -51,6 +51,22 @@
     <string name="language_english">English</string>
     <string name="language_portuguese">Português</string>
     <string name="language_spanish">Español</string>
+    <!-- Recordatorios de la planificación -->
+    <string name="reminders_section">Recordatorios</string>
+    <string name="reminder_start_setting">Recordarme fichar la entrada</string>
+    <string name="reminder_start_setting_subtitle">A la hora de inicio de cada trabajo planificado</string>
+    <string name="reminder_end_setting">Recordarme fichar la salida</string>
+    <string name="reminder_end_setting_subtitle">A la hora de fin planificada, o 8 horas después del inicio si no hay</string>
+    <string name="reminder_exact_alarm_title">Permitir alarmas exactas</string>
+    <string name="reminder_exact_alarm_subtitle">Sin esto el sistema puede retrasar el recordatorio unos minutos</string>
+    <string name="reminder_notifications_blocked_title">Permitir notificaciones</string>
+    <string name="reminder_notifications_blocked_subtitle">Los recordatorios son notificaciones; la app aún no tiene permiso para mostrarlas</string>
+    <string name="reminder_channel">Recordatorios de la planificación</string>
+    <string name="reminder_start_title">Hora de fichar la entrada</string>
+    <string name="reminder_start_text">%1$s · planificado para las %2$s</string>
+    <string name="reminder_end_title">Hora de fichar la salida</string>
+    <string name="reminder_end_text_running">Tu sesión en %1$s sigue abierta</string>
+    <string name="reminder_end_text_idle">%1$s · planificado hasta las %2$s. Registra tus horas si trabajaste.</string>
 
     <!-- Informes / factura -->
     <string name="reports_empty">No hay registros en el período seleccionado.</string>

@@ -144,6 +144,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -155,6 +156,7 @@ import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
 import com.xbertz.onsite.invoice.buildInvoiceLines
 import com.xbertz.onsite.photo.PhotoStamper
+import com.xbertz.onsite.reminders.ReminderScheduler
 import com.xbertz.onsite.photo.TimestampPosition
 import com.xbertz.onsite.report.ReportColumn
 import com.xbertz.onsite.ui.theme.OnSiteTheme
@@ -187,6 +189,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Alarms are cheap to re-arm and easy to lose (app update, cleared data, a missed boot broadcast).
+        ReminderScheduler.rescheduleAsync(applicationContext)
         setContent {
             val settingsViewModel: SettingsViewModel = viewModel()
             val themeMode by settingsViewModel.themeMode.collectAsState()
@@ -2443,6 +2447,10 @@ fun SettingsScreen(
 
             Spacer(Modifier.height(16.dp))
 
+            ReminderSettingsCard(viewModel)
+
+            Spacer(Modifier.height(16.dp))
+
             ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Column(modifier = Modifier.padding(vertical = 8.dp)) {
                     Text(
@@ -3028,6 +3036,164 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
+}
+
+/**
+ * The planning-reminder toggles (see reminders/ReminderScheduler.kt). On API 31+ an exact
+ * alarm needs a permission the user grants on a system screen; the row offering it is shown
+ * only while it's missing, and re-checked on resume since the grant happens outside the app.
+ */
+@Composable
+private fun ReminderSettingsCard(viewModel: SettingsViewModel) {
+    val remindStart by viewModel.remindStart.collectAsState()
+    val remindEnd by viewModel.remindEnd.collectAsState()
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var exactAllowed by remember { mutableStateOf(ReminderScheduler.exactAlarmsAllowed(context)) }
+    var notificationsAllowed by remember { mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled()) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                exactAllowed = ReminderScheduler.exactAlarmsAllowed(context)
+                notificationsAllowed = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    // A reminder is just a notification: switching one on is the natural moment to ask for the
+    // API 33+ permission (until now it was only requested when starting a tracked session).
+    val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        notificationsAllowed = granted
+    }
+    val ensureNotificationsAllowed: () -> Unit = {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notificationsAllowed) {
+            notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(
+                stringResource(R.string.reminders_section),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            )
+            SettingsSwitchRow(
+                icon = Icons.Filled.Login,
+                title = stringResource(R.string.reminder_start_setting),
+                subtitle = stringResource(R.string.reminder_start_setting_subtitle),
+                checked = remindStart,
+                onCheckedChange = { on ->
+                    viewModel.setRemindStart(on)
+                    if (on) ensureNotificationsAllowed()
+                }
+            )
+            SettingsSwitchRow(
+                icon = Icons.Filled.Logout,
+                title = stringResource(R.string.reminder_end_setting),
+                subtitle = stringResource(R.string.reminder_end_setting_subtitle),
+                checked = remindEnd,
+                onCheckedChange = { on ->
+                    viewModel.setRemindEnd(on)
+                    if (on) ensureNotificationsAllowed()
+                }
+            )
+            val anyOn = remindStart || remindEnd
+            if (anyOn && !notificationsAllowed) {
+                SettingsActionRow(
+                    icon = Icons.Filled.NotificationsOff,
+                    title = stringResource(R.string.reminder_notifications_blocked_title),
+                    subtitle = stringResource(R.string.reminder_notifications_blocked_subtitle),
+                    onClick = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                            context.findActivity()?.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS) != false
+                        ) {
+                            ensureNotificationsAllowed()
+                        } else {
+                            context.startActivity(
+                                Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName)
+                            )
+                        }
+                    }
+                )
+            }
+            if (anyOn && !exactAllowed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                SettingsActionRow(
+                    icon = Icons.Filled.Schedule,
+                    title = stringResource(R.string.reminder_exact_alarm_title),
+                    subtitle = stringResource(R.string.reminder_exact_alarm_subtitle),
+                    onClick = {
+                        context.startActivity(
+                            Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                                .setData(Uri.parse("package:${context.packageName}"))
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsActionRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String?,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = if (checked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            if (subtitle != null) {
+                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
 }
 
 @Composable

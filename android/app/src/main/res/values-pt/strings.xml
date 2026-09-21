@@ -51,6 +51,22 @@
     <string name="language_english">English</string>
     <string name="language_portuguese">Português</string>
     <string name="language_spanish">Español</string>
+    <!-- Lembretes do planejamento -->
+    <string name="reminders_section">Lembretes</string>
+    <string name="reminder_start_setting">Lembrar de bater o ponto</string>
+    <string name="reminder_start_setting_subtitle">No horário de início de cada trabalho planejado</string>
+    <string name="reminder_end_setting">Lembrar de finalizar o ponto</string>
+    <string name="reminder_end_setting_subtitle">No horário de término planejado, ou 8 horas após o início quando não houver</string>
+    <string name="reminder_exact_alarm_title">Permitir alarmes exatos</string>
+    <string name="reminder_exact_alarm_subtitle">Sem isso o sistema pode atrasar o lembrete em alguns minutos</string>
+    <string name="reminder_notifications_blocked_title">Permitir notificações</string>
+    <string name="reminder_notifications_blocked_subtitle">Os lembretes são notificações; o app ainda não tem permissão para exibi-las</string>
+    <string name="reminder_channel">Lembretes do planejamento</string>
+    <string name="reminder_start_title">Hora de bater o ponto</string>
+    <string name="reminder_start_text">%1$s · planejado para %2$s</string>
+    <string name="reminder_end_title">Hora de finalizar o ponto</string>
+    <string name="reminder_end_text_running">Sua sessão em %1$s continua aberta</string>
+    <string name="reminder_end_text_idle">%1$s · planejado até %2$s. Registre suas horas se trabalhou.</string>
 
     <!-- Relatórios / invoice -->
     <string name="reports_empty">Nenhum registro no período selecionado.</string>
