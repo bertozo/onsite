@@ -3,10 +3,11 @@ package com.xbertz.onsite
 import android.app.Application
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.xbertz.onsite.log.AppLog
+import com.xbertz.onsite.log.logFailure
 import com.xbertz.onsite.photo.PhotoStamper
 import com.xbertz.onsite.photo.TimestampPosition
 import kotlinx.coroutines.Dispatchers
@@ -69,7 +70,7 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
                     getApplication<Application>().contentResolver.openInputStream(uri)?.use { input ->
                         logoFile.outputStream().use { output -> input.copyTo(output) }
                     } ?: error("no stream")
-                }.isSuccess
+                }.logFailure(TAG, "saving stamp logo").isSuccess
             }
             if (saved) _uiState.update { it.copy(logoPath = logoFile.absolutePath) }
         }
@@ -108,7 +109,7 @@ class PhotoViewModel(application: Application) : AndroidViewModel(application) {
                     } finally {
                         bitmap.recycle()
                     }
-                }.also { file.delete() }.onFailure { Log.e(TAG, "Stamping photo failed", it) }
+                }.also { file.delete() }.onFailure { AppLog.e(TAG, "stamping photo failed", it) }
             }
             _uiState.update {
                 it.copy(

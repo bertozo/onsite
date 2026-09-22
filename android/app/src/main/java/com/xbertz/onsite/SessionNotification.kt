@@ -8,6 +8,7 @@ import android.content.Intent
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.xbertz.onsite.data.TrackingSession
+import com.xbertz.onsite.log.AppLog
 
 /**
  * Ongoing notification shown while a session is being tracked. It uses the system chronometer,
@@ -50,8 +51,9 @@ object SessionNotification {
             .build()
         try {
             manager.notify(NOTIFICATION_ID, notification)
-        } catch (_: SecurityException) {
+        } catch (e: SecurityException) {
             // Permission revoked between the check and the call; the notification is a convenience only.
+            AppLog.w("SessionNotification", "ongoing session notification blocked", e)
         }
     }
 

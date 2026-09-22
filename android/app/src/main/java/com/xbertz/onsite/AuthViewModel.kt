@@ -18,6 +18,8 @@ import com.xbertz.onsite.backend.SupabaseAuthResult
 import com.xbertz.onsite.backend.runSync
 import com.xbertz.onsite.backend.wipeLocalDomainData
 import com.xbertz.onsite.data.AppDatabase
+import com.xbertz.onsite.log.AppLog
+import com.xbertz.onsite.log.logFailure
 import com.xbertz.onsite.reminders.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -63,6 +65,8 @@ sealed interface PasswordResetUiState {
 private fun List<AccountMembershipDto>.mine(email: String): AccountMembershipDto =
     firstOrNull { it.accountName == email } ?: first()
 
+private const val TAG = "Auth"
+
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
     private val sessionStore = SessionStore(application)
     private val db = AppDatabase.getInstance(application)
@@ -107,16 +111,19 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     /** A pull can add, move or remove planned jobs, so the reminder alarms are re-armed after every sync. */
     private suspend fun syncAndReschedule(token: String) {
-        runCatching { runSync(db, token) }
-        runCatching { ReminderScheduler.reschedule(getApplication()) }
+        runCatching { runSync(db, token) }.logFailure(TAG, "sync")
+        runCatching { ReminderScheduler.reschedule(getApplication()) }.logFailure(TAG, "reminder reschedule")
     }
 
     private suspend fun refreshMe(token: String, email: String) {
-        val me = runCatching { BackendApi.me(token) }.getOrNull()
+        val me = runCatching { BackendApi.me(token) }.logFailure(TAG, "GET /v1/me").getOrNull()
         if (me == null) {
             // Offline on cold start: fall back to the cached personal account rather than
             // blocking the whole app on a network call.
             val accountId = sessionStore.accountId
+            // Worth a line of its own: this is the branch behind "the app forgot which
+            // account I was on" and "my team's data vanished", and it is otherwise silent.
+            AppLog.w(TAG, "identity unavailable, falling back to cache cachedAccount=${accountId != null}")
             if (accountId != null) {
                 _state.value = AuthUiState.LoggedIn(email, accountId, email, "OWNER", emptyList())
             } else {
@@ -150,8 +157,12 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val result = SupabaseAuth.signIn(trimmed, password)
                 completeLogin(result.accessToken)
             } catch (e: SupabaseAuthException) {
+                // The code, never the email or password: a log that quotes credentials is
+                // one nobody can safely share back to us.
+                AppLog.w(TAG, "sign-in rejected code=${e.code}")
                 _state.value = AuthUiState.LoggedOut(error = mapAuthError(e))
             } catch (e: Exception) {
+                AppLog.e(TAG, "sign-in failed", e)
                 _state.value = AuthUiState.LoggedOut(error = UiMessage(R.string.login_error_failed))
             }
         }
@@ -176,8 +187,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                         _state.value = AuthUiState.LoggedOut(info = UiMessage(R.string.signup_confirmation_sent))
                 }
             } catch (e: SupabaseAuthException) {
+                AppLog.w(TAG, "sign-up rejected code=${e.code}")
                 _state.value = AuthUiState.LoggedOut(error = mapAuthError(e))
             } catch (e: Exception) {
+                AppLog.e(TAG, "sign-up failed", e)
                 _state.value = AuthUiState.LoggedOut(error = UiMessage(R.string.login_error_failed))
             }
         }
@@ -209,7 +222,9 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         }
         _passwordReset.value = PasswordResetUiState.EnteringEmail(loading = true)
         viewModelScope.launch {
-            val error = runCatching { SupabaseAuth.recover(trimmed) }.exceptionOrNull() as? SupabaseAuthException
+            val error = runCatching { SupabaseAuth.recover(trimmed) }
+                .logFailure(TAG, "password recovery request")
+                .exceptionOrNull() as? SupabaseAuthException
             if (error?.code == "over_email_send_rate_limit") {
                 _passwordReset.value = PasswordResetUiState.EnteringEmail(error = mapAuthError(error))
                 return@launch
@@ -260,6 +275,8 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         sessionStore.save(token, me.email, personalAccount.accountId)
         BackendApi.activeAccountId = null
 
+        AppLog.i(TAG, "signed in account=${personalAccount.accountId} memberships=${me.memberships.size}")
+
         _state.value = AuthUiState.SyncingData
         syncAndReschedule(token)
 
@@ -291,6 +308,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         if (accountId == current.activeAccountId) return
         val target = current.memberships.firstOrNull { it.accountId == accountId } ?: return
 
+        AppLog.i(TAG, "switching account ${current.activeAccountId} -> $accountId")
         _state.value = AuthUiState.SyncingData
         viewModelScope.launch {
             syncAndReschedule(token)
@@ -307,7 +325,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun loadPendingInvites() {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            _pendingInvites.value = runCatching { BackendApi.listMyInvites(token) }.getOrDefault(emptyList())
+            _pendingInvites.value = runCatching { BackendApi.listMyInvites(token) }.logFailure(TAG, "GET /v1/me/invites").getOrDefault(emptyList())
         }
     }
 
@@ -315,7 +333,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val token = sessionStore.token ?: return
         val email = sessionStore.email ?: return
         viewModelScope.launch {
-            runCatching { BackendApi.acceptInvite(token, inviteId) }
+            runCatching { BackendApi.acceptInvite(token, inviteId) }.logFailure(TAG, "POST /v1/me/invites/accept")
             loadPendingInvites()
             refreshMe(token, email)
         }
@@ -325,7 +343,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val token = sessionStore.token ?: return
         val current = _state.value as? AuthUiState.LoggedIn ?: return
         viewModelScope.launch {
-            val result = runCatching { BackendApi.createInvite(token, current.activeAccountId, email.trim()) }
+            val result = runCatching { BackendApi.createInvite(token, current.activeAccountId, email.trim()) }.logFailure(TAG, "POST /v1/accounts/invites")
             onResult(result.isSuccess)
         }
     }
@@ -333,21 +351,21 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun loadPendingConnectionInvites() {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            _pendingConnectionInvites.value = runCatching { BackendApi.listMyConnectionInvites(token) }.getOrDefault(emptyList())
+            _pendingConnectionInvites.value = runCatching { BackendApi.listMyConnectionInvites(token) }.logFailure(TAG, "GET /v1/me/connection-invites").getOrDefault(emptyList())
         }
     }
 
     fun loadConnections() {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            _connections.value = runCatching { BackendApi.listMyConnections(token) }.getOrDefault(emptyList())
+            _connections.value = runCatching { BackendApi.listMyConnections(token) }.logFailure(TAG, "GET /v1/me/connections").getOrDefault(emptyList())
         }
     }
 
     fun loadEmployerConnections() {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            _employerConnections.value = runCatching { BackendApi.listEmployerConnections(token) }.getOrDefault(emptyList())
+            _employerConnections.value = runCatching { BackendApi.listEmployerConnections(token) }.logFailure(TAG, "GET /v1/connections").getOrDefault(emptyList())
         }
     }
 
@@ -355,7 +373,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun loadMembers() {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            _members.value = runCatching { BackendApi.listAccountMembers(token) }.getOrDefault(emptyList())
+            _members.value = runCatching { BackendApi.listAccountMembers(token) }.logFailure(TAG, "GET /v1/me/account-members").getOrDefault(emptyList())
         }
     }
 
@@ -363,7 +381,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun scheduleConnectionJob(connectionId: String, req: ConnectionPlannedJobRequest, onResult: (success: Boolean) -> Unit) {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            val result = runCatching { BackendApi.createConnectionPlannedJob(token, connectionId, req) }
+            val result = runCatching { BackendApi.createConnectionPlannedJob(token, connectionId, req) }.logFailure(TAG, "POST /v1/connections/planned-jobs")
             onResult(result.isSuccess)
         }
     }
@@ -372,7 +390,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun loadConnectionSessions(connectionId: String, onResult: (List<ConnectionSessionDto>) -> Unit) {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            onResult(runCatching { BackendApi.listConnectionSessions(token, connectionId) }.getOrDefault(emptyList()))
+            onResult(runCatching { BackendApi.listConnectionSessions(token, connectionId) }.logFailure(TAG, "GET /v1/connections/sessions").getOrDefault(emptyList()))
         }
     }
 
@@ -388,7 +406,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
             val result = if (remoteClientId == null) {
                 Result.failure(IllegalStateException("client not synced yet"))
             } else {
-                runCatching { BackendApi.acceptConnectionInvite(token, inviteId, remoteClientId) }
+                runCatching { BackendApi.acceptConnectionInvite(token, inviteId, remoteClientId) }.logFailure(TAG, "POST /v1/me/connection-invites/accept")
             }
             loadPendingConnectionInvites()
             loadConnections()
@@ -399,7 +417,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     fun revokeConnection(connectionId: String) {
         val token = sessionStore.token ?: return
         viewModelScope.launch {
-            runCatching { BackendApi.revokeConnection(token, connectionId) }
+            runCatching { BackendApi.revokeConnection(token, connectionId) }.logFailure(TAG, "DELETE /v1/connections")
             loadConnections()
         }
     }
@@ -409,12 +427,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
         val token = sessionStore.token ?: return
         val current = _state.value as? AuthUiState.LoggedIn ?: return
         viewModelScope.launch {
-            val result = runCatching { BackendApi.createConnectionInvite(token, current.activeAccountId, email.trim()) }
+            val result = runCatching { BackendApi.createConnectionInvite(token, current.activeAccountId, email.trim()) }.logFailure(TAG, "POST /v1/accounts/connection-invites")
             onResult(result.isSuccess)
         }
     }
 
     fun logout() {
+        AppLog.i(TAG, "signing out, local data kept")
         sessionStore.clear()
         BackendApi.activeAccountId = null
         _pendingInvites.value = emptyList()

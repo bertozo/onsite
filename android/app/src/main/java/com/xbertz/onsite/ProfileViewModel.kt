@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.xbertz.onsite.data.AppDatabase
 import com.xbertz.onsite.data.Profile
+import com.xbertz.onsite.log.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+
+private const val TAG = "Profile"
 
 data class ProfileUiState(
     val name: String = "",
@@ -77,6 +80,7 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
                     }
                     outFile.absolutePath
                 } catch (e: Exception) {
+                    AppLog.w(TAG, "copying profile photo failed", e)
                     null
                 }
             }

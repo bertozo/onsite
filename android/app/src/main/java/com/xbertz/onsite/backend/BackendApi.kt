@@ -1,9 +1,14 @@
 package com.xbertz.onsite.backend
 
+import com.xbertz.onsite.log.AppLog
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
+import io.ktor.client.plugins.ClientRequestException
+import io.ktor.client.plugins.HttpResponseValidator
+import io.ktor.client.plugins.ResponseException
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.statement.request
 import io.ktor.client.request.delete
 import io.ktor.client.request.get
 import io.ktor.client.request.header
@@ -16,6 +21,7 @@ import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import java.util.UUID
 
 /**
  * `adb reverse tcp:8080 tcp:8080` makes a device's own loopback address reach the backend
@@ -23,6 +29,15 @@ import kotlinx.serialization.json.Json
  * deployment's HTTPS URL once one exists.
  */
 private const val BASE_URL = "http://127.0.0.1:8080"
+
+private const val TAG = "Api"
+
+/**
+ * Minted per request and sent to the backend, which logs it and echoes it back (see the
+ * backend's plugins/Logging.kt). It is the only thing that lets a line in a phone's log
+ * file be matched against the server's own line for the same call.
+ */
+private const val HEADER_REQUEST_ID = "X-Request-Id"
 
 @Serializable
 data class AccountMembershipDto(
@@ -207,6 +222,33 @@ object BackendApi {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
         }
+
+        // A rejected call has to *fail*. Without this, the calls that don't parse a body
+        // (every create/update/delete) treated a 403 or a 500 as success, and SyncEngine
+        // then wrote a SyncMapping saying the row was synced - the local row and the
+        // server disagreeing from then on, silently and permanently.
+        expectSuccess = true
+
+        HttpResponseValidator {
+            validateResponse { response ->
+                val request = response.request
+                AppLog.d(
+                    TAG,
+                    "${request.method.value} ${request.url.encodedPath} status=${response.status.value} " +
+                        "requestId=${request.headers[HEADER_REQUEST_ID] ?: "-"}",
+                )
+            }
+            // Where a non-2xx, and an unreachable backend, become a line someone can read.
+            handleResponseExceptionWithRequest { cause, request ->
+                val status = (cause as? ResponseException)?.response?.status?.value
+                AppLog.w(
+                    TAG,
+                    "${request.method.value} ${request.url.encodedPath} failed status=${status ?: "-"} " +
+                        "requestId=${request.headers[HEADER_REQUEST_ID] ?: "-"}",
+                    cause,
+                )
+            }
+        }
     }
 
     suspend fun bootstrap(token: String): MeResponse =
@@ -247,7 +289,7 @@ object BackendApi {
         http.get("$BASE_URL/v1/connections") { bearerAuth(token) }.body()
 
     suspend fun revokeConnection(token: String, connectionId: String) {
-        http.delete("$BASE_URL/v1/connections/$connectionId") { bearerAuth(token) }
+        deleteIdempotent("$BASE_URL/v1/connections/$connectionId", token)
     }
 
     /** OWNER-only: every member of the active account, for the "assign to" picker. */
@@ -255,9 +297,12 @@ object BackendApi {
         http.get("$BASE_URL/v1/me/account-members") { bearerAuth(token) }.body()
 
     /** Null until the user has saved a profile on any device. */
-    suspend fun getProfile(token: String): ProfileDto? {
-        val response = http.get("$BASE_URL/v1/me/profile") { bearerAuth(token) }
-        return if (response.status == HttpStatusCode.NotFound) null else response.body()
+    suspend fun getProfile(token: String): ProfileDto? = try {
+        http.get("$BASE_URL/v1/me/profile") { bearerAuth(token) }.body()
+    } catch (e: ClientRequestException) {
+        // The documented "nothing saved yet" answer, not a failure - and with
+        // expectSuccess on it arrives as an exception rather than as a status to read.
+        if (e.response.status == HttpStatusCode.NotFound) null else throw e
     }
 
     /** Returns whichever version won last-write-wins server side (see IdentityRepository.saveProfile). */
@@ -282,7 +327,7 @@ object BackendApi {
     }
 
     suspend fun deleteClient(token: String, id: String) {
-        http.delete("$BASE_URL/v1/clients/$id") { bearerAuth(token) }
+        deleteIdempotent("$BASE_URL/v1/clients/$id", token)
     }
 
     suspend fun listClients(token: String): List<ClientRequest> =
@@ -297,7 +342,7 @@ object BackendApi {
     }
 
     suspend fun deleteSite(token: String, id: String) {
-        http.delete("$BASE_URL/v1/sites/$id") { bearerAuth(token) }
+        deleteIdempotent("$BASE_URL/v1/sites/$id", token)
     }
 
     suspend fun listSites(token: String): List<SiteRequest> =
@@ -312,7 +357,7 @@ object BackendApi {
     }
 
     suspend fun deleteJobType(token: String, id: String) {
-        http.delete("$BASE_URL/v1/job-types/$id") { bearerAuth(token) }
+        deleteIdempotent("$BASE_URL/v1/job-types/$id", token)
     }
 
     suspend fun listJobTypes(token: String): List<JobTypeRequest> =
@@ -338,7 +383,7 @@ object BackendApi {
     }
 
     suspend fun deleteTrackingSession(token: String, id: String) {
-        http.delete("$BASE_URL/v1/sessions/$id") { bearerAuth(token) }
+        deleteIdempotent("$BASE_URL/v1/sessions/$id", token)
     }
 
     suspend fun listTrackingSessions(token: String): List<TrackingSessionRequest> =
@@ -353,15 +398,29 @@ object BackendApi {
     }
 
     suspend fun deletePlannedJob(token: String, id: String) {
-        http.delete("$BASE_URL/v1/planned-jobs/$id") { bearerAuth(token) }
+        deleteIdempotent("$BASE_URL/v1/planned-jobs/$id", token)
     }
 
     suspend fun listPlannedJobs(token: String): List<PlannedJobRequest> =
         http.get("$BASE_URL/v1/planned-jobs") { bearerAuth(token) }.body()
+
+    /**
+     * A delete of a row the server no longer has is a delete that got what it wanted, so
+     * 404 counts as success; everything else throws, which is what lets [SyncEngine] keep
+     * the mapping and try the same delete again on the next sync.
+     */
+    private suspend fun deleteIdempotent(url: String, token: String) {
+        try {
+            http.delete(url) { bearerAuth(token) }
+        } catch (e: ClientRequestException) {
+            if (e.response.status != HttpStatusCode.NotFound) throw e
+        }
+    }
 }
 
 private fun io.ktor.client.request.HttpRequestBuilder.bearerAuth(token: String) {
     header("Authorization", "Bearer $token")
+    header(HEADER_REQUEST_ID, UUID.randomUUID().toString())
     BackendApi.activeAccountId?.let { header("X-Account-Id", it) }
 }
 

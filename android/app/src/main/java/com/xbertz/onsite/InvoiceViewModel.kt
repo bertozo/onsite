@@ -16,6 +16,7 @@ import com.xbertz.onsite.invoice.InvoiceData
 import com.xbertz.onsite.invoice.InvoiceLine
 import com.xbertz.onsite.invoice.InvoicePdfTemplate
 import com.xbertz.onsite.invoice.buildInvoiceLines
+import com.xbertz.onsite.log.logFailure
 import com.xbertz.onsite.report.ReportColumn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,8 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.LocalDate
 import java.util.Locale
+
+private const val TAG = "Invoice"
 
 /** A user-facing message kept as a resource id so the UI resolves it in the current app language. */
 data class UiMessage(@StringRes val resId: Int, val args: List<Any> = emptyList())
@@ -160,7 +163,7 @@ class InvoiceViewModel(application: Application) : AndroidViewModel(application)
                     val file = pdfFile(invoiceNumber, client)
                     InvoicePdfTemplate.render(data, file, res)
                     file
-                }
+                }.logFailure(TAG, "rendering invoice PDF")
             }
             result.onSuccess { file ->
                 val invoice = Invoice(

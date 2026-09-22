@@ -62,6 +62,11 @@
     <string name="reminder_notifications_blocked_title">Permitir notificações</string>
     <string name="reminder_notifications_blocked_subtitle">Os lembretes são notificações; o app ainda não tem permissão para exibi-las</string>
     <string name="reminder_channel">Lembretes do planejamento</string>
+    <!-- Diagnóstico (log/AppLog.kt) -->
+    <string name="diagnostics_section">Diagnóstico</string>
+    <string name="diagnostics_share_logs">Compartilhar registros do app</string>
+    <string name="diagnostics_share_logs_subtitle">Envia um registro pequeno da atividade para que um problema possa ser rastreado</string>
+    <string name="diagnostics_share_logs_subject">Registros do OnSite</string>
     <string name="reminder_start_title">Hora de bater o ponto</string>
     <string name="reminder_start_text">%1$s · planejado para %2$s</string>
     <string name="reminder_end_title">Hora de finalizar o ponto</string>

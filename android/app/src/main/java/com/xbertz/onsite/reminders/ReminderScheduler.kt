@@ -7,6 +7,7 @@ import android.content.Intent
 import android.os.Build
 import com.xbertz.onsite.data.AppDatabase
 import com.xbertz.onsite.data.PlannedJob
+import com.xbertz.onsite.log.logFailure
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -16,6 +17,8 @@ import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+
+private const val TAG = "Reminders"
 
 /**
  * Local reminders derived from the planning calendar - one alarm at each planned job's start
@@ -69,7 +72,7 @@ object ReminderScheduler {
     /** Fire-and-forget variant for callers without a coroutine (Activity, receivers, prefs setters). */
     fun rescheduleAsync(context: Context) {
         val app = context.applicationContext
-        scope.launch { runCatching { reschedule(app) } }
+        scope.launch { runCatching { reschedule(app) }.logFailure(TAG, "rescheduling reminders") }
     }
 
     suspend fun reschedule(context: Context) {

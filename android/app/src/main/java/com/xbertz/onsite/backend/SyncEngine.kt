@@ -10,6 +10,9 @@ import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.SyncDao
 import com.xbertz.onsite.data.SyncMapping
 import com.xbertz.onsite.data.TrackingSession
+import com.xbertz.onsite.log.AppLog
+import com.xbertz.onsite.log.logFailure
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 import java.util.UUID
 
@@ -19,6 +22,36 @@ private const val TYPE_JOB_TYPE = "job_type"
 private const val TYPE_INVOICE = "invoice"
 private const val TYPE_SESSION = "tracking_session"
 private const val TYPE_PLANNED_JOB = "planned_job"
+
+private const val TAG = "Sync"
+
+/**
+ * Row counts per entity type, for the single line [runSync] logs when it finishes. Per type
+ * rather than one total because "nothing moved at all" and "nothing moved for planned jobs"
+ * are different bugs, and this line is usually the only evidence either happened.
+ */
+private class SyncTally {
+    // type -> [pushed, deleted remotely, pulled, deleted locally]
+    private val counts = linkedMapOf<String, IntArray>()
+
+    private fun of(type: String) = counts.getOrPut(type) { IntArray(4) }
+
+    fun pushed(type: String) { of(type)[0]++ }
+    fun deletedRemotely(type: String) { of(type)[1]++ }
+    fun pulled(type: String) { of(type)[2]++ }
+    fun deletedLocally(type: String) { of(type)[3]++ }
+
+    /** e.g. `client[up=2 down=12] session[down=30 delDown=1]`; only what actually moved. */
+    override fun toString(): String {
+        val parts = counts.mapNotNull { (type, c) ->
+            val fields = listOf("up" to c[0], "delUp" to c[1], "down" to c[2], "delDown" to c[3])
+                .filter { it.second > 0 }
+            if (fields.isEmpty()) null
+            else fields.joinToString(" ", prefix = "$type[", postfix = "]") { "${it.first}=${it.second}" }
+        }
+        return if (parts.isEmpty()) "nothing changed" else parts.joinToString(" ")
+    }
+}
 
 /**
  * Two-way sync against the backend, opportunistic and full-reconciliation (not delta/cursor
@@ -35,22 +68,49 @@ private const val TYPE_PLANNED_JOB = "planned_job"
  */
 suspend fun runSync(db: AppDatabase, token: String) {
     val sync = db.syncDao()
+    val tally = SyncTally()
+    val startedAt = System.currentTimeMillis()
 
-    pushClients(db, sync, token)
-    pushSites(db, sync, token)
-    pushJobTypes(db, sync, token)
-    pushInvoices(db, sync, token)
-    pushSessions(db, sync, token)
-    pushPlannedJobs(db, sync, token)
+    // Sync is sequential and fails fast, so when it breaks the two things worth knowing
+    // are which step broke and how much had already moved - neither is recoverable after
+    // the fact from a phone that is back in someone's pocket.
+    suspend fun step(name: String, block: suspend () -> Unit) {
+        val stepStartedAt = System.currentTimeMillis()
+        try {
+            block()
+        } catch (cancelled: CancellationException) {
+            // The screen went away mid-sync; not a failure, and not worth a warning.
+            throw cancelled
+        } catch (t: Throwable) {
+            AppLog.w(
+                TAG,
+                "step $name failed after ${System.currentTimeMillis() - stepStartedAt}ms, moved so far: $tally",
+                t,
+            )
+            throw t
+        }
+        AppLog.d(TAG, "step $name durationMs=${System.currentTimeMillis() - stepStartedAt}")
+    }
 
-    pullClients(db, sync, token)
-    pullSites(db, sync, token)
-    pullJobTypes(db, sync, token)
-    pullInvoices(db, sync, token)
-    pullSessions(db, sync, token)
-    pullPlannedJobs(db, sync, token)
+    AppLog.d(TAG, "sync starting")
 
-    syncProfile(db, token)
+    step("pushClients") { pushClients(db, sync, token, tally) }
+    step("pushSites") { pushSites(db, sync, token, tally) }
+    step("pushJobTypes") { pushJobTypes(db, sync, token, tally) }
+    step("pushInvoices") { pushInvoices(db, sync, token, tally) }
+    step("pushSessions") { pushSessions(db, sync, token, tally) }
+    step("pushPlannedJobs") { pushPlannedJobs(db, sync, token, tally) }
+
+    step("pullClients") { pullClients(db, sync, token, tally) }
+    step("pullSites") { pullSites(db, sync, token, tally) }
+    step("pullJobTypes") { pullJobTypes(db, sync, token, tally) }
+    step("pullInvoices") { pullInvoices(db, sync, token, tally) }
+    step("pullSessions") { pullSessions(db, sync, token, tally) }
+    step("pullPlannedJobs") { pullPlannedJobs(db, sync, token, tally) }
+
+    step("syncProfile") { syncProfile(db, token) }
+
+    AppLog.i(TAG, "sync done durationMs=${System.currentTimeMillis() - startedAt} $tally")
 }
 
 /**
@@ -117,7 +177,7 @@ suspend fun wipeLocalDomainData(db: AppDatabase) {
     db.syncDao().clearAll()
 }
 
-private suspend fun pushClients(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pushClients(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.clientDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
@@ -125,7 +185,14 @@ private suspend fun pushClients(db: AppDatabase, sync: SyncDao, token: String) {
 
     for (mapping in mappings) {
         if (mapping.localId !in localIds) {
-            runCatching { BackendApi.deleteClient(token, mapping.remoteId) }
+            // The mapping is dropped only once the server has actually let go of the
+            // row (a 404 counts - see BackendApi.deleteIdempotent). Dropping it after a
+            // failed delete would strand that row on the server forever: the local row is
+            // already gone, so nothing would ever ask about it again.
+            val deleted = runCatching { BackendApi.deleteClient(token, mapping.remoteId) }
+                .logFailure(TAG, "DELETE $TYPE_CLIENT ${mapping.remoteId}")
+            if (deleted.isFailure) continue
+            tally.deletedRemotely(TYPE_CLIENT)
             sync.deleteMapping(TYPE_CLIENT, mapping.localId)
         }
     }
@@ -144,11 +211,12 @@ private suspend fun pushClients(db: AppDatabase, sync: SyncDao, token: String) {
             hourlyRate = row.hourlyRate,
         )
         if (mapping == null) BackendApi.createClient(token, req) else BackendApi.updateClient(token, remoteId, req)
+        tally.pushed(TYPE_CLIENT)
         sync.upsertMapping(SyncMapping(TYPE_CLIENT, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullClients(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pullClients(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.clientDao()
     val remoteRows = BackendApi.listClients(token)
     val remoteIds = remoteRows.map { it.id }.toSet()
@@ -167,18 +235,20 @@ private suspend fun pullClients(db: AppDatabase, sync: SyncDao, token: String) {
             hourlyRate = remote.hourlyRate,
         )
         val localId = if (mapping == null) dao.insert(client) else { dao.update(client); mapping.localId }
+        tally.pulled(TYPE_CLIENT)
         sync.upsertMapping(SyncMapping(TYPE_CLIENT, localId, remote.id, System.currentTimeMillis()))
     }
 
     for (mapping in mappings) {
         if (mapping.remoteId !in remoteIds) {
             dao.deleteById(mapping.localId)
+            tally.deletedLocally(TYPE_CLIENT)
             sync.deleteMapping(TYPE_CLIENT, mapping.localId)
         }
     }
 }
 
-private suspend fun pushSites(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pushSites(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.siteDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
@@ -186,7 +256,11 @@ private suspend fun pushSites(db: AppDatabase, sync: SyncDao, token: String) {
 
     for (mapping in mappings) {
         if (mapping.localId !in localIds) {
-            runCatching { BackendApi.deleteSite(token, mapping.remoteId) }
+            // Mapping kept on failure, so the next sync retries - see pushClients.
+            val deleted = runCatching { BackendApi.deleteSite(token, mapping.remoteId) }
+                .logFailure(TAG, "DELETE $TYPE_SITE ${mapping.remoteId}")
+            if (deleted.isFailure) continue
+            tally.deletedRemotely(TYPE_SITE)
             sync.deleteMapping(TYPE_SITE, mapping.localId)
         }
     }
@@ -204,11 +278,12 @@ private suspend fun pushSites(db: AppDatabase, sync: SyncDao, token: String) {
             createdAtMillis = row.createdAtMillis,
         )
         if (mapping == null) BackendApi.createSite(token, req) else BackendApi.updateSite(token, remoteId, req)
+        tally.pushed(TYPE_SITE)
         sync.upsertMapping(SyncMapping(TYPE_SITE, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullSites(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pullSites(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.siteDao()
     val remoteRows = BackendApi.listSites(token)
     val remoteIds = remoteRows.map { it.id }.toSet()
@@ -226,18 +301,20 @@ private suspend fun pullSites(db: AppDatabase, sync: SyncDao, token: String) {
             createdAtMillis = remote.createdAtMillis,
         )
         val localId = if (mapping == null) dao.insert(site) else { dao.update(site); mapping.localId }
+        tally.pulled(TYPE_SITE)
         sync.upsertMapping(SyncMapping(TYPE_SITE, localId, remote.id, System.currentTimeMillis()))
     }
 
     for (mapping in mappings) {
         if (mapping.remoteId !in remoteIds) {
             dao.deleteById(mapping.localId)
+            tally.deletedLocally(TYPE_SITE)
             sync.deleteMapping(TYPE_SITE, mapping.localId)
         }
     }
 }
 
-private suspend fun pushJobTypes(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pushJobTypes(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.jobTypeDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
@@ -245,7 +322,11 @@ private suspend fun pushJobTypes(db: AppDatabase, sync: SyncDao, token: String) 
 
     for (mapping in mappings) {
         if (mapping.localId !in localIds) {
-            runCatching { BackendApi.deleteJobType(token, mapping.remoteId) }
+            // Mapping kept on failure, so the next sync retries - see pushClients.
+            val deleted = runCatching { BackendApi.deleteJobType(token, mapping.remoteId) }
+                .logFailure(TAG, "DELETE $TYPE_JOB_TYPE ${mapping.remoteId}")
+            if (deleted.isFailure) continue
+            tally.deletedRemotely(TYPE_JOB_TYPE)
             sync.deleteMapping(TYPE_JOB_TYPE, mapping.localId)
         }
     }
@@ -256,11 +337,12 @@ private suspend fun pushJobTypes(db: AppDatabase, sync: SyncDao, token: String) 
         val remoteId = mapping?.remoteId ?: UUID.randomUUID().toString()
         val req = JobTypeRequest(id = remoteId, name = row.name, createdAtMillis = row.createdAtMillis)
         if (mapping == null) BackendApi.createJobType(token, req) else BackendApi.updateJobType(token, remoteId, req)
+        tally.pushed(TYPE_JOB_TYPE)
         sync.upsertMapping(SyncMapping(TYPE_JOB_TYPE, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullJobTypes(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pullJobTypes(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.jobTypeDao()
     val remoteRows = BackendApi.listJobTypes(token)
     val remoteIds = remoteRows.map { it.id }.toSet()
@@ -271,18 +353,20 @@ private suspend fun pullJobTypes(db: AppDatabase, sync: SyncDao, token: String) 
         val mapping = mappingByRemoteId[remote.id]
         val jobType = JobType(id = mapping?.localId ?: 0, name = remote.name, createdAtMillis = remote.createdAtMillis)
         val localId = if (mapping == null) dao.insert(jobType) else { dao.update(jobType); mapping.localId }
+        tally.pulled(TYPE_JOB_TYPE)
         sync.upsertMapping(SyncMapping(TYPE_JOB_TYPE, localId, remote.id, System.currentTimeMillis()))
     }
 
     for (mapping in mappings) {
         if (mapping.remoteId !in remoteIds) {
             dao.deleteById(mapping.localId)
+            tally.deletedLocally(TYPE_JOB_TYPE)
             sync.deleteMapping(TYPE_JOB_TYPE, mapping.localId)
         }
     }
 }
 
-private suspend fun pushInvoices(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pushInvoices(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.invoiceDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
@@ -318,11 +402,12 @@ private suspend fun pushInvoices(db: AppDatabase, sync: SyncDao, token: String) 
             createdAtMillis = row.createdAtMillis,
         )
         if (mapping == null) BackendApi.createInvoice(token, req) else BackendApi.updateInvoice(token, remoteId, req)
+        tally.pushed(TYPE_INVOICE)
         sync.upsertMapping(SyncMapping(TYPE_INVOICE, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullInvoices(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pullInvoices(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.invoiceDao()
     val remoteRows = BackendApi.listInvoices(token)
     val mappings = sync.mappingsFor(TYPE_INVOICE)
@@ -348,13 +433,14 @@ private suspend fun pullInvoices(db: AppDatabase, sync: SyncDao, token: String) 
             createdAtMillis = remote.createdAtMillis,
         )
         val localId = if (mapping == null) dao.insert(invoice) else { dao.update(invoice); mapping.localId }
+        tally.pulled(TYPE_INVOICE)
         sync.upsertMapping(SyncMapping(TYPE_INVOICE, localId, remote.id, System.currentTimeMillis()))
     }
     // Invoices have no deleteById (never removed locally): a remote row disappearing here
     // would be unexpected, so it's deliberately left alone rather than guessing how to react.
 }
 
-private suspend fun pushSessions(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pushSessions(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.trackingSessionDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
@@ -362,7 +448,11 @@ private suspend fun pushSessions(db: AppDatabase, sync: SyncDao, token: String) 
 
     for (mapping in mappings) {
         if (mapping.localId !in localIds) {
-            runCatching { BackendApi.deleteTrackingSession(token, mapping.remoteId) }
+            // Mapping kept on failure, so the next sync retries - see pushClients.
+            val deleted = runCatching { BackendApi.deleteTrackingSession(token, mapping.remoteId) }
+                .logFailure(TAG, "DELETE $TYPE_SESSION ${mapping.remoteId}")
+            if (deleted.isFailure) continue
+            tally.deletedRemotely(TYPE_SESSION)
             sync.deleteMapping(TYPE_SESSION, mapping.localId)
         }
     }
@@ -387,11 +477,12 @@ private suspend fun pushSessions(db: AppDatabase, sync: SyncDao, token: String) 
             invoiceId = row.invoiceId?.let { invoiceMappingByLocalId[it]?.remoteId },
         )
         if (mapping == null) BackendApi.createTrackingSession(token, req) else BackendApi.updateTrackingSession(token, remoteId, req)
+        tally.pushed(TYPE_SESSION)
         sync.upsertMapping(SyncMapping(TYPE_SESSION, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullSessions(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pullSessions(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.trackingSessionDao()
     val remoteRows = BackendApi.listTrackingSessions(token)
     val remoteIds = remoteRows.map { it.id }.toSet()
@@ -416,18 +507,20 @@ private suspend fun pullSessions(db: AppDatabase, sync: SyncDao, token: String) 
             invoiceId = remote.invoiceId?.let { invoiceMappingByRemoteId[it]?.localId },
         )
         val localId = if (mapping == null) dao.insert(session) else { dao.update(session); mapping.localId }
+        tally.pulled(TYPE_SESSION)
         sync.upsertMapping(SyncMapping(TYPE_SESSION, localId, remote.id, System.currentTimeMillis()))
     }
 
     for (mapping in mappings) {
         if (mapping.remoteId !in remoteIds) {
             dao.deleteById(mapping.localId)
+            tally.deletedLocally(TYPE_SESSION)
             sync.deleteMapping(TYPE_SESSION, mapping.localId)
         }
     }
 }
 
-private suspend fun pushPlannedJobs(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pushPlannedJobs(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.plannedJobDao()
     val localRows = dao.getAll().first()
     val localIds = localRows.map { it.id }.toSet()
@@ -435,7 +528,11 @@ private suspend fun pushPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
 
     for (mapping in mappings) {
         if (mapping.localId !in localIds) {
-            runCatching { BackendApi.deletePlannedJob(token, mapping.remoteId) }
+            // Mapping kept on failure, so the next sync retries - see pushClients.
+            val deleted = runCatching { BackendApi.deletePlannedJob(token, mapping.remoteId) }
+                .logFailure(TAG, "DELETE $TYPE_PLANNED_JOB ${mapping.remoteId}")
+            if (deleted.isFailure) continue
+            tally.deletedRemotely(TYPE_PLANNED_JOB)
             sync.deleteMapping(TYPE_PLANNED_JOB, mapping.localId)
         }
     }
@@ -456,11 +553,12 @@ private suspend fun pushPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
             assignedUserId = row.assignedUserId,
         )
         if (mapping == null) BackendApi.createPlannedJob(token, req) else BackendApi.updatePlannedJob(token, remoteId, req)
+        tally.pushed(TYPE_PLANNED_JOB)
         sync.upsertMapping(SyncMapping(TYPE_PLANNED_JOB, row.id, remoteId, System.currentTimeMillis()))
     }
 }
 
-private suspend fun pullPlannedJobs(db: AppDatabase, sync: SyncDao, token: String) {
+private suspend fun pullPlannedJobs(db: AppDatabase, sync: SyncDao, token: String, tally: SyncTally) {
     val dao = db.plannedJobDao()
     val remoteRows = BackendApi.listPlannedJobs(token)
     val remoteIds = remoteRows.map { it.id }.toSet()
@@ -481,12 +579,14 @@ private suspend fun pullPlannedJobs(db: AppDatabase, sync: SyncDao, token: Strin
             assignedUserId = remote.assignedUserId,
         )
         val localId = if (mapping == null) dao.insert(job) else { dao.update(job); mapping.localId }
+        tally.pulled(TYPE_PLANNED_JOB)
         sync.upsertMapping(SyncMapping(TYPE_PLANNED_JOB, localId, remote.id, System.currentTimeMillis()))
     }
 
     for (mapping in mappings) {
         if (mapping.remoteId !in remoteIds) {
             dao.deleteById(mapping.localId)
+            tally.deletedLocally(TYPE_PLANNED_JOB)
             sync.deleteMapping(TYPE_PLANNED_JOB, mapping.localId)
         }
     }

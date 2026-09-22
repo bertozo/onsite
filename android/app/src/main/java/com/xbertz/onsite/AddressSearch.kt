@@ -1,5 +1,6 @@
 package com.xbertz.onsite
 
+import com.xbertz.onsite.log.AppLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -68,6 +69,7 @@ suspend fun searchAddresses(query: String): List<AddressSuggestion> = withContex
             if (label.isBlank()) null else AddressSuggestion(label, latitude, longitude)
         }
     } catch (e: Exception) {
+        AppLog.w("AddressSearch", "address lookup failed", e)
         emptyList()
     }
 }

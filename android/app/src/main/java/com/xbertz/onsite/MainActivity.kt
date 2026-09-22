@@ -110,6 +110,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -146,6 +147,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -155,6 +157,8 @@ import com.xbertz.onsite.data.PlannedJob
 import com.xbertz.onsite.data.Site
 import com.xbertz.onsite.data.TrackingSession
 import com.xbertz.onsite.invoice.buildInvoiceLines
+import com.xbertz.onsite.log.AppLog
+import com.xbertz.onsite.log.logFailure
 import com.xbertz.onsite.photo.PhotoStamper
 import com.xbertz.onsite.reminders.ReminderScheduler
 import com.xbertz.onsite.photo.TimestampPosition
@@ -163,6 +167,7 @@ import com.xbertz.onsite.ui.theme.OnSiteTheme
 import com.xbertz.onsite.ui.theme.tabularNums
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
@@ -181,6 +186,8 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
+private const val TAG = "UI"
+
 class MainActivity : ComponentActivity() {
     // Apply the language chosen in Settings before any resource is resolved.
     override fun attachBaseContext(newBase: Context) {
@@ -189,6 +196,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Before anything else that might want to log: this is what opens the on-device
+        // log file the diagnostics row shares (see log/AppLog.kt).
+        AppLog.init(applicationContext)
         // Alarms are cheap to re-arm and easy to lose (app update, cleared data, a missed boot broadcast).
         ReminderScheduler.rescheduleAsync(applicationContext)
         setContent {
@@ -2192,6 +2202,7 @@ private fun StampCameraView(
                                 cameraProvider.unbindAll()
                                 cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageCapture)
                             } catch (e: Exception) {
+                                AppLog.w(TAG, "camera preview could not be bound", e)
                                 onError()
                             }
                         }, ContextCompat.getMainExecutor(ctx))
@@ -2320,7 +2331,7 @@ private fun rememberBitmapFromUri(uri: Uri?): ImageBitmap? {
                 while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 1200) sample *= 2
                 val options = BitmapFactory.Options().apply { inSampleSize = sample }
                 context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }?.asImageBitmap()
-            }.getOrNull()
+            }.logFailure(TAG, "decoding image for preview").getOrNull()
         }
     }
     return bitmap
@@ -2448,6 +2459,10 @@ fun SettingsScreen(
             Spacer(Modifier.height(16.dp))
 
             ReminderSettingsCard(viewModel)
+
+            Spacer(Modifier.height(16.dp))
+
+            DiagnosticsCard()
 
             Spacer(Modifier.height(16.dp))
 
@@ -3137,8 +3152,62 @@ private fun ReminderSettingsCard(viewModel: SettingsViewModel) {
     }
 }
 
+/**
+ * Hands the on-device log file (see log/AppLog.kt) to the share sheet. Nobody using this app
+ * is sitting next to adb, so this row is the only route by which a failure that happened on
+ * a roof last Tuesday ever reaches us. The file is read off the main thread: it is small,
+ * but it is still disk I/O on a tap.
+ */
 @Composable
-private fun SettingsActionRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun DiagnosticsCard() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val chooserTitle = stringResource(R.string.diagnostics_share_logs)
+    val subject = stringResource(R.string.diagnostics_share_logs_subject)
+
+    ElevatedCard(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Text(
+                stringResource(R.string.diagnostics_section),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+            )
+            SettingsActionRow(
+                icon = Icons.Filled.BugReport,
+                title = chooserTitle,
+                subtitle = stringResource(R.string.diagnostics_share_logs_subtitle),
+                tint = MaterialTheme.colorScheme.primary,
+                onClick = {
+                    scope.launch {
+                        val file = withContext(Dispatchers.IO) { AppLog.collectForSharing() }
+                        if (file == null) {
+                            AppLog.w(TAG, "nothing to share: no log file yet")
+                            return@launch
+                        }
+                        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        val intent = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_STREAM, uri)
+                            putExtra(Intent.EXTRA_SUBJECT, subject)
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        }
+                        context.startActivity(Intent.createChooser(intent, chooserTitle))
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    tint: Color = MaterialTheme.colorScheme.error,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -3146,7 +3215,7 @@ private fun SettingsActionRow(icon: ImageVector, title: String, subtitle: String
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)

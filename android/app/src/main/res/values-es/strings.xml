@@ -62,6 +62,11 @@
     <string name="reminder_notifications_blocked_title">Permitir notificaciones</string>
     <string name="reminder_notifications_blocked_subtitle">Los recordatorios son notificaciones; la app aún no tiene permiso para mostrarlas</string>
     <string name="reminder_channel">Recordatorios de la planificación</string>
+    <!-- Diagnóstico (log/AppLog.kt) -->
+    <string name="diagnostics_section">Diagnóstico</string>
+    <string name="diagnostics_share_logs">Compartir registros de la app</string>
+    <string name="diagnostics_share_logs_subtitle">Envía un registro pequeño de la actividad para poder rastrear un problema</string>
+    <string name="diagnostics_share_logs_subject">Registros de OnSite</string>
     <string name="reminder_start_title">Hora de fichar la entrada</string>
     <string name="reminder_start_text">%1$s · planificado para las %2$s</string>
     <string name="reminder_end_title">Hora de fichar la salida</string>

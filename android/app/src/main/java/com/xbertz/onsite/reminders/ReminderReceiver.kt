@@ -13,12 +13,15 @@ import com.xbertz.onsite.MainActivity
 import com.xbertz.onsite.R
 import com.xbertz.onsite.data.AppDatabase
 import com.xbertz.onsite.data.PlannedJob
+import com.xbertz.onsite.log.AppLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+
+private const val TAG = "Reminders"
 
 /**
  * Fires when one of [ReminderScheduler]'s alarms goes off. The job is re-read from Room at
@@ -87,8 +90,9 @@ class ReminderReceiver : BroadcastReceiver() {
             .build()
         try {
             manager.notify(notificationId(jobId, kind), notification)
-        } catch (_: SecurityException) {
+        } catch (e: SecurityException) {
             // Permission revoked between the check and the call.
+            AppLog.w(TAG, "reminder notification blocked", e)
         }
     }
 

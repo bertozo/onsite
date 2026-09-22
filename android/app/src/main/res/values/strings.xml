@@ -64,6 +64,11 @@
     <string name="reminder_notifications_blocked_title">Allow notifications</string>
     <string name="reminder_notifications_blocked_subtitle">Reminders are notifications; the app is not allowed to show them yet</string>
     <string name="reminder_channel">Planning reminders</string>
+    <!-- Diagnostics (log/AppLog.kt) -->
+    <string name="diagnostics_section">Diagnostics</string>
+    <string name="diagnostics_share_logs">Share app logs</string>
+    <string name="diagnostics_share_logs_subtitle">Sends a small activity log so a problem you ran into can be traced</string>
+    <string name="diagnostics_share_logs_subject">OnSite logs</string>
     <string name="reminder_start_title">Time to clock in</string>
     <string name="reminder_start_text">%1$s · planned for %2$s</string>
     <string name="reminder_end_title">Time to clock out</string>

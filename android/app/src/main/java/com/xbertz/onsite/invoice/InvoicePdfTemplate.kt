@@ -11,6 +11,7 @@ import android.content.res.Resources
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
 import com.xbertz.onsite.R
+import com.xbertz.onsite.log.AppLog
 import com.xbertz.onsite.report.ReportColumn
 import java.io.File
 import java.io.FileOutputStream
@@ -442,6 +443,7 @@ object InvoicePdfTemplate {
             if (square !== decoded) decoded.recycle()
             square
         } catch (e: Exception) {
+            AppLog.w("InvoicePdf", "logo could not be decoded, invoice rendered without it", e)
             null
         }
     }
