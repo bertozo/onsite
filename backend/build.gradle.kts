@@ -34,7 +34,10 @@ dependencies {
     implementation("com.auth0:jwks-rsa:0.22.1") // JWKS lookup for configureSupabaseJwt, keyed/cached by "kid"
     implementation("io.ktor:ktor-server-status-pages-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-call-logging-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-server-call-id-jvm:$ktorVersion") // X-Request-Id in and out, see plugins/Logging.kt
     implementation("io.ktor:ktor-server-cors-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-server-metrics-micrometer-jvm:$ktorVersion")
+    implementation("io.micrometer:micrometer-registry-prometheus:1.13.4") // /metrics, see plugins/Metrics.kt
 
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
     implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
@@ -47,6 +50,7 @@ dependencies {
     implementation("org.flywaydb:flyway-database-postgresql:10.17.3")
 
     implementation("ch.qos.logback:logback-classic:1.5.8")
+    implementation("net.logstash.logback:logstash-logback-encoder:8.0") // the LOG_FORMAT=JSON appender
 
     testImplementation("io.ktor:ktor-server-test-host-jvm:$ktorVersion")
     // `useJUnitPlatform()` below runs on the JUnit 5 platform, which needs the Jupiter engine

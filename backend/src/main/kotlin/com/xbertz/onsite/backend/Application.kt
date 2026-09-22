@@ -22,7 +22,12 @@ import com.xbertz.onsite.backend.identity.IdentityRepository
 import com.xbertz.onsite.backend.identity.InviteRepository
 import com.xbertz.onsite.backend.identity.identityRoutes
 import com.xbertz.onsite.backend.identity.inviteRoutes
+import com.xbertz.onsite.backend.plugins.configureLogging
+import com.xbertz.onsite.backend.plugins.configureMetrics
 import com.xbertz.onsite.backend.plugins.configureStatusPages
+import com.xbertz.onsite.backend.plugins.healthRoutes
+import com.xbertz.onsite.backend.plugins.newMeterRegistry
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
@@ -30,23 +35,48 @@ import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
-import io.ktor.server.plugins.callloging.CallLogging
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.plugins.cors.routing.CORS
 import io.ktor.server.routing.routing
+import io.micrometer.prometheusmetrics.PrometheusMeterRegistry
 import kotlinx.serialization.json.Json
+import org.slf4j.LoggerFactory
+import javax.sql.DataSource
+
+private val logger = LoggerFactory.getLogger("com.xbertz.onsite.backend.Application")
 
 fun main() {
     val config = AppConfig.fromEnv()
-    DatabaseFactory.connect(config)
+    // Nothing secret here, and it answers the questions a deploy actually raises: which
+    // port, which database, is dev login open, and why the log looks the way it does.
+    logger.info(
+        "starting onsite-backend version={} env={} port={} db={} devAuth={} logLevel={} logFormat={} metrics={}",
+        config.appVersion,
+        config.appEnv,
+        config.port,
+        config.dbUrl.substringBefore('?'),
+        config.devAuthEnabled,
+        config.logLevel,
+        config.logFormat,
+        if (config.metricsToken == null) "collected" else "exposed",
+    )
+    // Created here rather than inside the module: the connection pool has to be handed the
+    // same registry at construction time for its own metrics to exist at all.
+    val meterRegistry = newMeterRegistry()
+    val dataSource = DatabaseFactory.connect(config, meterRegistry)
 
     embeddedServer(Netty, port = config.port) {
-        module(config)
+        module(config, dataSource, meterRegistry)
     }.start(wait = true)
 }
 
-fun Application.module(config: AppConfig) {
-    install(CallLogging)
+fun Application.module(
+    config: AppConfig,
+    dataSource: DataSource,
+    meterRegistry: PrometheusMeterRegistry = newMeterRegistry(),
+) {
+    configureLogging()
+    configureMetrics(config, meterRegistry)
 
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true })
@@ -59,6 +89,10 @@ fun Application.module(config: AppConfig) {
         allowHeader("Authorization")
         allowHeader("Content-Type")
         allowHeader("X-Account-Id")
+        allowHeader(HttpHeaders.XRequestId)
+        // Without the expose, the browser hides the echoed id from our own fetch() - and
+        // the web client would have nothing to log next to a failed call.
+        exposeHeader(HttpHeaders.XRequestId)
     }
 
     install(Authentication) {
@@ -78,6 +112,7 @@ fun Application.module(config: AppConfig) {
     val plannedJobsRepository = PlannedJobsRepository()
 
     routing {
+        healthRoutes(dataSource, config)
         devAuthRoutes(config)
         identityRoutes(identityRepository)
         inviteRoutes(inviteRepository)

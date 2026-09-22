@@ -2,8 +2,7 @@ package com.xbertz.onsite.backend.connections
 
 import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
-import com.xbertz.onsite.backend.identity.requestedAccountId
-import com.xbertz.onsite.backend.identity.resolveActiveAccount
+import com.xbertz.onsite.backend.identity.activeAccount
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -25,7 +24,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
         post("/v1/accounts/{accountId}/connection-invites") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
             val accountId = UUID.fromString(call.parameters["accountId"])
-            resolveActiveAccount(user.userId, accountId).requireOwner()
+            call.activeAccount(user.userId, accountId).requireOwner()
             val req = call.receive<CreateConnectionInviteRequest>()
             val invite = withContext(Dispatchers.IO) { repository.createInvite(accountId, req.email) }
             call.respond(HttpStatusCode.Created, invite)
@@ -38,7 +37,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
             }
             post("/{inviteId}/accept") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val inviteId = UUID.fromString(call.parameters["inviteId"])
                 val req = call.receive<AcceptConnectionInviteRequest>()
                 val connection = withContext(Dispatchers.IO) {
@@ -50,7 +49,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
 
         get("/v1/connections") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-            val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+            val active = call.activeAccount(user.userId)
             active.requireOwner()
             call.respond(withContext(Dispatchers.IO) { repository.connectionsForEmployer(active.accountId) })
         }
@@ -62,7 +61,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
 
         delete("/v1/connections/{id}") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-            val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+            val active = call.activeAccount(user.userId)
             val id = UUID.fromString(call.parameters["id"])
             val revoked = withContext(Dispatchers.IO) { repository.revoke(id, active.accountId, user.userId) }
             call.respond(if (revoked) HttpStatusCode.NoContent else HttpStatusCode.NotFound)
@@ -70,7 +69,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
 
         post("/v1/connections/{id}/planned-jobs") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-            val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+            val active = call.activeAccount(user.userId)
             active.requireOwner()
             val id = UUID.fromString(call.parameters["id"])
             val req = call.receive<ConnectionPlannedJobRequest>()
@@ -80,7 +79,7 @@ fun Route.connectionRoutes(repository: ConnectionsRepository) {
 
         get("/v1/connections/{id}/sessions") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-            val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+            val active = call.activeAccount(user.userId)
             active.requireOwner()
             val id = UUID.fromString(call.parameters["id"])
             call.respond(withContext(Dispatchers.IO) { repository.sessionsForConnection(id, active.accountId) })

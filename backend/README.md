@@ -57,6 +57,26 @@ set -a; source .env; set +a
 ./gradlew run
 ```
 
+### Logs
+
+One line per request, carrying the `X-Request-Id` the clients send (and get echoed back),
+plus `userId`/`accountId` once the call authenticated:
+
+```
+2026-09-22 22:02:10.194 INFO  [my-own-id-123] ktor.application - GET /v1/clients status=200 durationMs=53 userId=484dbf1c-… accountId=d48cf1d5-…
+```
+
+Two environment variables shape the output: `LOG_LEVEL` (default `INFO`) and `LOG_FORMAT`
+(`console`, the default, or `json` for one JSON object per line with `requestId` as a
+field - what to use wherever logs are collected). `APP_ENV`/`APP_VERSION` are stamped on
+every JSON line and every metric.
+
+Alongside the log: `GET /health` (liveness), `GET /health/ready` (asks the database; what
+the compose healthcheck polls) and `GET /metrics` (Prometheus format, registered only when
+`METRICS_TOKEN` is set, and then only for `Authorization: Bearer <token>`). Conventions,
+how the same request id is followed across the Android and web clients, and what to point
+at `/metrics` later are in `../docs/logging.md`.
+
 There is no real Supabase project yet, so there is nothing to sign up against. Two ways to
 get a token in the meantime, both signed with `SUPABASE_JWT_SECRET` and shaped exactly like
 a Supabase one:

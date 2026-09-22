@@ -114,7 +114,7 @@ fun Route.inviteRoutes(repository: InviteRepository) {
         post("/v1/accounts/{accountId}/invites") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
             val accountId = UUID.fromString(call.parameters["accountId"])
-            val active = resolveActiveAccount(user.userId, accountId)
+            val active = call.activeAccount(user.userId, accountId)
             active.requireOwner()
             val req = call.receive<CreateInviteRequest>()
             val invite = withContext(Dispatchers.IO) { repository.createInvite(accountId, req.email) }

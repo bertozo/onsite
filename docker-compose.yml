@@ -11,6 +11,16 @@
 # `./gradlew run` / `npm run dev` directly instead - see backend/README.md and web/README.md.
 #
 # Override values in a root .env file (see .env.example) rather than editing this file.
+
+# Without this, a container's whole log history dies with the container - and every
+# `up --build` recreates them. 50 MB per service is plenty to answer "what happened an hour
+# ago" (see docs/logging.md).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -27,6 +37,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    logging: *default-logging
 
   backend:
     build:
@@ -42,9 +53,28 @@ services:
       SUPABASE_JWT_ISSUER: supabase
       DEV_AUTH_ENABLED: ${DEV_AUTH_ENABLED:-true}
       PORT: 8080
+      # See docs/logging.md. JSON is the shape to use wherever logs are collected.
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-console}
+      # Stamped on every JSON log line and every metric, so one line or series points at
+      # one deployment of one build.
+      APP_ENV: ${APP_ENV:-local}
+      APP_VERSION: ${APP_VERSION:-dev}
+      # Unset means /metrics is not registered at all (it would hand out every route name
+      # and its traffic volume). Set it to the bearer token the scraper will send.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
+    healthcheck:
+      # /health/ready asks the database; /health alone would answer "ok" from a backend
+      # that can't serve a single request (see backend plugins/Health.kt).
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 40s
+    logging: *default-logging
 
   web:
     build:
@@ -57,7 +87,10 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - backend
+      # Waits for a backend that can actually answer, not just one that has started.
+      backend:
+        condition: service_healthy
+    logging: *default-logging
 
 volumes:
   onsite-postgres-data:

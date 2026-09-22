@@ -1,6 +1,7 @@
 package com.xbertz.onsite.backend.identity
 
 import com.xbertz.onsite.backend.db.tables.Memberships
+import com.xbertz.onsite.backend.plugins.rememberAccountForLog
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.request.header
@@ -45,5 +46,13 @@ fun resolveActiveAccount(userId: UUID, requestedAccountId: UUID?): ActiveAccount
     ActiveAccount(membership[Memberships.accountId], membership[Memberships.role])
 }
 
-fun resolveActiveAccountId(userId: UUID, requestedAccountId: UUID?): UUID =
-    resolveActiveAccount(userId, requestedAccountId).accountId
+/**
+ * The route-facing form: resolves the account this call acts against and records it for
+ * the request's log line (see plugins/Logging.kt). Who called is only half of "what
+ * happened" - the other half is which account's data the call touched, and an X-Account-Id
+ * the client may or may not have sent is not that answer.
+ */
+fun ApplicationCall.activeAccount(userId: UUID, accountId: UUID? = requestedAccountId()): ActiveAccount =
+    resolveActiveAccount(userId, accountId).also { rememberAccountForLog(it.accountId) }
+
+fun ApplicationCall.activeAccountId(userId: UUID): UUID = activeAccount(userId).accountId

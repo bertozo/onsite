@@ -61,7 +61,7 @@ fun Route.identityRoutes(repository: IdentityRepository) {
         // The OWNER's picker for "assign this job to": every member of the active account.
         get("/v1/me/account-members") {
             val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-            val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+            val active = call.activeAccount(user.userId)
             active.requireOwner()
             call.respond(withContext(Dispatchers.IO) { repository.membersOf(active.accountId) })
         }

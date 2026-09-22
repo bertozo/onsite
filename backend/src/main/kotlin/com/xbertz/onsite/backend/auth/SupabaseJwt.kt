@@ -5,6 +5,8 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.Payload
 import com.xbertz.onsite.backend.config.AppConfig
+import com.xbertz.onsite.backend.plugins.rememberUserForLog
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.AuthenticationConfig
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.jwt.jwt
@@ -28,11 +30,18 @@ private const val AUTH_JWT_SUPABASE = "auth-jwt-supabase"
 private const val AUTH_JWT_DEV = "auth-jwt-dev"
 val AUTH_JWT = arrayOf(AUTH_JWT_SUPABASE, AUTH_JWT_DEV)
 
-private fun validatePrincipal(payload: Payload): JWTPrincipal? {
+/**
+ * Records the caller on the call for the request log line (see plugins/Logging.kt) as a
+ * side effect: this is the single place every authenticated request passes through, so
+ * the 40-odd routes don't each have to remember to do it.
+ */
+private fun ApplicationCall.validatePrincipal(payload: Payload): JWTPrincipal? {
     val subject = payload.subject ?: return null
     val hasEmail = payload.getClaim("email")?.asString() != null
-    val validSubject = runCatching { UUID.fromString(subject) }.isSuccess
-    return if (hasEmail && validSubject) JWTPrincipal(payload) else null
+    val userId = runCatching { UUID.fromString(subject) }.getOrNull()
+    if (!hasEmail || userId == null) return null
+    rememberUserForLog(userId)
+    return JWTPrincipal(payload)
 }
 
 fun AuthenticationConfig.configureSupabaseJwt(config: AppConfig) {

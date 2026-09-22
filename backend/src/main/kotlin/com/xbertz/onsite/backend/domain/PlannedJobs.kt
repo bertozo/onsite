@@ -3,8 +3,7 @@ package com.xbertz.onsite.backend.domain
 import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
 import com.xbertz.onsite.backend.db.tables.PlannedJobs
-import com.xbertz.onsite.backend.identity.requestedAccountId
-import com.xbertz.onsite.backend.identity.resolveActiveAccount
+import com.xbertz.onsite.backend.identity.activeAccount
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -146,13 +145,13 @@ fun Route.plannedJobRoutes(repository: PlannedJobsRepository) {
         route("/v1/planned-jobs") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val ownOnly = if (active.isOwner) null else user.userId
                 call.respond(withContext(Dispatchers.IO) { repository.list(active.accountId, ownOnly) })
             }
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val req = call.receive<PlannedJobRequest>()
                 // A WORKER can only ever schedule for themselves, whatever the request says.
                 val assignedUserId = if (active.isOwner) req.assignedUserId?.let(UUID::fromString) else user.userId
@@ -163,7 +162,7 @@ fun Route.plannedJobRoutes(repository: PlannedJobsRepository) {
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<PlannedJobRequest>()
@@ -174,7 +173,7 @@ fun Route.plannedJobRoutes(repository: PlannedJobsRepository) {
             }
             delete("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val deleted = withContext(Dispatchers.IO) { repository.softDelete(active.accountId, id, ownOnly) }

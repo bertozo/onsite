@@ -3,9 +3,8 @@ package com.xbertz.onsite.backend.domain
 import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
 import com.xbertz.onsite.backend.db.tables.Clients
-import com.xbertz.onsite.backend.identity.requestedAccountId
-import com.xbertz.onsite.backend.identity.resolveActiveAccount
-import com.xbertz.onsite.backend.identity.resolveActiveAccountId
+import com.xbertz.onsite.backend.identity.activeAccount
+import com.xbertz.onsite.backend.identity.activeAccountId
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -118,18 +117,18 @@ fun Route.clientRoutes(repository: ClientsRepository) {
         route("/v1/clients") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccountId(user.userId, call.requestedAccountId())
+                val accountId = call.activeAccountId(user.userId)
                 call.respond(withContext(Dispatchers.IO) { repository.list(accountId) })
             }
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
+                val accountId = call.activeAccount(user.userId).apply { requireOwner() }.accountId
                 val req = call.receive<ClientRequest>()
                 call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(accountId, req) })
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
+                val accountId = call.activeAccount(user.userId).apply { requireOwner() }.accountId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<ClientRequest>()
                 val result = withContext(Dispatchers.IO) { repository.update(accountId, id, req) }
@@ -137,7 +136,7 @@ fun Route.clientRoutes(repository: ClientsRepository) {
             }
             delete("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val accountId = resolveActiveAccount(user.userId, call.requestedAccountId()).apply { requireOwner() }.accountId
+                val accountId = call.activeAccount(user.userId).apply { requireOwner() }.accountId
                 val id = UUID.fromString(call.parameters["id"])
                 val deleted = withContext(Dispatchers.IO) { repository.softDelete(accountId, id) }
                 call.respond(if (deleted) HttpStatusCode.NoContent else HttpStatusCode.NotFound)

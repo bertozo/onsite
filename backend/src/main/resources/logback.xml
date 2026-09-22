@@ -1,10 +1,20 @@
 <configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
-        </encoder>
-    </appender>
-    <root level="INFO">
-        <appender-ref ref="STDOUT"/>
-    </root>
+    <!--
+      Output shape is picked by LOG_FORMAT: "console" (the default, for a terminal) or
+      "json" (one object per line, MDC included, for anywhere logs are shipped and
+      queried - the request id is then a field instead of a substring to regex out).
+      Each shape lives in its own include because logback warns about, and then dumps its
+      whole internal status over, an appender that is declared but not referenced.
+
+      LOG_LEVEL and LOG_FORMAT are read from the environment here because logback parses
+      this file before AppConfig exists; AppConfig mirrors both only so the startup line
+      can state what is actually in effect - "why am I not seeing my debug logs" should be
+      answerable from the log itself.
+    -->
+    <include resource="logback-${LOG_FORMAT:-console}.xml"/>
+
+    <!-- Chatty at DEBUG and silent about this app's own behaviour; pinning them is what
+         keeps LOG_LEVEL=DEBUG usable for debugging our code. -->
+    <logger name="io.netty" level="INFO"/>
+    <logger name="com.zaxxer.hikari" level="INFO"/>
 </configuration>

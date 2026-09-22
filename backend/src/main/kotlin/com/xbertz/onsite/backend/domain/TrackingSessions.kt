@@ -3,8 +3,7 @@ package com.xbertz.onsite.backend.domain
 import com.xbertz.onsite.backend.auth.AUTH_JWT
 import com.xbertz.onsite.backend.auth.toAuthenticatedUser
 import com.xbertz.onsite.backend.db.tables.TrackingSessions
-import com.xbertz.onsite.backend.identity.requestedAccountId
-import com.xbertz.onsite.backend.identity.resolveActiveAccount
+import com.xbertz.onsite.backend.identity.activeAccount
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.auth.authenticate
@@ -153,19 +152,19 @@ fun Route.trackingSessionRoutes(repository: TrackingSessionsRepository) {
         route("/v1/sessions") {
             get {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val ownOnly = if (active.isOwner) null else user.userId
                 call.respond(withContext(Dispatchers.IO) { repository.list(active.accountId, ownOnly) })
             }
             post {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val req = call.receive<TrackingSessionRequest>()
                 call.respond(HttpStatusCode.Created, withContext(Dispatchers.IO) { repository.create(active.accountId, user.userId, req) })
             }
             put("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val req = call.receive<TrackingSessionRequest>()
@@ -174,7 +173,7 @@ fun Route.trackingSessionRoutes(repository: TrackingSessionsRepository) {
             }
             delete("/{id}") {
                 val user = call.principal<JWTPrincipal>()!!.toAuthenticatedUser()
-                val active = resolveActiveAccount(user.userId, call.requestedAccountId())
+                val active = call.activeAccount(user.userId)
                 val ownOnly = if (active.isOwner) null else user.userId
                 val id = UUID.fromString(call.parameters["id"])
                 val deleted = withContext(Dispatchers.IO) { repository.softDelete(active.accountId, id, ownOnly) }
