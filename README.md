@@ -6,6 +6,7 @@ Monorepo for the OnSite project.
 - `backend/` — API server (Kotlin, Ktor)
 - `ios/` — iOS app (planned)
 - `web/` — Web app (React, TypeScript, Vite) — management/desktop client, no offline storage or GPS tracking
+- `docs/` — architecture diagrams, and `logging.md` (log levels, the shared request id, what never goes in a log line)
 
 ## Running the full stack locally (Docker)
 
