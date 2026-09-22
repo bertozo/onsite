@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import type { ClientRequest, TrackingSessionRequest } from "../lib/types";
 import { periodRange, summarize } from "../lib/reportLogic";
 import { formatHours, formatMoney, millisToDateInput, millisToTimeInput } from "../lib/format";
+import { log, logAndFallback } from "../lib/log";
 import { Card, PageHeader, Spinner } from "../components/ui";
 
 export function DashboardPage() {
@@ -13,8 +14,11 @@ export function DashboardPage() {
   const [clients, setClients] = useState<ClientRequest[]>([]);
 
   useEffect(() => {
-    backendApi.listTrackingSessions().then(setSessions).catch(() => setSessions([]));
-    backendApi.listClients().then(setClients).catch(() => undefined);
+    backendApi.listTrackingSessions().then(setSessions).catch((e) => {
+      log.warn("loading sessions failed, showing none", e);
+      setSessions([]);
+    });
+    backendApi.listClients().then(setClients).catch(logAndFallback("loading clients", undefined));
   }, []);
 
   const ratesByClient = useMemo(() => new Map(clients.map((c) => [c.name, c.hourlyRate])), [clients]);

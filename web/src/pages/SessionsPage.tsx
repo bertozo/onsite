@@ -3,6 +3,7 @@ import { backendApi, ApiError } from "../lib/backendApi";
 import { useCrud } from "../lib/useCrud";
 import type { ClientRequest, JobTypeRequest, SiteRequest, TrackingSessionRequest } from "../lib/types";
 import { combineLocalDateTime, formatHours, formatMoney, millisToDateInput, millisToTimeInput } from "../lib/format";
+import { logAndFallback } from "../lib/log";
 import { amountOk, parseAmount, VALIDATION_MESSAGES } from "../lib/validators";
 import { Badge, Button, Card, ConfirmDialog, EmptyState, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner } from "../components/ui";
 
@@ -18,9 +19,9 @@ function useCatalog() {
   const [sites, setSites] = useState<SiteRequest[]>([]);
   const [jobTypes, setJobTypes] = useState<JobTypeRequest[]>([]);
   useEffect(() => {
-    backendApi.listClients().then(setClients).catch(() => undefined);
-    backendApi.listSites().then(setSites).catch(() => undefined);
-    backendApi.listJobTypes().then(setJobTypes).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(logAndFallback("loading clients", undefined));
+    backendApi.listSites().then(setSites).catch(logAndFallback("loading sites", undefined));
+    backendApi.listJobTypes().then(setJobTypes).catch(logAndFallback("loading job types", undefined));
   }, []);
   return { clients, sites, jobTypes };
 }

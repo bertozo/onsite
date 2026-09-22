@@ -3,6 +3,7 @@
 // SharedPreferences key (one setting shared by both the Reports screen and invoice
 // generation, not a per-invoice choice - see ReportViewModel/InvoiceViewModel).
 import { REPORT_COLUMNS, type ReportColumn } from "./reportLogic";
+import { log } from "./log";
 
 const KEY = "onsite_report_columns";
 
@@ -16,7 +17,8 @@ export function loadReportColumns(): ReportColumn[] {
   try {
     const saved = new Set(JSON.parse(raw) as ReportColumn[]);
     return REPORT_COLUMNS.filter((c) => ALWAYS_ON.includes(c) || saved.has(c));
-  } catch {
+  } catch (e) {
+    log.debug("stored report columns could not be parsed, falling back to all of them", e);
     return [...REPORT_COLUMNS];
   }
 }

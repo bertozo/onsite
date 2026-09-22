@@ -2,6 +2,7 @@
 // endpoint. Every call needs a valid Supabase access token (refreshed here if it's close to
 // expiring) and, once an active account is chosen, an X-Account-Id header telling the
 // backend which account (personal or a joined team account) to act against.
+import { log } from "./log";
 import { loadSession, updateTokens } from "./sessionStore";
 import { refreshSession } from "./supabaseAuth";
 import type {
@@ -26,10 +27,36 @@ const BASE_URL = import.meta.env.VITE_BACKEND_URL ?? "http://localhost:8080";
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  /** The id the backend logged this same call under - see the backend's plugins/Logging.kt. */
+  requestId: string | null;
+  constructor(status: number, message: string, requestId: string | null = null) {
     super(message);
     this.status = status;
+    this.requestId = requestId;
   }
+}
+
+/**
+ * Sent on every call and echoed back by the backend, which logs it too: it is what lets a
+ * console warning here be matched against the server's line for the same request. Not
+ * crypto.randomUUID() unconditionally - that is undefined outside a secure context, which
+ * is exactly the plain-http deployment where logs matter most.
+ */
+function newRequestId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  return `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** The backend's error bodies are `{error, requestId}`; anything else is shown as-is. */
+function errorMessage(body: string, status: number): string {
+  if (!body) return `HTTP ${status}`;
+  try {
+    const parsed = JSON.parse(body) as { error?: unknown };
+    if (typeof parsed.error === "string" && parsed.error) return parsed.error;
+  } catch {
+    // not JSON - a proxy error page, say
+  }
+  return body;
 }
 
 /** Which account the caller is acting as; kept in sync with the stored session by AuthContext. */
@@ -53,17 +80,32 @@ async function validToken(): Promise<string> {
 
 /** Signs a request with a caller-supplied token, used only during login before a session exists. */
 async function rawRequest<T>(token: string, method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  const requestId = newRequestId();
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}`, "X-Request-Id": requestId };
   if (activeAccountId) headers["X-Account-Id"] = activeAccountId;
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } catch (e) {
+    // The backend was never reached, so there is no server-side line to find: this is the
+    // only record that the call happened at all. Rethrown untouched - callers tell a
+    // network failure apart from an ApiError and word it differently for the user.
+    log.warn(`${method} ${path} could not reach the backend requestId=${requestId}`, e);
+    throw e;
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new ApiError(response.status, text || response.statusText);
+    const message = errorMessage(text, response.status);
+    // The echoed header wins: on a retry through a proxy it is the id the backend actually
+    // logged. Same id, both sides, one grep.
+    const loggedId = response.headers.get("X-Request-Id") ?? requestId;
+    log.warn(`${method} ${path} failed status=${response.status} requestId=${loggedId}: ${message}`);
+    throw new ApiError(response.status, message, loggedId);
   }
   if (response.status === 204) return undefined as T;
   const text = await response.text();

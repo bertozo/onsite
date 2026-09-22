@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { backendApi, setActiveAccountId as setApiActiveAccountId } from "../lib/backendApi";
 import { mapAuthError } from "../lib/authError";
+import { log } from "../lib/log";
 import * as sessionStore from "../lib/sessionStore";
 import * as supabaseAuth from "../lib/supabaseAuth";
 import { SupabaseAuthError } from "../lib/supabaseAuth";
@@ -76,7 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     backendApi
       .me()
       .then((me) => setState(loggedInFrom(me, stored.activeAccountId)))
-      .catch(() => setState({ status: "loggedOut" }));
+      .catch((e) => {
+        // The one branch behind "it logged me out on refresh": an expired token and a
+        // backend that is simply down look identical to the user, and used to look
+        // identical in the console too.
+        log.warn("session could not be restored, signing out", e);
+        setState({ status: "loggedOut" });
+      });
   }, []);
 
   const completeLogin = useCallback(async (session: supabaseAuth.SupabaseSession) => {
@@ -110,6 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const session = await supabaseAuth.signIn(trimmed, password);
         await completeLogin(session);
       } catch (e) {
+        // Never the email or the password - only why it was refused.
+        log.warn("sign-in failed", e);
         setState({ status: "loggedOut", error: mapAuthError(e) });
       }
     },
@@ -136,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setState({ status: "loggedOut", info: "Enviamos um e-mail de confirmação. Confirme para entrar." });
         }
       } catch (e) {
+        log.warn("sign-up failed", e);
         setState({ status: "loggedOut", error: mapAuthError(e) });
       }
     },
@@ -158,10 +168,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email: trimmed }),
         });
-        if (!response.ok) throw new Error("dev login failed");
+        if (!response.ok) throw new Error(`dev login failed with HTTP ${response.status}`);
         const { token } = (await response.json()) as { token: string };
         await completeLogin({ accessToken: token, refreshToken: null, expiresAtMillis: Date.now() + 23 * 3600 * 1000 });
-      } catch {
+      } catch (e) {
+        log.warn("dev login failed", e);
         setState({ status: "loggedOut", error: "Login de teste indisponível (backend local rodando com DEV_AUTH_ENABLED?)." });
       }
     },
@@ -186,6 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await supabaseAuth.recover(trimmed);
     } catch (e) {
+      log.warn("password recovery request failed", e);
       if (e instanceof SupabaseAuthError && e.code === "over_email_send_rate_limit") {
         setPasswordReset({ step: "email", error: mapAuthError(e) });
         return;

@@ -6,6 +6,7 @@ import { epochDayToLabel, formatMoney, millisToLocalEpochDay, millisToTimeInput,
 import { loadProfile, saveProfile, syncProfile, type BusinessProfile } from "../lib/profileStore";
 import { amountOk, hasErrors, parseAmount, profileErrors, VALIDATION_MESSAGES } from "../lib/validators";
 import { loadReportColumns } from "../lib/columnPrefs";
+import { log } from "../lib/log";
 import type { ReportColumn } from "../lib/reportLogic";
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from "../components/ui";
 
@@ -40,7 +41,10 @@ export function InvoicesPage() {
   }
 
   useEffect(() => {
-    reload().catch(() => setInvoices([]));
+    reload().catch((e) => {
+      log.warn("loading the invoices screen failed, showing none", e);
+      setInvoices([]);
+    });
   }, []);
 
   if (!invoices) return <Spinner className="h-6 w-6 text-violet-600" />;

@@ -1,6 +1,8 @@
 // localStorage equivalent of the Android client's SessionStore (EncryptedSharedPreferences
 // on that platform; the browser has no equivalent secure-storage primitive available to a
 // plain SPA, so this is the standard tradeoff for a token kept client-side).
+import { log } from "./log";
+
 const KEY = "onsite_session";
 
 export interface StoredSession {
@@ -19,7 +21,10 @@ export function loadSession(): StoredSession | null {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as StoredSession;
-  } catch {
+  } catch (e) {
+    // A corrupted session reads as "never signed in", which is the one silent logout a
+    // user cannot explain - so it says so here.
+    log.warn("stored session could not be parsed, treating it as signed out", e);
     return null;
   }
 }

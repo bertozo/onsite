@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { useCrud } from "../lib/useCrud";
 import type { ClientRequest, JobTypeRequest, MemberDto, PlannedJobRequest, SiteRequest } from "../lib/types";
 import { epochDayToIsoDate, epochDayToLabel, isoDateToEpochDay, minuteOfDayToTimeInput, timeInputToMinuteOfDay, todayEpochDay } from "../lib/format";
+import { logAndFallback } from "../lib/log";
 import { Button, Card, ConfirmDialog, EmptyState, Field, Input, Modal, PageHeader, Select, Spinner, Textarea } from "../components/ui";
 
 const api = {
@@ -26,10 +27,10 @@ export function PlanningPage() {
   const [fromDate, setFromDate] = useState(epochDayToIsoDate(todayEpochDay()));
 
   useEffect(() => {
-    backendApi.listClients().then(setClients).catch(() => undefined);
-    backendApi.listSites().then(setSites).catch(() => undefined);
-    backendApi.listJobTypes().then(setJobTypes).catch(() => undefined);
-    if (isOwner) backendApi.listAccountMembers().then(setMembers).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(logAndFallback("loading clients", undefined));
+    backendApi.listSites().then(setSites).catch(logAndFallback("loading sites", undefined));
+    backendApi.listJobTypes().then(setJobTypes).catch(logAndFallback("loading job types", undefined));
+    if (isOwner) backendApi.listAccountMembers().then(setMembers).catch(logAndFallback("loading account members", undefined));
   }, [isOwner]);
 
   const membersById = useMemo(() => new Map(members.map((m) => [m.userId, m])), [members]);

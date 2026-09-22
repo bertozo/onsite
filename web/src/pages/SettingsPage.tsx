@@ -7,6 +7,7 @@ import { hasErrors, profileErrors } from "../lib/validators";
 import { loadReportColumns, saveReportColumns } from "../lib/columnPrefs";
 import { ColumnPicker } from "../components/ColumnPicker";
 import { epochDayToIsoDate, formatDateTime, isoDateToEpochDay, timeInputToMinuteOfDay, todayEpochDay } from "../lib/format";
+import { log, logAndFallback } from "../lib/log";
 import { Badge, Button, Card, ErrorBanner, Field, InfoBanner, Input, Modal, PageHeader, Select, Spinner } from "../components/ui";
 
 export function SettingsPage() {
@@ -112,7 +113,14 @@ function ReceivedInvitesCard() {
   const [invites, setInvites] = useState<InviteDto[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const reload = () => backendApi.listMyInvites().then(setInvites).catch(() => setInvites([]));
+  const reload = () =>
+    backendApi
+      .listMyInvites()
+      .then(setInvites)
+      .catch((e) => {
+        log.warn("loading my invites failed, showing none", e);
+        setInvites([]);
+      });
   useEffect(() => {
     reload();
   }, []);
@@ -154,7 +162,7 @@ function TeamCard({ accountId }: { accountId: string }) {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    backendApi.listAccountMembers().then(setMembers).catch(() => undefined);
+    backendApi.listAccountMembers().then(setMembers).catch(logAndFallback("loading account members", undefined));
   }, [accountId]);
 
   return (
@@ -200,7 +208,7 @@ function TeamCard({ accountId }: { accountId: string }) {
 function MyConnectionsCard() {
   const [connections, setConnections] = useState<ConnectionDto[]>([]);
   useEffect(() => {
-    backendApi.listMyConnections().then(setConnections).catch(() => undefined);
+    backendApi.listMyConnections().then(setConnections).catch(logAndFallback("loading my connections", undefined));
   }, []);
   if (connections.length === 0) return null;
   return (
@@ -227,10 +235,10 @@ function ReceivedConnectionInvitesCard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const reload = () => backendApi.listMyConnectionInvites().then(setInvites).catch(() => undefined);
+  const reload = () => backendApi.listMyConnectionInvites().then(setInvites).catch(logAndFallback("loading my connection invites", undefined));
   useEffect(() => {
     reload();
-    backendApi.listClients().then(setClients).catch(() => undefined);
+    backendApi.listClients().then(setClients).catch(logAndFallback("loading clients", undefined));
   }, []);
 
   if (invites.length === 0) return null;
@@ -297,7 +305,7 @@ function EmployerConnectionsCard({ accountId }: { accountId: string }) {
   const [detail, setDetail] = useState<ConnectionDto | null>(null);
   const [revoking, setRevoking] = useState<ConnectionDto | null>(null);
 
-  const reload = () => backendApi.listEmployerConnections().then(setConnections).catch(() => undefined);
+  const reload = () => backendApi.listEmployerConnections().then(setConnections).catch(logAndFallback("loading employer connections", undefined));
   useEffect(() => {
     reload();
   }, [accountId]);
@@ -387,7 +395,10 @@ function ConnectionDetailModal({ connection, onClose }: { connection: Connection
   const [ok, setOk] = useState(false);
 
   useEffect(() => {
-    backendApi.listConnectionSessions(connection.id).then(setSessions).catch(() => setSessions([]));
+    backendApi.listConnectionSessions(connection.id).then(setSessions).catch((e) => {
+      log.warn("loading connection sessions failed, showing none", e);
+      setSessions([]);
+    });
   }, [connection.id]);
 
   return (

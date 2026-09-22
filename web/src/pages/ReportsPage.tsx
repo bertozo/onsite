@@ -4,6 +4,7 @@ import type { ClientRequest, SiteRequest, TrackingSessionRequest } from "../lib/
 import { buildCsv, periodRange, summarize, totalsByClient, totalsByJobType, totalsBySite, weeklyTotals, type ReportPeriod } from "../lib/reportLogic";
 import { loadReportColumns } from "../lib/columnPrefs";
 import { formatHours, formatMoney } from "../lib/format";
+import { log, logAndFallback } from "../lib/log";
 import { Card, PageHeader, Select, Spinner } from "../components/ui";
 import { Link } from "react-router-dom";
 
@@ -24,9 +25,12 @@ export function ReportsPage() {
   const [unbilledOnly, setUnbilledOnly] = useState(false);
 
   useEffect(() => {
-    backendApi.listTrackingSessions().then(setSessions).catch(() => setSessions([]));
-    backendApi.listClients().then(setClients).catch(() => undefined);
-    backendApi.listSites().then(setSites).catch(() => undefined);
+    backendApi.listTrackingSessions().then(setSessions).catch((e) => {
+      log.warn("loading sessions failed, showing none", e);
+      setSessions([]);
+    });
+    backendApi.listClients().then(setClients).catch(logAndFallback("loading clients", undefined));
+    backendApi.listSites().then(setSites).catch(logAndFallback("loading sites", undefined));
   }, []);
 
   const ratesByClient = useMemo(() => new Map(clients.map((c) => [c.name, c.hourlyRate])), [clients]);

@@ -3,6 +3,7 @@
 // against it by last-write-wins on updatedAtMillis, the client's own edit time. localStorage
 // is only a per-browser cache so the invoice header renders instantly and offline.
 import { backendApi } from "./backendApi";
+import { log } from "./log";
 import type { ProfileDto } from "./types";
 
 const KEY = "onsite_profile";
@@ -42,7 +43,8 @@ export function loadProfile(): BusinessProfile {
     // Before sync existed the bank details were one free-text field; keep that text visible.
     const bankAccount = parsed.bankAccount ?? parsed.bankDetails ?? "";
     return { ...EMPTY_PROFILE, ...parsed, bankAccount };
-  } catch {
+  } catch (e) {
+    log.warn("cached profile could not be parsed, starting from an empty one", e);
     return EMPTY_PROFILE;
   }
 }
@@ -93,7 +95,8 @@ export async function syncProfile(): Promise<BusinessProfile> {
   let remote: ProfileDto | null;
   try {
     remote = await backendApi.getProfile();
-  } catch {
+  } catch (e) {
+    log.warn("profile could not be fetched, using the cached copy", e);
     return local;
   }
   const hasLocal = local.name.trim() !== "";
@@ -104,7 +107,10 @@ export async function syncProfile(): Promise<BusinessProfile> {
       const winner = fromDto(await backendApi.putProfile(toDto(upload)));
       cache(winner);
       return winner;
-    } catch {
+    } catch (e) {
+      // The invoice header the user just edited is now only on this browser: it will look
+      // wrong on their phone until a later sync succeeds.
+      log.warn("profile upload failed, the cached copy stays local for now", e);
       return local;
     }
   }
@@ -124,7 +130,8 @@ export async function saveProfile(profile: BusinessProfile): Promise<BusinessPro
     const winner = fromDto(await backendApi.putProfile(toDto(stamped)));
     cache(winner);
     return winner;
-  } catch {
+  } catch (e) {
+    log.warn("profile save reached the cache but not the backend", e);
     return stamped;
   }
 }
